@@ -1,7 +1,7 @@
 # PHP 코어 긴급 취약점(PHP2Shell) — Executive Summary
 
 **문서 상태:** 최종 검토본 v2 (기술 검증 반영) · 2026-10-21 23:30 KST
-**기준 커밋:** `windshock/php2shell` `9b427ee` (공개 저장소)
+**기준:** `windshock/php2shell` main 최신 커밋(2026-10-21) · 증적 매니페스트 [docs/evidence-manifest-20261021.sha256](evidence-manifest-20261021.sha256)
 **분석 범위:** PHP 8.4.4·8.5.4 → 수정 8.4.27 교차 검증, 격리된 로컬 랩, 정적 코드 검증 및 공개 연구 대조. 운영 서비스의 침해 여부는 조사 범위에서 제외.
 
 > **한 줄 결론:** PHP 보안팀이 공식 확인한 **Critical RCE 2건**이며 **패치가 유일한 완전한 해결책**이다. 자체 랩에서는 **CVE-2026-109619 계열(잔류 전역 상태) UAF를 재현**하고 **8.4.27에서 소멸**함을 확인했다. 자체적으로 RCE를 재현한 것은 아니다.
@@ -12,7 +12,7 @@
 2. **초기 공개 PoC의 원인 설명은 반박됨:** `post_bytes_processed` 포인터 UAF 주장은 PHP 원본의 `Z_TRY_ADDREF(progress->data)` 참조 유지 동작과 모순된다(8.4.4·8.5.4 동일, 랩 전 조합 ASAN 오류 0).
 3. **대신 확인된 경로:** 요청 파싱 중 (un)serialize가 모듈 RINIT보다 먼저 실행되고, 비정상 종료 시 `BG(serialize)`/`BG(unserialize)` 컨텍스트 정리가 생략되어 **다음 요청이 해제된 메모리를 재사용**한다. 랩 재현: CLI 5/5, Apache mod_php 3/3 + 2/2, 모두 `heap-use-after-free`(ASAN 3종 스택 일치).
 4. **패치 효과 확인:** 8.4.27에서 동일 입력 재실행 결과 **PoC 0/5, ASAN 0, 잔류 0**. 공식 Diff는 `php_basic_early_rinit()`(요청 시작 직후 BG 상태 리셋)과 `PS(in_rfc1867_update)` 기반 직렬화 범위 제한을 추가해 **자체 분석과 동일 메커니즘**을 수정한다.
-5. **WAF 단독 방어 불가:** ModSecurity 2.9.7에서 필드명만 검사하는 룰은 10가지 multipart 변형 중 **2건을 통과시키면서 PHP는 해당 파라미터를 처리**했다(중복 `name`, 추가 파라미터). 문자열 기반 룰은 가상패치가 아니다.
+5. **WAF 단독 방어 불가:** ModSecurity 2.9.7에서 필드명만 검사하는 룰은 10가지 multipart 변형 중 **2건을 통과시키면서 PHP는 해당 파라미터를 처리**했다(중복 `name`, 추가 파라미터). 룰을 보강해도 이 2건은 그대로여서 **실질 위험 감소는 0**이며, 문자열 기반 룰은 가상패치가 아니다.
 6. **미검증:** 자체 RCE 체인, 무인증 원격 단독 진입, 실제 운영 환경의 침해 여부.
 
 ## 2. 공식 사실 vs 자체 검증
@@ -35,7 +35,7 @@
 | 동일 HTTP 입력 비교 | 기준 | `identical` |
 
 **판정:** `patch_effect_confirmed`(랩 범위) · `root_cause_confirmed`(CVE-2026-109619)
-**증적:** SHA-256 매니페스트 2,839개 파일, `verify-evidence` 전체 통과.
+**증적:** SHA-256 매니페스트([docs/evidence-manifest-20261021.sha256](evidence-manifest-20261021.sha256), 3,000+ 파일), `verify-evidence` 통과.
 
 ## 4. 사업 영향과 대응 우선순위
 

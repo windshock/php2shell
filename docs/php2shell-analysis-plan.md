@@ -100,7 +100,7 @@
 
 **advisory는 공식 출처만 허용한다.** `cve`(CVE-YYYY-NNNN 형식), `official_url`(php.net 또는 php-src), `affected_version`, `fixed_version`이 모두 채워져야 하고, `fixed_version`은 요청 버전과 일치해야 한다. 자리표시자 advisory는 거부되므로 **공식 매핑 없이 `regression_difference_observed`가 생성되지 않는다.**
 
-각 단계(빌드·프로파일 4종·PoC·GDB 2모드·`http-compare` 2종·`verify-evidence`)의 종료 코드를 집계하고 `summary.json`에 기록한다. 하나라도 결과를 만들지 못하면 `inconclusive`, 하네스가 실패하면 `PHASE4_FAILED`로 종료한다(`PHASE4_DONE`은 전 단계 성공 시에만). `SKIP_BUILD=1`은 기존 빌드 매니페스트를 재사용한다.
+각 단계(빌드·프로파일 5종·PoC·GDB 2모드·`http-compare` 2종·`verify-evidence`)의 종료 코드를 집계하고 `summary.json`에 기록한다. 하나라도 결과를 만들지 못하면 `inconclusive`, 하네스가 실패하면 `PHASE4_FAILED`로 종료한다. **종료 코드: 0 = 판정 완료, 2 = inconclusive, 1 = 하네스 실패.** `SKIP_BUILD=1`은 기존 빌드 매니페스트를 재사용한다.
 
 ### 7.1 실행 결과 — 8.4.4 → 8.4.27 (2026-10-21 23:15)
 
@@ -266,7 +266,7 @@
 | 8.5.12 교차 검증 | **완료** | PoC 0/5, ASAN 0, identical (findings §6.1) |
 | CVE-2026-109618 고유 경로 | **부분** — 조건·처리 차이 재현, 손상 미재현 | `probe.py --profile oomparse` (findings §6.2) |
 | 109619 다른 변형 | **정적 조사 완료** — 시작 단계 (un)serialize는 session.c가 유일, url_scanner/fatal backtrace는 별도 상태류 | `linux/serialize-sites.sh` (findings §6.3) |
-| 탐지 룰 | **구축·부분 검증** — ModSecurity 6/10, Sigma 3종(실험적) | `linux/detect-rules/` (findings §6.4) |
+| 탐지 룰 | **구축·부분 검증** — ModSecurity 6/10(우회 2건 유지, 통제 아님), Sigma 4종(구조 검증) | `linux/detect-rules/`, `linux/validate-rules.py` (findings §6.4·§6.5) |
 
 ## 10. 산출물 목록
 
@@ -283,7 +283,8 @@
 11. `linux/build-jit.sh`, `linux/jit-compare.sh` — opcache/JIT 차등 비교.
 12. `linux/patch-diff.sh` — 수정 릴리스 Diff 수집(원인 일치 확인).
 13. `linux/detect-rules/` — ModSecurity·Sigma 탐지 룰과 검증 기록.
-14. `linux/serialize-sites.sh` — 시작 단계 (un)serialize 호출지 정적 조사.
+14. `linux/validate-rules.py` — 룰 구조 검증(UUID·AND/OR·condition 참조).
+15. `linux/serialize-sites.sh` — 시작 단계 (un)serialize 호출지 정적 조사.
 5. `var/linux-evidence/evidence/probe-*/`, `probe-gdb-*/` — 프로브 실행 증적.
 6. `var/linux-evidence/evidence-manifest.sha256` — 증적 해시 매니페스트.
 7. `docs/php2shell-analysis-findings.md` — 정적·동적 분석 결과 및 주장별 판정표.

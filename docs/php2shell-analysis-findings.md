@@ -579,7 +579,7 @@ PHPAPI void php_basic_early_rinit(void)
 4. 공식 완화책(공지): 109618 — `memory_limit=-1`, 낮은 `post_max_size`, 프록시/컨테이너 수준 입력 한도; 109619 — `session.upload_progress.enabled=0` + 전 워커 재시작, PHP 8.5는 `fatal_error_backtraces=0`, 초기화 전 진단을 내는 잘못된 설정 제거. 이는 우리 실험(업로드 진행 경로·OOM 조건)과 방향이 일치한다.
 
 
-## 6. P0/P1 잔여 항목 (2026-10-22 00:05)
+## 6. P0/P1 잔여 항목 (커밋 b56e745, 2026-10-21)
 
 ### 6.1 8.5.12 교차 검증 — 완료
 
@@ -616,9 +616,23 @@ PHPAPI void php_basic_early_rinit(void)
 | 룰셋 | 차단 | PHP 도달 | 비고 |
 |---|---|---|---|
 | 단순 `ARGS_NAMES @streq`(기존) | 5/10 | 2 | 기준선 |
-| `ARGS_NAMES @contains` + `FILES_NAMES` | **6/10** | 2 | `filename_first` 추가 차단 |
+| `ARGS_NAMES @streq` + `FILES_NAMES @streq` | 6/10 | 2 | `filename_first` 차단 추가. 단 이 변형은 PHP 미도달 → **실질 위험 감소 0** |
 | `MULTIPART_PART_HEADERS`(@contains) | 실효 없음 | 2 | 2.9.7에서 중복/추가 파라미터 미탐(실측) |
 | `REQUEST_BODY` 체인 | 실효 없음 | 2 | multipart 처리 후 본문 미노출 |
 
 - Sigma 3종(실험적): ① 중복·추가 파라미터를 가진 업로드 진행 필드, ② 파싱 중 OOM fatal, ③ multipart 직후 FPM 워커 종료(신호/exit 70). **SIEM 실행 검증은 미실시**.
 - 결론: 이름 기반 룰은 6/10이 한계다. 나머지는 **원문 바이트를 보는 프록시/게이트웨이** 또는 `session.upload_progress.enabled=0`로 닫아야 한다.
+
+### 6.5 검토 반영 — 판정 정확도 수정
+
+| 지적 | 수정 | 검증 |
+|---|---|---|
+| Sigma `id`가 UUID가 아님 | UUIDv4로 교체 | `linux/validate-rules.py` **PASS** |
+| Sigma 목록이 OR로 평가됨 | 필드를 매핑으로 바꿔 AND 강제, 조건을 `selection_a and (b or c)`로 명시 | 구조 검증 PASS (sigma-cli·SIEM 미실행) |
+| 워커 종료 규칙이 상관분석을 주장 | 규칙 3·4로 분리하고 “SIEM에서 join” 명시 | 문서화 |
+| `phase4.sh`가 inconclusive를 성공 처리 | 프로브 rc 전체 집계 + `inconclusive` 전파 + 종료 코드 0/2/1 | **음성 대조 exit=2** (`PHASE4_INCONCLUSIVE`) |
+| WAF “개선”이 실질 위험을 줄이지 않음 | `@contains`→`@streq`(오탐 축소), README에 “통제 아님·위험 감소 0” 명시 | 6/10 차단, **PHP 도달 2건 유지** |
+| P14가 워커 생존을 오판 | PID before/after·재기동·ASAN 유형·응답 스니펫 기록 | 8.4.4: 502, PID 413→436(재기동) / 8.4.27: 400, PID 443→443 |
+| 문서 시각·커밋 불일치 | §6 머리글을 커밋 기준으로, Executive Summary는 해시 대신 매니페스트 참조 | — |
+
+**남은 한계:** Sigma 규칙은 구조 검증만 거쳤고 SIEM 변환·실행은 미실시다. ModSecurity 룰은 여전히 검증된 우회 2건을 막지 못하므로 **운영 차단 통제로 배포하면 안 된다**.

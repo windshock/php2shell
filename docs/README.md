@@ -21,6 +21,7 @@ PHP2Shell 분석 산출물의 읽는 순서와 역할입니다.
 | PoC(트리거) | `linux/poc-bgserialize.py` |
 | SAPI 랩 | `linux/build-apache.sh`, `linux/apache-lab.sh`, `linux/apache-poc-matrix.sh` |
 | WAF 대조 | `linux/waf-lab.sh`, `linux/waf-compare.py` |
+| 탐지 룰 | `linux/detect-rules/`, `linux/validate-rules.py` |
 | Fuzzer / JIT | `linux/build-fuzzer.sh`, `linux/fuzz-smoke.sh`, `linux/build-jit.sh`, `linux/jit-compare.sh` |
 | 패치 검증 | `linux/phase4.sh`, `linux/patch-diff.sh`, `linux/verify-evidence.py` |
 

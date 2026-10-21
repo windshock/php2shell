@@ -713,6 +713,7 @@ def probe_oom_parse(lab, probes):
     Observation only: records ASAN reports and worker state.
     """
     lab.request('/session')
+    pid_before = worker_pid(lab.out)
     pairs = []
     for index in range(30000):
         pairs.append('a[%d][k]=v' % index)
@@ -735,25 +736,35 @@ def probe_oom_parse(lab, probes):
     match = re.match(rb'HTTP/1\.[01] (\d+)', data)
     if match:
         status = int(match.group(1))
+    snippet = data[:160].decode('latin-1', 'replace').replace('\r', ' ').replace('\n', ' ')
     time.sleep(0.5)
     log = lab.php_error_log()
     oom = 'Allowed memory size of' in log
+    pid_after = worker_pid(lab.out)
     health = None
     try:
         health = lab.request('/health', timeout=5)
     except Exception as exc:
         health = str(exc)
+    reports = lab.asan_reports()
+    asan_detail = None
+    if reports:
+        text = Path(reports[-1]).read_text(errors='replace')
+        asan_detail = dict(is_heap_use_after_free='heap-use-after-free' in text,
+                           first_frame=next((line.strip() for line in text.splitlines()
+                                             if 'php_' in line and ' in ' in line), ''))
     probes.append(dict(
         name='P14_oom_during_post_parse',
         body_bytes=len(body), parameter_count=len(pairs),
-        response_status=status,
+        response_status=status, response_snippet=snippet,
         oom_during_parse=oom,
-        asan_reports=len(lab.asan_reports()),
+        asan_reports=len(reports), asan_detail=asan_detail,
+        worker_pid_before=pid_before, worker_pid_after=pid_after,
+        worker_restarted=(pid_before != pid_after),
         worker_alive_after=(isinstance(health, dict) and health.get('ok') is True),
-        worker_pid=worker_pid(lab.out),
         verdict=dict(oom_observed=oom,
-                     memory_error_observed=bool(lab.asan_reports()),
-                     worker_survived=(isinstance(health, dict) and health.get('ok') is True))))
+                     memory_error_observed=bool(asan_detail and asan_detail['is_heap_use_after_free']),
+                     worker_survived_same_process=(pid_before is not None and pid_before == pid_after))))
 
 
 PROFILES = {

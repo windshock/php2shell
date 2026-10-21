@@ -8,7 +8,7 @@
 # advisories are refused, so a difference can never be labelled a regression
 # without an official mapping.
 #
-# Exit codes: 0 determinate verdict, 1 harness failure, 2 inconclusive.
+# Exit codes: 0 determinate verdict, 2 inconclusive, 1 harness failure.
 set -u
 ver=${1:?usage: phase4.sh <fixed-version> <advisory.json> [asan|normal]}
 advisory=${2:?usage: phase4.sh <fixed-version> <advisory.json> [asan|normal]}
@@ -66,6 +66,7 @@ run_step probe_standard python3 linux/probe.py --version "$ver" --flavor "$flavo
 run_step probe_oom      python3 linux/probe.py --version "$ver" --flavor "$flavor" --allocator tracked --buffering off --profile oom
 run_step probe_parts    python3 linux/probe.py --version "$ver" --flavor "$flavor" --allocator tracked --buffering off --profile parts
 run_step probe_cleanup  python3 linux/probe.py --version "$ver" --flavor "$flavor" --allocator tracked --buffering off --profile cleanup
+run_step probe_oomparse python3 linux/probe.py --version "$ver" --flavor "$flavor" --allocator tracked --buffering off --profile oomparse
 
 # PoC "not reproduced" is a legitimate patched outcome, so its rc is recorded but not fatal.
 run_step poc python3 linux/poc-bgserialize.py --version "$ver" --iterations 5
@@ -83,21 +84,26 @@ run_step verify python3 linux/verify-evidence.py
 
 # ---------- aggregate verdict ----------
 python3 - "$out" "$ver" "$flavor" "$advisory" "${STEP_RC[poc]}" "${STEP_RC[gdb_serialize]}" \
-         "${STEP_RC[gdb_unserialize]}" "${STEP_RC[compare_progress]}" "${STEP_RC[compare_oom]}" "$T0" <<'PY'
+         "${STEP_RC[gdb_unserialize]}" "${STEP_RC[compare_progress]}" "${STEP_RC[compare_oom]}" \
+         "${STEP_RC[probe_standard]}" "${STEP_RC[probe_oom]}" "${STEP_RC[probe_parts]}" \
+         "${STEP_RC[probe_cleanup]}" "${STEP_RC[probe_oomparse]}" "$T0" <<'PY'
 import glob, json, os, sys
-out, ver, flavor, advisory, poc_rc, gdbs_rc, gdbu_rc, cmp1_rc, cmp2_rc, t0 = sys.argv[1:]
+(out, ver, flavor, advisory, poc_rc, gdbs_rc, gdbu_rc, cmp1_rc, cmp2_rc,
+ p_std, p_oom, p_parts, p_cleanup, p_parse, t0) = sys.argv[1:]
 t0 = float(t0)
+probe_rcs = dict(standard=int(p_std), oom=int(p_oom), parts=int(p_parts),
+                 cleanup=int(p_cleanup), oomparse=int(p_parse))
 adv = json.load(open(advisory, encoding='utf-8-sig'))
-summary = dict(verdict='inconclusive', advisory=adv, steps={})
+summary = dict(verdict='inconclusive', advisory=adv, steps={}, probes={})
 
 def fresh(pattern):
-    """Newest path matching pattern, created/modified after T0."""
     items = [p for p in glob.glob(pattern) if os.path.getmtime(os.path.dirname(p) if p.endswith('result.json') else p) >= t0]
     return sorted(items)[-1] if items else None
 
 def load(path):
     return json.load(open(path, encoding='utf-8-sig')) if path and os.path.exists(path) else None
 
+summary['probes'] = probe_rcs
 summary['steps']['poc_rc'] = int(poc_rc)
 poc = load(fresh('/home/phplab/php-lab/evidence/poc-*-%s-tracked/result.json' % ver))
 if poc:
@@ -134,12 +140,19 @@ summary['compare_progress'] = cmp_status('progress-lifecycle')
 summary['compare_oom'] = cmp_status('oom-residue')
 
 statuses = (summary['compare_progress'], summary['compare_oom'])
-harness_ok = (int(gdbs_rc) == 0 and int(gdbu_rc) == 0
-              and int(cmp1_rc) in (0, 2) and int(cmp2_rc) in (0, 2)
-              and all(statuses))
+# Every required step must have run: probes, gdb modes, verify (already fatal), comparisons.
+all_probes_ok = all(rc == 0 for rc in probe_rcs.values())
+comparisons_ok = (int(cmp1_rc) in (0, 2) and int(cmp2_rc) in (0, 2)
+                  and all(statuses) and 'inconclusive' not in statuses)
+harness_ok = (all_probes_ok and int(gdbs_rc) == 0 and int(gdbu_rc) == 0 and comparisons_ok)
+summary['steps']['all_probes_ok'] = all_probes_ok
+summary['steps']['comparisons_ok'] = comparisons_ok
+
 if not harness_ok:
     summary['verdict'] = 'inconclusive'
-    summary['reason'] = 'one or more comparison steps did not produce a result'
+    summary['reason'] = ('probe or comparison step did not complete: probes=%s '
+                         'gdbs=%s gdbu=%s compare=%s/%s' %
+                         (probe_rcs, gdbs_rc, gdbu_rc, summary['compare_progress'], summary['compare_oom']))
 elif 'regression_difference_observed' in statuses or 'difference_observed' in statuses:
     summary['verdict'] = 'regression_difference_observed'
 else:
@@ -159,6 +172,14 @@ PY
 
 rc=$?
 if [ "$rc" -ne 0 ]; then fail "aggregation failed"; fi
-echo "PHASE4_DONE log=$log"
-echo "LOG=$log"
-exit 0
+
+verdict=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1],encoding='utf-8-sig'))['verdict'])" "$out/summary.json")
+echo "step rc: $(for k in "${!STEP_RC[@]}"; do printf '%s=%s ' "$k" "${STEP_RC[$k]}"; done)"
+case "$verdict" in
+  no_difference_observed|regression_difference_observed)
+    echo "PHASE4_DONE verdict=$verdict log=$log"; echo "LOG=$log"; exit 0 ;;
+  inconclusive)
+    echo "PHASE4_INCONCLUSIVE log=$log"; echo "LOG=$log"; exit 2 ;;
+  *)
+    fail "unexpected verdict: $verdict" ;;
+esac

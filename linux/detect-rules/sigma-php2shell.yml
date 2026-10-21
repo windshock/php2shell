@@ -1,10 +1,11 @@
-title: PHP upload progress field used with multipart duplicate or extra parameters
-id: 8f1c2a10-php2shell-0001
+title: PHP upload progress field with duplicate or extra multipart parameters
+id: 4e1c7a52-9b3d-4a1e-8f27-6c5d2b9e1a41
 status: experimental
 description: >
   Detects multipart POST bodies that carry PHP_SESSION_UPLOAD_PROGRESS while the
-  part header also contains duplicate or extra parameters. In the lab this shape
-  bypassed name-based WAF rules while PHP still treated it as the progress field.
+  part header also contains a duplicate or extra name parameter. In the lab this
+  shape bypassed name-based WAF rules while PHP still used the field as the
+  upload-progress key. Requires raw request-body logging.
 references:
   - https://github.com/windshock/php2shell/blob/main/docs/php2shell-analysis-findings.md
 author: php2shell lab
@@ -15,58 +16,64 @@ detection:
   selection_method:
     cs-method: POST
   selection_body:
-    - request_body|contains: 'PHP_SESSION_UPLOAD_PROGRESS'
-    - cs-content-type|contains: 'multipart/form-data'
-  selection_shape:
-    - request_body|re: 'name\s*=\s*"[^"]+"\s*;\s*name\s*='
-    - request_body|re: '(?i)content-disposition:[^\r\n]*;\s*\w+\s*=\s*"[^"]*"\s*;\s*name\s*='
-  condition: selection_method and selection_body and selection_shape
+    request_body|contains: 'PHP_SESSION_UPLOAD_PROGRESS'
+    cs-content-type|contains: 'multipart/form-data'
+  selection_duplicate:
+    request_body|re: 'name\s*=\s*"[^"]+"\s*;\s*name\s*='
+  selection_extra:
+    request_body|re: '(?i)content-disposition:[^\r\n]*;\s*\w+\s*=\s*"[^"]*"\s*;\s*name\s*='
+  condition: selection_method and selection_body and (selection_duplicate or selection_extra)
 fields:
   - c-ip
   - cs-uri-stem
   - cs-content-type
 falsepositives:
-  - Applications that legitimately repeat form field names in one part (rare)
+  - Applications that legitimately repeat form field names inside one part (rare)
 level: high
+
 ---
-title: PHP fatal memory exhaustion during request parsing
-id: 8f1c2a10-php2shell-0002
+title: PHP fatal memory exhaustion while parsing request input
+id: 7b2d9f10-3c48-4e6a-9d15-2f8b7c0a6e33
 status: experimental
 description: >
-  Detects "Allowed memory size ... exhausted" fatals that occur while PHP is
-  parsing request input (CVE-2026-109618 direction). Correlate with a multipart
-  or large form POST within the same second.
+  Detects memory-limit fatals in PHP logs. Correlate the timestamp with a large
+  or multipart POST to separate parsing-time exhaustion (CVE-2026-109618
+  direction) from ordinary long-running scripts.
 logsource:
   product: php
   service: fpm
 detection:
-  selection:
-    - message|contains: 'Allowed memory size of'
-    - message|contains: 'exhausted'
-  condition: selection
+  selection_limit:
+    message|contains: 'Allowed memory size of'
+  selection_exhausted:
+    message|contains: 'exhausted'
+  condition: selection_limit and selection_exhausted
 fields:
   - host
   - pool
   - pid
 falsepositives:
-  - Legitimate memory-limit hits in long-running scripts
+  - Legitimate memory-limit hits inside application code
 level: medium
+
 ---
-title: PHP-FPM worker terminated after a multipart request
-id: 8f1c2a10-php2shell-0003
+title: PHP-FPM worker terminated (signal or exit code 70)
+id: a3f5c821-6d74-4b09-8e2c-1d9f4a7b3c58
 status: experimental
 description: >
-  Detects worker death (signal or exit code 70) shortly after a multipart POST.
-  In the lab, request-startup failure terminates the FPM worker with code 70
-  (allocation/OOM paths), which is a strong availability signal.
+  Detects worker death recorded by the FPM master. In the lab, a failure during
+  request startup terminates the worker with code 70. This rule is one side of a
+  correlation: join it with a multipart POST rule (below) on host+pool within a
+  few seconds in the SIEM; Sigma itself does not express joins.
 logsource:
   product: php
   service: fpm
 detection:
-  selection_exit:
-    - message|contains: 'exited with code 70'
-    - message|contains: 'exited on signal'
-  condition: selection_exit
+  selection_code:
+    message|contains: 'exited with code 70'
+  selection_signal:
+    message|contains: 'exited on signal'
+  condition: selection_code or selection_signal
 fields:
   - host
   - pool
@@ -74,3 +81,28 @@ fields:
 falsepositives:
   - Deploys, OOM killer, unrelated crashes
 level: high
+
+---
+title: Multipart POST to a PHP endpoint (correlation counterpart)
+id: c9e4b7a3-2f61-4d8c-9a47-5b1e3f8d2c06
+status: experimental
+description: >
+  Counterpart for joining with the worker-termination rule: flags multipart POST
+  requests to PHP-handled paths. Join on host and a short time window in the SIEM;
+  tune the URI condition to the deployment.
+logsource:
+  category: webserver
+detection:
+  selection_method:
+    cs-method: POST
+  selection_type:
+    cs-content-type|contains: 'multipart/form-data'
+  selection_path:
+    cs-uri-stem|endswith: '.php'
+  condition: selection_method and selection_type and selection_path
+fields:
+  - c-ip
+  - cs-uri-stem
+falsepositives:
+  - Normal file uploads (expected high volume; use only as a correlation input)
+level: low
