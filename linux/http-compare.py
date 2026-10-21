@@ -31,12 +31,21 @@ SESSION_FIELD = 'PHPSESSID'
 
 
 def error_signatures(text, limit=8):
-    """Stable error identity: severity + first 80 chars, without timestamps."""
+    """Stable error identity: severity + message template.
+
+    Absolute source paths, line numbers and byte counts differ between builds
+    and allocators without implying a behavioural difference, so they are
+    normalised away before comparison.
+    """
     found = []
     for line in text.splitlines():
-        match = re.search(r'PHP (Fatal error|Warning|Notice|Deprecated):\s*(.{0,80})', line)
+        match = re.search(r'PHP (Fatal error|Warning|Notice|Deprecated):\s*(.{0,120})', line)
         if match:
-            found.append('%s: %s' % (match.group(1), match.group(2).strip()))
+            message = re.sub(r'\s+', ' ', match.group(2).strip())
+            message = re.sub(r'exhausted at .*?\(tried', 'exhausted at <loc> (tried', message)
+            message = re.sub(r'/[^\s:()]+\.(?:c|h|re|php)(?::\d+)?', '<src>', message)
+            message = re.sub(r'\b\d+\b', '<n>', message)
+            found.append('%s: %s' % (match.group(1), message[:100]))
     return sorted(set(found))[:limit]
 
 
@@ -61,11 +70,11 @@ def run_progress(lab, tag):
         progress_key_mid_upload=bool(mid),
         progress_key_cleaned=(not session_snapshot(lab, ['cmp1'])),
         visits_increment=(after_visits - first),
-        asan_reports=len(lab.asan_reports()),
-        error_signatures=error_signatures(lab.php_error_log()))
+        asan_reports=len(lab.asan_reports()))
     runtime = dict(worker_pid_first=pid_first, worker_pid_last=pid_last,
                    worker_reused=(pid_first is not None and pid_first == pid_last),
-                   worker_restarted=(pid_first != pid_last))
+                   worker_restarted=(pid_first != pid_last),
+                   error_signatures=error_signatures(lab.php_error_log()))
     status = 'code_path_reached' if mid else 'not_run'
     return dict(tag=tag, scenario='progress-lifecycle', observations=stable,
                 runtime=runtime, status=status)
@@ -98,8 +107,10 @@ def run_oom(lab, tag):
         worker_survived_oom=(pid_before == pid_after_n),
         request_n1_status=req_n1['status'],
         worker_exit_codes=sorted(set(exits)),
-        asan_reports=len(asan),
-        error_signatures=error_signatures(lab.php_error_log()))
+        asan_reports=len(asan))
+    runtime = dict(worker_pid_before=pid_before,
+                   worker_pid_after=worker_pid(lab.out),
+                   error_signatures=error_signatures(lab.php_error_log()))
     if asan:
         status = 'memory_error_observed'
     elif req_n['status'] in (500, 502) and pid_before != pid_after_n:

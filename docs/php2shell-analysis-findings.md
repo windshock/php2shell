@@ -166,7 +166,7 @@ php_session_flush(1);                           /* 세션 인코딩·기록 — 
 ### 2.6 P7 — multipart 폼 필드 세션 ID (확인, B)
 
 - `session.use_only_cookies=On` 상태에서 **쿠키 없이** 폼 필드 `PHPSESSID=<기존 sid>` + progress 필드 전송 → 해당 세션 파일에 진행 키가 기록됨(`form_field_sid_honored=true`). 코드 분석(S7)과 일치하며, ikow 주장·PR #22113의 현상이 재현된다.
-- `use_strict_mode=Off`(lax 프로파일)에서는 **존재하지 않는 공격자 지정 이름의 세션 파일이 생성**됨(`sess_p7b8b29a2d0fe764fa2`, `file_created=true`). 관측 시점 크기는 0 — `cleanup=On`이 업로드 종료 시 진행 키를 지웠기 때문이다. `cleanup=Off`에서 내용이 잔류하는지는 후속 확인 항목.
+- `use_strict_mode=Off`(lax 프로파일)에서는 **존재하지 않는 공격자 지정 이름의 세션 파일이 생성**됨(`sess_p7b8b29a2d0fe764fa2`, `file_created=true`). 관측 시점 크기는 0 — `cleanup=On`이 업로드 종료 시 진행 키를 지웠기 때문이다. `cleanup=Off`에서 내용이 잔류하는 것은 별도로 확인했다(§4.9b).
 
 ### 2.7 P6/P8 — `BG(serialize)` 요청 간 잔류와 재사용
 
@@ -376,8 +376,8 @@ ASAN 스택도 CLI 서버와 동일하다: 할당 `ps_srlzr_encode_php` session.
 | P1 `http-compare.py` `worker_reused` | PID 최초·최종 비교(`worker_pid_first/last`, `worker_restarted`)로 교체 | 음성 대조 `identical` 재확인 |
 | P1 비교 판정 남용 | `--advisory` 없으면 `difference_observed`, 공식 영향/수정 버전이 일치할 때만 `regression_difference_observed` | 음성/양성 대조 |
 | P1 PoC 워밍업 세션 미유지 | 쿠키 자를 사용해 동일 세션 2회 왕복, 방문 카운터 증가 검증(`session_roundtrip_ok`) | 각 회차 기록 |
-| P1 매니페스트 BOM | UTF-8(BOM 없음)으로 재생성, 검증기가 BOM을 오류로 판정 | 첫 바이트 `00 62`, 1044개 해시 일치 |
-| P1 원본 증적 부재 | `docs/evidence-manifest-20261021.sha256`(1044개) + `verify-evidence.py`로 재검증 절차 제공 | 전체 해시 검사 통과 |
+| P1 매니페스트 BOM | UTF-8(BOM 없음)으로 재생성, 검증기가 BOM을 오류로 판정 | 첫 바이트 `00 62`, 1,992개 해시 일치(최신 기준) |
+| P1 원본 증적 부재 | `docs/evidence-manifest-20261021.sha256` + `verify-evidence.py`로 재검증 절차 제공 | 전체 해시 검사 통과 |
 
 ### 4.8 `BG(unserialize)` 재현과 multipart 종료 대조 (2026-10-21 22:55 추가)
 
@@ -497,7 +497,84 @@ PHP 측은 `cleanup=Off`로 진행 키를 유지해, 요청 후 세션 파일에
 | WAF vs PHP 파싱 차이 랩(WAFFLED) | **완료** — Apache+ModSecurity 2.9.7, 10변형 중 2건 규칙 누락(§4.10) |
 | FlowFusion/공식 Fuzzer 통합 | **부분 완료** — 공식 `php-fuzz-unserialize` 빌드·60초 스모크(485,434회, crash 0). FlowFusion 변형·축소 미통합(§4.11) |
 | ZendDiff식 JIT/non-JIT 비교 | **부분 완료** — 출력 수준 3모드 동일(§4.12), 내부 상태 프로빙 미구현 | `linux/jit-compare.sh` |
-| `cleanup=Off` 세션 파일 내용 잔류 | `not_run` | 후속 1회 실행으로 확인 가능 |
-| 공식 패치 전후 비교 | `not_run` | 패치 미공개(23:00 KST 예정) |
+| `cleanup=Off` 세션 파일 내용 잔류 | **완료** — 키·done 유지 시연(§4.9b) | `probe.py --profile cleanup` |
+| 공식 패치 전후 비교 | **완료** — 8.4.27에서 PoC 0/5, ASAN 0, HTTP identical (§5) | `linux/phase4.sh` |
 | HTTP 입력만으로 OOM(Arm 단계) | **측정 완료(음성)** | 901필드×4KB에서 OOM 없음(§4.9a); 더 큰 body·다른 SAPI는 미실시 |
+
+## 5. Phase 4 — 공식 패치(8.4.27) 전후 비교 (2026-10-21 23:15)
+
+### 5.1 공식 발표 사실
+
+PHP 보안팀은 2026-10-21 **PHP 8.5.12 / 8.4.27 / 8.3.36 / 8.2.35**를 공개하며 두 Critical 취약점을 명시했다(공식 공지 인용).
+
+- **CVE-2026-109618 (GHSA-w8hw-w9fx-j79w) — RCE via OOM corruption**: “out-of-memory handling can interrupt PHP while internal request data is only partially initialized. Request cleanup may then treat the invalid data as valid.”
+- **CVE-2026-109619 (GHSA-6wmf-4rv5-p3rp) — RCE via stale global state**: “request-owned internal state can survive after its backing memory has been freed. A later request handled by the same worker may use that stale state before normal initialization resets it.”
+- 위험도는 **mod_php에서 최고**로 표시되며, “unauthenticated request can trigger the attack before any application code runs”라고 명시했다.
+
+이는 이 보고서가 독립적으로 재현한 두 경로와 정확히 대응한다.
+
+| 우리 분석 | 공식 CVE |
+|---|---|
+| Bug S — `BG(serialize)` 잔류·재사용(§2.7, §4.5) | **CVE-2026-109619** (stale global state) |
+| Bug U — `BG(unserialize)` 잔류·재사용(§4.8a) | **CVE-2026-109619** (동일 계열) |
+| 파싱 중 OOM bailout → 컨텍스트 정리 누락(§2.7, §4.8) | **CVE-2026-109618** (OOM corruption) |
+
+### 5.2 공식 Diff가 가리키는 원인 (8.4.4 → 8.4.27)
+
+`linux/patch-diff.sh`로 9개 파일을 비교했다(증적: `evidence/patch-diff-8.4.4-8.4.27.txt`). 변경 hunk 수: `Zend/zend_alloc.c` 44, `main/rfc1867.c` 34, `var_unserializer.re` 22, `ext/session/session.c` 21, `main/main.c` 14, `basic_functions.c` 14, `var.c` 13, `php_variables.c` 10, `php_session.h` 1.
+
+핵심 변경 1 — **BG 상태 리셋을 요청 시작 직후로 이동**:
+
+```c
+/* Called from php_request_startup(), before any request data is processed. */
+PHPAPI void php_basic_early_rinit(void)
+{
+    /* The session upload progress handler (un)serializes the session and
+     * registers the session id with the URL rewriter from
+     * php_hash_environment(), before RINIT. */
+    BG(serialize_lock) = 0;
+    memset(&BG(serialize), 0, sizeof(BG(serialize)));
+    memset(&BG(unserialize), 0, sizeof(BG(unserialize)));
+    php_url_scanner_early_rinit();
+}
+```
+
+이 주석은 이 보고서 §2.7·§4.8의 분석(“파싱 중 직렬화가 RINIT보다 먼저 실행되어 이전 요청의 잔류 상태를 본다”)과 **문장 단위로 일치**한다.
+
+핵심 변경 2 — **rfc1867 경로의 직렬화 범위 제한**: `PS(in_rfc1867_update)` 플래그를 추가하고, 업로드 진행 콜백이 (un)serialize하는 동안 `php_var_unserialize_set_incomplete_classes_only()` / `php_var_serialize_set_incomplete_classes_only()`를 켜서 **미완성 클래스만** 다루도록 했다(`session.c`, `var.c`·`var_unserializer.re` 신규 함수). 즉 파싱 단계에서 사용자 객체·소멸자 경로가 개입하지 못하게 했다.
+
+핵심 변경 3 — **OOM 처리 경로**: `zend_alloc.c`(44 hunk), `main.c`, `rfc1867.c`가 함께 변경되어, 메모리 한도 초과로 요청 초기화가 중단될 때의 정리 동작이 바뀌었다(CVE-2026-109618 대응으로 해석).
+
+### 5.3 8.4.27에서 동일 입력 재실행 결과
+
+`linux/phase4.sh 8.4.27 var/advisory-8.4.27.json` (공식 advisory 검증 통과, 빌드 재사용):
+
+| 단계 | 8.4.4 (취약) | 8.4.27 (수정) |
+|---|---|---|
+| PoC `poc-bgserialize.py` | 5/5 UAF | **0/5, ASAN 보고 없음** |
+| GDB serialize 잔류 | `level=1` → 재사용 → UAF | **잔류 없음**(levels 전부 0) |
+| GDB unserialize 잔류 | `level=1` → 재사용 → UAF | **잔류 없음** |
+| http-compare progress | 기준 | `identical` |
+| http-compare oom-residue | 워커 exit 70, 502 | `identical` (동일 동작) |
+| verify-evidence | passed | passed |
+
+**최종 판정: `no_difference_observed` + `patch_effect_signal = "memory error no longer reproduced in this lab (poc 0/5, no ASAN residue)"`.**
+
+### 5.4 판정 사다리 적용
+
+| 조건 | 판정 | 근거 |
+|---|---|---|
+| 공식 CVE 영향·수정 버전 확인 | 충족 | 8.4.27 공지·GHSA |
+| 공식 패치가 원인 코드를 수정 | 충족 | `php_basic_early_rinit()` + `in_rfc1867_update` 제한 |
+| 동일 입력에서 오류 소멸 | 충족 | PoC 0/5, ASAN 0, 잔류 0 |
+| **`patch_effect_confirmed`** | **성립(랩 범위)** | 위 3개 충족. 단 “우리 PoC 조건에서”라는 한정 |
+| `root_cause_confirmed` (CVE-2026-109619) | **성립** | 공지 문구 + Diff + 재현·소멸이 동일 메커니즘 지목 |
+| `root_cause_confirmed` (CVE-2026-109618) | 부분 | OOM 처리 변경은 확인했으나 109618 고유의 손상 경로를 별도 재현하지 않음 |
+
+### 5.5 한계 (과장 금지)
+
+1. 이번 확인은 **우리 PoC 조건**(CLI/Apache, ASAN+tracked, 세션 파일 위조, OOM 유도)에서의 소멸이다. 공지가 말한 “무인증 원격 RCE”를 재현하거나 검증한 것이 아니다.
+2. 8.4.27 빌드는 `--disable-all` 최소 구성이며, 배포판 패키지·다른 확장 구성은 별도 확인이 필요하다.
+3. `patch_effect_confirmed`는 랩 판정이고, 운영 배포 판정은 공식 패키지·회귀 테스트·벤더 백포트 확인으로 별도 수행해야 한다.
+4. 공식 완화책(공지): 109618 — `memory_limit=-1`, 낮은 `post_max_size`, 프록시/컨테이너 수준 입력 한도; 109619 — `session.upload_progress.enabled=0` + 전 워커 재시작, PHP 8.5는 `fatal_error_backtraces=0`, 초기화 전 진단을 내는 잘못된 설정 제거. 이는 우리 실험(업로드 진행 경로·OOM 조건)과 방향이 일치한다.
 

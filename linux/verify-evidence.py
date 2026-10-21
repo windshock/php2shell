@@ -86,7 +86,12 @@ def check_gdb(root):
                      else 'serialize_context_reuse_request_indexes')
         problems = []
         if oom is None:
-            problems.append('oom request not identified from recorded transitions')
+            # No OOM inside the serialize/unserialize window is a legitimate
+            # negative (e.g. fixed build), unless reuse or ASAN is still present.
+            if data.get('asan_reports'):
+                problems.append('asan report present but no oom request was identified')
+            if verdict.get(reuse_key):
+                problems.append('context reuse recorded without an identified oom request')
         else:
             if not (0 <= oom < len(levels)):
                 problems.append('oom index out of range')
@@ -100,7 +105,9 @@ def check_gdb(root):
                     and data.get('asan_reports'):
                 problems.append('asan report present but no post-oom reuse recorded')
         results.append(dict(mode=mode, status='passed' if not problems else 'failed',
-                            result=str(path), oom_request_index=oom,
+                            result=str(path),
+                            build_version=(data.get('build') or {}).get('version'),
+                            oom_request_index=oom,
                             reuse_request_index=reuse, levels=levels, problems=problems))
         problems_all.extend(problems)
     return dict(status='passed' if not problems_all else 'failed', modes=results)
@@ -140,11 +147,21 @@ def main():
     summary = dict(scope='evidence audit; fails on inconsistency',
                    poc=check_poc(args.root), gdb=check_gdb(args.root),
                    manifest=check_manifest(args.root))
-    summary['status'] = ('passed' if all(part['status'] in ('passed', 'not_run')
-                                         for part in (summary['poc'], summary['gdb'], summary['manifest']))
-                         else 'failed')
+    parts = (summary['poc'], summary['gdb'], summary['manifest'])
+    checked = [part for part in parts if part['status'] != 'not_run']
+    if not checked:
+        summary['status'] = 'not_run'
+        summary['reason'] = 'no evidence was found to audit'
+    elif any(part['status'] == 'failed' for part in parts):
+        summary['status'] = 'failed'
+    else:
+        summary['status'] = 'passed'
     print(json.dumps(summary, indent=2))
-    return 0 if summary['status'] == 'passed' else 1
+    if summary['status'] == 'passed':
+        return 0
+    if summary['status'] == 'not_run':
+        return 2
+    return 1
 
 
 if __name__ == '__main__':

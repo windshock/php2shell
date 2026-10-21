@@ -1,6 +1,6 @@
-# PHP2Shell 취약점 확인·분석·E2E 테스트 계획 (패치 전)
+# PHP2Shell 취약점 확인·분석·E2E 테스트 계획
 
-> 작성: 2026-10-21 21:30 KST · 대상: PHP 8.4.4 / 8.5.4 로컬 검증 랩 · 상태: 공식 패치(23:00 KST 예정) 공개 전
+> 작성: 2026-10-21 21:30 KST · 대상: PHP 8.4.4 / 8.5.4 → 수정 8.4.27 · 상태: **Phase 4 실행 완료**(8.4.27 공개 후)
 
 ## 1. 배경과 현재 상태
 
@@ -94,9 +94,37 @@
 - 근거 수준 표기(A=원본 코드 직접 확인, B=랩 관측, C=관측 못함/미확인).
 - 판정 한계 명시: 특정 빌드·SAPI·설정에서의 관측은 다른 구성의 안전을 보장하지 않음.
 
-## 7. Phase 4 — 공식 패치 공개 후 (23:00 KST 이후, 후속 작업)
+## 7. Phase 4 — 공식 패치 공개 후 (엄격 판정)
 
-1. php.net 보안 공지·GitHub 신규 태그 확인 → CVE별 영향/수정 버전·공격 조건 확정.
+`linux/phase4.sh <수정버전> <공식 advisory.json> [asan|normal]`
+
+**advisory는 공식 출처만 허용한다.** `cve`(CVE-YYYY-NNNN 형식), `official_url`(php.net 또는 php-src), `affected_version`, `fixed_version`이 모두 채워져야 하고, `fixed_version`은 요청 버전과 일치해야 한다. 자리표시자 advisory는 거부되므로 **공식 매핑 없이 `regression_difference_observed`가 생성되지 않는다.**
+
+각 단계(빌드·프로파일 4종·PoC·GDB 2모드·`http-compare` 2종·`verify-evidence`)의 종료 코드를 집계하고 `summary.json`에 기록한다. 하나라도 결과를 만들지 못하면 `inconclusive`, 하네스가 실패하면 `PHASE4_FAILED`로 종료한다(`PHASE4_DONE`은 전 단계 성공 시에만). `SKIP_BUILD=1`은 기존 빌드 매니페스트를 재사용한다.
+
+### 7.1 실행 결과 — 8.4.4 → 8.4.27 (2026-10-21 23:15)
+
+공식 advisory: CVE-2026-109619, affected 8.4.4 → fixed 8.4.27.
+
+| 단계 | 8.4.4 | 8.4.27 |
+|---|---|---|
+| PoC (5회) | 5/5 UAF | **0/5, ASAN 없음** |
+| GDB serialize 잔류 | level=1 → UAF | **잔류 0** |
+| GDB unserialize 잔류 | level=1 → UAF | **잔류 0** |
+| http-compare progress / oom | 기준 | `identical` / `identical` |
+| 최종 | — | **`no_difference_observed` + `patch_effect_signal`** |
+
+공식 Diff(`linux/patch-diff.sh`)는 `php_basic_early_rinit()`(요청 시작 직후 BG 상태 리셋)과 `PS(in_rfc1867_update)` + `incomplete_classes_only` 제한을 추가해, 본 계획의 S4·S5 가설과 일치한다. 상세: findings §5.
+
+| 조건 | 판정 |
+|---|---|
+| 빌드 성공, 일부 테스트 실패/미실행 | `inconclusive` |
+| 전후 차이 관측, 공식 매핑 없음 | `difference_observed` |
+| 공식 CVE 영향·수정 버전 확인 + 차이 관측 | `regression_difference_observed` |
+| 공식 패치가 원인 코드를 수정하고 오류 소멸 확인 | `patch_effect_confirmed` (수동 확인 필요) |
+| 공식 수정 코드와 원인 분석까지 일치 | `root_cause_confirmed` (수동 확인 필요) |
+
+1. php.net 보안 공지·GitHub 신규 태그로 CVE별 영향/수정 버전·공격 조건 확정. 공식 advisory JSON 작성 후 `phase4.sh`에 전달.
 2. 수정 버전 순정 빌드(동일 모드) → `linux/compare.py`로 공식 회귀 PHPT 비교 (advisory.json 공식 근거 기입).
 3. 본 프로브를 수정 빌드에 재실행해 전후 동작 차이 비교.
 4. 공식 Diff 기반으로 S1~S6 재점검, 이 계획의 가설 순위 갱신.
@@ -244,6 +272,7 @@
 9. `linux/waf-lab.sh`, `linux/waf-compare.py` — ModSecurity vs PHP 파싱 대조 랩.
 10. `linux/build-fuzzer.sh`, `linux/fuzz-smoke.sh` — 공식 fuzzing SAPI 빌드·스모크。
 11. `linux/build-jit.sh`, `linux/jit-compare.sh` — opcache/JIT 차등 비교.
+12. `linux/patch-diff.sh` — 수정 릴리스 Diff 수집(원인 일치 확인).
 5. `var/linux-evidence/evidence/probe-*/`, `probe-gdb-*/` — 프로브 실행 증적.
 6. `var/linux-evidence/evidence-manifest.sha256` — 증적 해시 매니페스트.
 7. `docs/php2shell-analysis-findings.md` — 정적·동적 분석 결과 및 주장별 판정표.

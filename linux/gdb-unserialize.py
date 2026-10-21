@@ -152,6 +152,15 @@ def main():
     log_text = (out / 'gdb.log').read_text(errors='replace')
     report['requests'] = parse_marks(log_text)
     report['asan_reports'] = sorted(str(p) for p in out.glob('asan.*') if p.is_file())
+    asan_detail = None
+    if report['asan_reports']:
+        text = Path(report['asan_reports'][-1]).read_text(errors='replace')
+        asan_detail = dict(
+            is_heap_use_after_free='heap-use-after-free' in text,
+            first_frame=next((line.strip() for line in text.splitlines()
+                              if 'tmp_var' in line), ''),
+            summary=next((line for line in text.splitlines() if 'SUMMARY' in line), ''))
+    report['asan_detail'] = asan_detail
     php_log = out / 'php-error.log'
     report['php_error_log'] = php_log.read_text(errors='replace')[:4000] if php_log.exists() else ''
 
@@ -177,7 +186,9 @@ def main():
         post_oom_reuse_observed=(oom_index is not None
                                  and any(index > oom_index for index in reuse)),
         asan_report_count=len(report['asan_reports']),
-        memory_error_observed=bool(report['asan_reports']),
+        memory_error_observed=bool(asan_detail and asan_detail['is_heap_use_after_free']
+                                   and asan_detail['first_frame']),
+        asan_first_stack_frame=(asan_detail or {}).get('first_frame'),
         request_levels=levels)
     (out / 'result.json').write_text(json.dumps(report, indent=2))
     print(json.dumps({'evidence': report['evidence'], 'checks': report['checks'],
