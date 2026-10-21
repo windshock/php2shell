@@ -475,6 +475,8 @@ PHP 측은 `cleanup=Off`로 진행 키를 유지해, 요청 후 세션 파일에
 
 한계: `generate_unserialize_dict.php`가 최소 빌드에서 **빈 사전**을 출력해(클래스 목록 비어 있음) 사전 없이 실행했다. 60초 스모크는 “크래시가 없었다”는 관측일 뿐 취약점 부재의 증거가 아니며, FlowFusion의 데이터흐름 변형·테스트 축소는 통합하지 않았다.
 
+**교차 버전 확인(8.5.4):** `parts`·`cleanup`·`arm` 프로파일을 8.5.4에서도 실행해 동일 결과를 얻었다 — 부품 한도 초과 시 END·cleanup 실행(`key_removed=true`), `cleanup=Off`에서 키·done 유지, HTTP-only 입력에서 OOM 없음.
+
 ### 4.12 미구현·미검증 목록 (과장 금지)
 
 | 항목 | 상태 | 사유 |
