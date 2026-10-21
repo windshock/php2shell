@@ -1,0 +1,76 @@
+title: PHP upload progress field used with multipart duplicate or extra parameters
+id: 8f1c2a10-php2shell-0001
+status: experimental
+description: >
+  Detects multipart POST bodies that carry PHP_SESSION_UPLOAD_PROGRESS while the
+  part header also contains duplicate or extra parameters. In the lab this shape
+  bypassed name-based WAF rules while PHP still treated it as the progress field.
+references:
+  - https://github.com/windshock/php2shell/blob/main/docs/php2shell-analysis-findings.md
+author: php2shell lab
+date: 2026/10/21
+logsource:
+  category: webserver
+detection:
+  selection_method:
+    cs-method: POST
+  selection_body:
+    - request_body|contains: 'PHP_SESSION_UPLOAD_PROGRESS'
+    - cs-content-type|contains: 'multipart/form-data'
+  selection_shape:
+    - request_body|re: 'name\s*=\s*"[^"]+"\s*;\s*name\s*='
+    - request_body|re: '(?i)content-disposition:[^\r\n]*;\s*\w+\s*=\s*"[^"]*"\s*;\s*name\s*='
+  condition: selection_method and selection_body and selection_shape
+fields:
+  - c-ip
+  - cs-uri-stem
+  - cs-content-type
+falsepositives:
+  - Applications that legitimately repeat form field names in one part (rare)
+level: high
+---
+title: PHP fatal memory exhaustion during request parsing
+id: 8f1c2a10-php2shell-0002
+status: experimental
+description: >
+  Detects "Allowed memory size ... exhausted" fatals that occur while PHP is
+  parsing request input (CVE-2026-109618 direction). Correlate with a multipart
+  or large form POST within the same second.
+logsource:
+  product: php
+  service: fpm
+detection:
+  selection:
+    - message|contains: 'Allowed memory size of'
+    - message|contains: 'exhausted'
+  condition: selection
+fields:
+  - host
+  - pool
+  - pid
+falsepositives:
+  - Legitimate memory-limit hits in long-running scripts
+level: medium
+---
+title: PHP-FPM worker terminated after a multipart request
+id: 8f1c2a10-php2shell-0003
+status: experimental
+description: >
+  Detects worker death (signal or exit code 70) shortly after a multipart POST.
+  In the lab, request-startup failure terminates the FPM worker with code 70
+  (allocation/OOM paths), which is a strong availability signal.
+logsource:
+  product: php
+  service: fpm
+detection:
+  selection_exit:
+    - message|contains: 'exited with code 70'
+    - message|contains: 'exited on signal'
+  condition: selection_exit
+fields:
+  - host
+  - pool
+  - pid
+falsepositives:
+  - Deploys, OOM killer, unrelated crashes
+level: high

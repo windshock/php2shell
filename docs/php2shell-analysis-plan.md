@@ -259,6 +259,15 @@
 | `cleanup=Off`에서 진행 키 잔류 | **확인** — 완료 후에도 키·done 유지 | `probe.py --profile cleanup` |
 | Zend vs 계측 할당기 구분 | 부분 완료 | zend 모드에서 decode OOM로 다른 지점임을 확인(§2.7c) |
 
+### 9.9 P0/P1 잔여 항목 진행 상태 (2026-10-22 00:05)
+
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| 8.5.12 교차 검증 | **완료** | PoC 0/5, ASAN 0, identical (findings §6.1) |
+| CVE-2026-109618 고유 경로 | **부분** — 조건·처리 차이 재현, 손상 미재현 | `probe.py --profile oomparse` (findings §6.2) |
+| 109619 다른 변형 | **정적 조사 완료** — 시작 단계 (un)serialize는 session.c가 유일, url_scanner/fatal backtrace는 별도 상태류 | `linux/serialize-sites.sh` (findings §6.3) |
+| 탐지 룰 | **구축·부분 검증** — ModSecurity 6/10, Sigma 3종(실험적) | `linux/detect-rules/` (findings §6.4) |
+
 ## 10. 산출물 목록
 
 1. `docs/php2shell-analysis-plan.md` — 이 문서.
@@ -273,6 +282,8 @@
 10. `linux/build-fuzzer.sh`, `linux/fuzz-smoke.sh` — 공식 fuzzing SAPI 빌드·스모크。
 11. `linux/build-jit.sh`, `linux/jit-compare.sh` — opcache/JIT 차등 비교.
 12. `linux/patch-diff.sh` — 수정 릴리스 Diff 수집(원인 일치 확인).
+13. `linux/detect-rules/` — ModSecurity·Sigma 탐지 룰과 검증 기록.
+14. `linux/serialize-sites.sh` — 시작 단계 (un)serialize 호출지 정적 조사.
 5. `var/linux-evidence/evidence/probe-*/`, `probe-gdb-*/` — 프로브 실행 증적.
 6. `var/linux-evidence/evidence-manifest.sha256` — 증적 해시 매니페스트.
 7. `docs/php2shell-analysis-findings.md` — 정적·동적 분석 결과 및 주장별 판정표.

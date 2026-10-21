@@ -8,6 +8,7 @@ port=${2:-18090}
 base=/home/phplab/php-lab
 prefix="$base/install/8.4.4-apache"
 run="$base/evidence/waf-lab"
+rules=${RULES_FILE:-/mnt/c/Users/user/Downloads/php/linux/detect-rules/modsecurity-php2shell.conf}
 mkdir -p "$run/tmp" "$run/data" "$run/sessions" "$run/uploads"
 
 cat > "$run/php.ini" <<INI
@@ -72,7 +73,7 @@ SecRequestBodyNoFilesLimit 1048576
 SecTmpDir $run/tmp
 SecDataDir $run/data
 SecAuditEngine Off
-SecRule ARGS_NAMES "@streq PHP_SESSION_UPLOAD_PROGRESS" "id:1001,phase:2,deny,status:403,log,msg:'progress field blocked'"
+Include $rules
 CONF
 
 asan=$(ls /usr/lib/x86_64-linux-gnu/libasan.so.8 2>/dev/null || true)
