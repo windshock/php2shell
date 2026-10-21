@@ -48,6 +48,10 @@ curl -F "file=@README.md" http://127.0.0.1:18084/upload
 
 ## 분석 자료
 
+- **분석 계획**: [docs/php2shell-analysis-plan.md](docs/php2shell-analysis-plan.md) — 패치 전 확인·분석·E2E 테스트 계획(외부 검토 의견 반영 포함).
+- **분석 결과**: [docs/php2shell-analysis-findings.md](docs/php2shell-analysis-findings.md) — 정적 분석(S1~S8), 동적 E2E(P1~P8), 주장별 판정표.
+- **E2E 프로브**: `linux/probe.py`(HTTP), `linux/gdb-probe.py`(GDB 상태 계측), `linux/probe-matrix.sh`(순차 매트릭스).
+- **증적**: `var/linux-evidence/` + `evidence-manifest.sha256`(SHA-256).
 - 원본 소스: `sources/php-src-php-8.4.4/` (ZIP 내부 디렉터리 이름 기준).
 - 우선 검토 위치: `ext/session/session.c`, `ext/session/php_session.h`, `ext/standard/var.c`, `ext/standard/basic_functions.c`, `main/main.c`, `main/php_variables.c`, `main/rfc1867.c`.
 - 보고서의 `Z_TRY_ADDREF(progress->data)` 포인터 수명 가설과 `BG(serialize)` 요청 간 상태 가설을 별도로 검증해야 한다.
