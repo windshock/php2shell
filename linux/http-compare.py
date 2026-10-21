@@ -187,7 +187,7 @@ def main():
             mapped = False
             advisory = None
             if args.advisory:
-                advisory = json.loads(args.advisory.read_text())
+                advisory = json.loads(args.advisory.read_text(encoding='utf-8-sig'))
                 mapped = (advisory.get('affected_version') == runs['before']['observations'].get('version')
                           or advisory.get('affected_version') == args.before.split('-')[0]) \
                     and (advisory.get('fixed_version') == args.after.split('-')[0])
