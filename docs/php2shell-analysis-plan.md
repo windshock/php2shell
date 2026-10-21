@@ -184,12 +184,34 @@
 | `root_cause_confirmed` | 공식 패치·공지와 원인 일치 | 미도달(패치 전) |
 | `inconclusive` / `not_run` | 증거 부족 / 미실행 | 패치 비교, Apache |
 
+### 9.6 PoC 트랙 (2026-10-21 23:10 추가)
+
+**PoC의 정의와 계층** — “증명”을 한 덩어리로 보지 않고 4단계로 나눈다.
+
+| 단계 | 내용 | 상태 | 증거 |
+|---|---|---|---|
+| L0 트리거 PoC | 입력 시퀀스가 취약 경로를 지나 메모리 오류를 재현 | **완료** | `poc-bgserialize.py`: 5/5, ASAN `heap-use-after-free` (var.c:732) |
+| L1 재현율 | 동일 조건 반복 시 재현되는 비율 | **완료 (100%)** | `var/linux-evidence/evidence/poc-*/result.json` (reproduced 5/5) |
+| L2 영향 등급 | 요청 실패·워커 종료·프로세스 크래시로 분류 | **완료** | A=500, B=연결 종료(프로세스 abort), FPM은 exit 70 |
+| L3 익스플로잇 | 제어된 코드 실행 체인 | **수행 안 함(정책)** | 계획 §9.3 비목표 |
+
+**L0 PoC의 최소 조건 (재현에 필요한 것):**
+
+1. CLI 내장 서버(요청 실패 후에도 프로세스 유지) + ASAN + `USE_TRACKED_ALLOC=1`.
+2. `memory_limit=8M`과 3MB 위조 세션(세션 저장 경로에 대한 로컬 쓰기 필요 — 원격 단독 PoC 아님).
+3. 요청 A: multipart에 `PHPSESSID`(위조 세션) + `PHP_SESSION_UPLOAD_PROGRESS` + 파일 → 파싱 중 재인코딩이 한도 초과로 bailout.
+4. **A와 B 사이에 다른 HTTP 요청이 없어야 함** — 어떤 요청이든 `zend_activate_modules`에 도달하면 `PHP_RINIT_FUNCTION(basic)`이 `BG(serialize)`를 memset해 잔류를 지운다(이번에 실측으로 확인).
+5. 요청 B: 같은 프로세스에서 진행 업로드 → 파싱 중 encode가 잔류 컨텍스트를 재사용.
+
+**도구:** `linux/poc-bgserialize.py` (`--iterations N`, 기본 5). 각 회차는 새 프로세스로 시작하며, 요청 A/B 상태·OOM 로그·ASAN 요약·첫 프레임을 `result.json`에 기록한다.
+
 ## 10. 산출물 목록
 
 1. `docs/php2shell-analysis-plan.md` — 이 문서.
 2. `linux/probe.py` (+ `linux-probe.cmd`) — HTTP E2E 프로브 하네스(P1~P7).
 3. `linux/gdb-probe.py` (+ `linux-gdb.cmd`) — 요청 수명·직렬화 상태 계측 하네스(P8).
 4. `linux/http-compare.py` — 동일 입력 HTTP 전후 비교 도구(판정 어휘 포함).
+5. `linux/poc-bgserialize.py` — L0 트리거 PoC 러너(재현율 측정, 익스플로잇 아님).
 5. `var/linux-evidence/evidence/probe-*/`, `probe-gdb-*/` — 프로브 실행 증적.
 6. `var/linux-evidence/evidence-manifest.sha256` — 증적 해시 매니페스트.
 7. `docs/php2shell-analysis-findings.md` — 정적·동적 분석 결과 및 주장별 판정표.
