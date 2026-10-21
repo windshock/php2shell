@@ -218,6 +218,18 @@
 | 증적 자동 감사 | `verify-evidence.py` — PoC 회차/PID, GDB 인덱스, 매니페스트 해시·BOM | **passed** |
 | 원본 증적 보관 | `docs/evidence-manifest-20261021.sha256`(1044개) — 저장소에는 해시만, 원본은 `var/linux-evidence/` | 적용 |
 
+### 9.8 외부 연구 대조 반영 (2026-10-21 22:55 추가)
+
+| 외부 지적 | 우리 상태 | 처리 |
+|---|---|---|
+| Bug S — `BG(serialize)` 요청 간 UAF | 재현 완료(CLI 5/5, Apache 3/3+2/2) | 유지 |
+| **Bug U — `BG(unserialize)` 요청 간 UAF** | **미검증 → 재현 완료** | `linux/gdb-unserialize.py` 신설: decode 단계 OOM(5M 한도) → 잔류 level=1 → 다음 요청 decode 재사용 → ASAN `tmp_var`(var_unserializer.re:166) |
+| Apache prefork + mod_php | 완료(3/3+2/2, 프로세스 유지 확인) | §4.6 |
+| PoC 재현율 판정기 결함 | 수정 완료(회차별 신규 보고서·PID 일치) | `verify-evidence.py` |
+| 19h “부품 수 제한 시 END 생략” | **반박** — 코드상 `goto fileupload_done`이 END를 실행(rfc1867.c:795-797→1267-1272), 동적 대조(P11)에서도 cleanup 실행 | `probe.py --profile parts`: `key_removed=true` |
+| HTTP 입력만으로 OOM(Arm 단계) | 미실시 | P1 후속: 로컬 세션 위조 없이 body 크기만으로 OOM 도달 여부 측정 |
+| Zend vs 계측 할당기 구분 | 부분 완료 | zend 모드에서 decode OOM로 다른 지점임을 확인(§2.7c) |
+
 ## 10. 산출물 목록
 
 1. `docs/php2shell-analysis-plan.md` — 이 문서.
@@ -227,6 +239,7 @@
 5. `linux/poc-bgserialize.py` — L0 트리거 PoC 러너(재현율 측정, 익스플로잇 아님).
 6. `linux/build-apache.sh`, `linux/apache-lab.sh`, `linux/apache-poc-matrix.sh` — Apache mod_php 랩(빌드·기동·재현율).
 7. `linux/verify-evidence.py` — 증적 자동 감사(회차별 ASAN·PID, GDB 인덱스, 매니페스트).
+8. `linux/gdb-unserialize.py` — `BG(unserialize)`(Bug U) 상태 계측·재현 하네스.
 5. `var/linux-evidence/evidence/probe-*/`, `probe-gdb-*/` — 프로브 실행 증적.
 6. `var/linux-evidence/evidence-manifest.sha256` — 증적 해시 매니페스트.
 7. `docs/php2shell-analysis-findings.md` — 정적·동적 분석 결과 및 주장별 판정표.

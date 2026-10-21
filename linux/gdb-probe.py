@@ -40,7 +40,7 @@ handle SIGUSR2 nostop noprint pass
 break php_request_startup
 commands
 silent
-printf "MARK REQ_STARTUP ser_level=%u ser_data=%p ser_lock=%u unser_level=%u\n", basic_globals.serialize.level, (void*)basic_globals.serialize.data, basic_globals.serialize_lock, basic_globals.unserialize.level
+printf "MARK REQ_STARTUP ser_level=%u ser_data=%p ser_lock=%u unser_level=%u unser_data=%p\n", basic_globals.serialize.level, (void*)basic_globals.serialize.data, basic_globals.serialize_lock, basic_globals.unserialize.level, (void*)basic_globals.unserialize.data
 continue
 end
 break php_hash_environment
@@ -67,6 +67,18 @@ silent
 printf "MARK SER_DESTROY_ENTER ser_level=%u ser_data=%p\n", basic_globals.serialize.level, (void*)basic_globals.serialize.data
 continue
 end
+break php_var_unserialize_init
+commands
+silent
+printf "MARK UNSER_INIT_ENTER unser_level=%u unser_data=%p\n", basic_globals.unserialize.level, (void*)basic_globals.unserialize.data
+continue
+end
+break php_var_unserialize_destroy
+commands
+silent
+printf "MARK UNSER_DESTROY_ENTER unser_level=%u unser_data=%p\n", basic_globals.unserialize.level, (void*)basic_globals.unserialize.data
+continue
+end
 break php_session_flush
 commands
 silent
@@ -82,7 +94,7 @@ end
 break php_request_shutdown
 commands
 silent
-printf "MARK REQ_SHUTDOWN ser_level=%u ser_data=%p\n", basic_globals.serialize.level, (void*)basic_globals.serialize.data
+printf "MARK REQ_SHUTDOWN ser_level=%u ser_data=%p unser_level=%u unser_data=%p\n", basic_globals.serialize.level, (void*)basic_globals.serialize.data, basic_globals.unserialize.level, (void*)basic_globals.unserialize.data
 continue
 end
 run -c {ini} -S 127.0.0.1:{port} -t {docroot} {router}
@@ -99,8 +111,8 @@ def parse_marks(log_text):
         fields = dict(re.findall(r'(\w+)=(\S+)', rest))
         if kind == 'REQ_STARTUP':
             current = dict(startup=fields, hash_env=None, activate=None,
-                           ser_init=[], ser_destroy=[], flush=[], callbacks=[],
-                           shutdown=None)
+                           ser_init=[], ser_destroy=[], unser_init=[], unser_destroy=[],
+                           flush=[], callbacks=[], shutdown=None)
             requests.append(current)
         elif current is None:
             continue
@@ -112,6 +124,10 @@ def parse_marks(log_text):
             current['ser_init'].append(fields)
         elif kind == 'SER_DESTROY_ENTER':
             current['ser_destroy'].append(fields)
+        elif kind == 'UNSER_INIT_ENTER':
+            current['unser_init'].append(fields)
+        elif kind == 'UNSER_DESTROY_ENTER':
+            current['unser_destroy'].append(fields)
         elif kind == 'SESSION_FLUSH':
             current['flush'].append(fields)
         elif kind == 'RFC1867_CB':

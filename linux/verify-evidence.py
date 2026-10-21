@@ -68,33 +68,42 @@ def check_poc(root):
 
 
 def check_gdb(root):
-    path = latest('evidence/probe-gdb-*/result.json', root)
-    if not path:
+    by_mode = {}
+    for path in sorted(root.glob('evidence/probe-gdb-*/result.json')):
+        data = json.loads(path.read_text())
+        mode = data.get('verdict', {}).get('mode', 'serialize')
+        by_mode[mode] = (path, data)  # newest per mode wins
+    if not by_mode:
         return dict(status='not_run', reason='no gdb result.json')
-    data = json.loads(path.read_text())
-    verdict = data.get('verdict', {})
-    levels = verdict.get('request_levels') or []
-    oom = verdict.get('oom_request_index')
-    reuse = verdict.get('reuse_request_index')
-    problems = []
-    if oom is None:
-        problems.append('oom request not identified from recorded transitions')
-    else:
-        if not (0 <= oom < len(levels)):
-            problems.append('oom index out of range')
-        if reuse is not None and reuse != oom + 1:
-            problems.append('reuse index is not the request after the oom request')
-        if reuse is not None and not (0 <= reuse < len(levels)):
-            problems.append('reuse index out of range')
-        if reuse is not None and levels and levels[reuse] != verdict.get('residue_level_at_next_request_start'):
-            problems.append('residue level field does not match recorded request levels')
-        if not any(index > oom for index in
-                   verdict.get('serialize_context_reuse_request_indexes', [])) \
-                and data.get('asan_reports'):
-            problems.append('asan report present but no post-oom reuse recorded')
-    return dict(status='passed' if not problems else 'failed', result=str(path),
-                oom_request_index=oom, reuse_request_index=reuse, levels=levels,
-                problems=problems)
+    results = []
+    problems_all = []
+    for mode, (path, data) in sorted(by_mode.items()):
+        verdict = data.get('verdict', {})
+        levels = verdict.get('request_levels') or []
+        oom = verdict.get('oom_request_index')
+        reuse = verdict.get('reuse_request_index')
+        reuse_key = ('unserialize_reuse_request_indexes' if mode == 'unserialize'
+                     else 'serialize_context_reuse_request_indexes')
+        problems = []
+        if oom is None:
+            problems.append('oom request not identified from recorded transitions')
+        else:
+            if not (0 <= oom < len(levels)):
+                problems.append('oom index out of range')
+            if reuse is not None and reuse != oom + 1:
+                problems.append('reuse index is not the request after the oom request')
+            if reuse is not None and not (0 <= reuse < len(levels)):
+                problems.append('reuse index out of range')
+            if reuse is not None and levels and levels[reuse] != verdict.get('residue_level_at_next_request_start'):
+                problems.append('residue level field does not match recorded request levels')
+            if not any(index > oom for index in verdict.get(reuse_key, [])) \
+                    and data.get('asan_reports'):
+                problems.append('asan report present but no post-oom reuse recorded')
+        results.append(dict(mode=mode, status='passed' if not problems else 'failed',
+                            result=str(path), oom_request_index=oom,
+                            reuse_request_index=reuse, levels=levels, problems=problems))
+        problems_all.extend(problems)
+    return dict(status='passed' if not problems_all else 'failed', modes=results)
 
 
 def check_manifest(root):

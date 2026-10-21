@@ -593,6 +593,60 @@ def probe_progress_disabled(lab, probes):
                      upload_still_works=(b'"ok":true' in result['body']))))
 
 
+def probe_part_limit(lab, probes):
+    """P11: does MULTIPART_EVENT_END (and progress cleanup) still run when the
+    max_multipart_body_parts limit is exceeded? 19h claimed END is skipped;
+    rfc1867.c:795-797 jumps to fileupload_done which emits END at :1267-1272.
+    The file part is sent BEFORE the extra fields so progress data exists when
+    the limit trips."""
+    lab.request('/session')
+    sid = [c.value for c in lab.jar if c.name == 'PHPSESSID'][0]
+    key = 'pl1'
+    boundary = 'ProbeParts' + secrets.token_hex(6)
+    body = b''
+    body += ('--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n'
+             % (boundary, PROGRESS_FIELD, key)).encode()
+    body += ('--%s\r\nContent-Disposition: form-data; name="file"; filename="pl.bin"\r\n'
+             'Content-Type: application/octet-stream\r\n\r\n' % boundary).encode()
+    body += b'P' * 1024 + b'\r\n'
+    for index in range(10):
+        body += ('--%s\r\nContent-Disposition: form-data; name="f%d"\r\n\r\nv\r\n'
+                 % (boundary, index)).encode()
+    body += ('--%s--\r\n' % boundary).encode()
+    sock = socket.create_connection(('127.0.0.1', HTTP_PORT), timeout=8)
+    try:
+        head = ('POST /upload HTTP/1.1\r\nHost: 127.0.0.1\r\n'
+                'Content-Type: multipart/form-data; boundary=%s\r\n'
+                'Content-Length: %d\r\nConnection: close\r\nCookie: PHPSESSID=%s\r\n\r\n'
+                % (boundary, len(body), sid))
+        sock.sendall(head.encode() + body)
+        data = b''
+        while True:
+            block = sock.recv(65536)
+            if not block:
+                break
+            data += block
+    finally:
+        sock.close()
+    status = None
+    match = re.match(rb'HTTP/1\.[01] (\d+)', data)
+    if match:
+        status = int(match.group(1))
+    time.sleep(0.4)
+    state = session_snapshot(lab, [key])
+    log = lab.php_error_log()
+    limit_hit = 'Multipart body parts limit exceeded' in log
+    probes.append(dict(
+        name='P11_multipart_part_limit',
+        response_status=status,
+        part_limit_hit=limit_hit,
+        progress_key_after=state,
+        key_removed=(key not in state),
+        verdict=dict(limit_observed=limit_hit,
+                     end_and_cleanup_ran=(limit_hit and key not in state),
+                     key_retained=(key in state))))
+
+
 PROFILES = {
     'standard': dict(ini_extra=['session.upload_progress.min_freq=0'], probes=lambda lab, p: (
         probe_reachability(lab, p),
@@ -617,6 +671,10 @@ PROFILES = {
     'off': dict(ini_extra=['session.upload_progress.enabled=Off',
                            'session.upload_progress.min_freq=0'], probes=lambda lab, p: (
         probe_progress_disabled(lab, p),
+    )),
+    'parts': dict(ini_extra=['session.upload_progress.min_freq=0',
+                             'max_multipart_body_parts=3'], probes=lambda lab, p: (
+        probe_part_limit(lab, p),
     )),
 }
 

@@ -379,7 +379,38 @@ ASAN 스택도 CLI 서버와 동일하다: 할당 `ps_srlzr_encode_php` session.
 | P1 매니페스트 BOM | UTF-8(BOM 없음)으로 재생성, 검증기가 BOM을 오류로 판정 | 첫 바이트 `00 62`, 1044개 해시 일치 |
 | P1 원본 증적 부재 | `docs/evidence-manifest-20261021.sha256`(1044개) + `verify-evidence.py`로 재검증 절차 제공 | 전체 해시 검사 통과 |
 
-### 4.8 미구현·미검증 목록 (과장 금지)
+### 4.8 `BG(unserialize)` 재현과 multipart 종료 대조 (2026-10-21 22:55 추가)
+
+#### (a) Bug U — `BG(unserialize)` 요청 간 UAF: **재현**
+
+`linux/gdb-unserialize.py` (CLI 내장 서버, ASAN, tracked, `memory_limit=5M`, 3MB 위조 세션). 5M는 `s_read`(약 3MB)는 통과시키고 decode의 문자열 할당(3MB)이 한도를 넘도록 고른 값이다.
+
+| 단계 | 관측 |
+|---|---|
+| 요청 A | 500, `Allowed memory size ... exhausted`, `Failed to decode session object` |
+| A 종료 시 | `BG(unserialize).level = 1` (DESTROY 생략) |
+| 요청 B (동일 프로세스) | 연결 리셋 = 프로세스 abort |
+| ASAN | 1건, `heap-use-after-free` |
+| GDB 인덱스 | `oom_request_index=3`, `reuse_request_index=4`, `request_levels=[0,0,0,0,1]` |
+
+ASAN 스택:
+
+| 구분 | 스택 |
+|---|---|
+| 사용 | **`tmp_var` (var_unserializer.re:166)** ← `ps_srlzr_decode_php` (session.c:1120) ← `php_session_decode` (279) ← `php_session_rfc1867_update` (3182) |
+| 할당 | **`php_var_unserialize_init` (var_unserializer.re:64)** ← `ps_srlzr_decode_php` (1103) ← `php_session_decode` (279) |
+
+→ Bug S(`BG(serialize)`)와 **같은 계열의 결함이 decode 경로에도 존재**한다. 두 후보 모두 순정 8.4.4에서 재현되며, 서로 다른 직렬화 상태를 사용한다.
+
+#### (b) multipart 부품 수 제한과 END/cleanup — 19h 주장 **반박**
+
+`max_multipart_body_parts=3`에서 progress 필드 → 파일 → 추가 필드 10개를 보내 한도를 초과시켰다.
+
+- 관측: `Multipart body parts limit exceeded` 경고 발생, HTTP 200, **진행 키가 세션에서 제거됨**(`key_removed=true`).
+- 코드 근거: `--body_parts_cnt < 0` → `goto fileupload_done`(rfc1867.c:795-797)이고, `fileupload_done` 라벨이 `MULTIPART_EVENT_END`를 호출한다(1267-1272). 즉 END는 생략되지 않으며 cleanup도 실행된다.
+- 판정: “부품 수 제한 초과로 END가 생략되어 세션 데이터가 보존된다”는 설명은 8.4.4 원본에서 성립하지 않는다. 다른 원인으로 잔류가 관측됐다면 세션 저장 실패 등 별도 경로를 조사해야 한다.
+
+### 4.9 미구현·미검증 목록 (과장 금지)
 
 | 항목 | 상태 | 사유 |
 |---|---|---|
@@ -389,4 +420,5 @@ ASAN 스택도 CLI 서버와 동일하다: 할당 `ps_srlzr_encode_php` session.
 | ZendDiff식 JIT/non-JIT 비교 | `not_run` | JIT 빌드 필요 |
 | `cleanup=Off` 세션 파일 내용 잔류 | `not_run` | 후속 1회 실행으로 확인 가능 |
 | 공식 패치 전후 비교 | `not_run` | 패치 미공개(23:00 KST 예정) |
+| HTTP 입력만으로 OOM(Arm 단계, 로컬 세션 위조 없이) | `not_run` | P1 후속 — body 크기·설정만으로 OOM 도달 여부 측정 |
 
