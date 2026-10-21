@@ -477,14 +477,26 @@ PHP 측은 `cleanup=Off`로 진행 키를 유지해, 요청 후 세션 파일에
 
 **교차 버전 확인(8.5.4):** `parts`·`cleanup`·`arm` 프로파일을 8.5.4에서도 실행해 동일 결과를 얻었다 — 부품 한도 초과 시 END·cleanup 실행(`key_removed=true`), `cleanup=Off`에서 키·done 유지, HTTP-only 입력에서 OOM 없음.
 
-### 4.12 미구현·미검증 목록 (과장 금지)
+### 4.12 JIT/non-JIT 차등 (ZendDiff 방식, 22:51 추가)
+
+`linux/build-jit.sh`로 opcache 포함 8.4.4를 빌드하고, 20,000회 `serialize`/`unserialize` + 세션 encode/decode 스크립트를 `opcache.jit=off|tracing|function`으로 실행했다.
+
+| 설정 | 출력 | exit | 시간 |
+|---|---|---|---|
+| off | 기준 | 0 | 34ms |
+| tracing | **동일** | 0 | 29ms |
+| function | **동일** | 0 | 30ms |
+
+해석: 출력 수준 차등에서는 세 모드가 완전히 일치한다. 단, 이는 ZendDiff의 **내부 상태 프로빙**이 아니라 출력·종료코드 비교이며, 이번 PHP2Shell 경로는 사용자 코드 실행 이전의 파싱 단계(C 코드)라 JIT 영향과 무관하다는 전제의 대조군이다.
+
+### 4.13 미구현·미검증 목록 (과장 금지)
 
 | 항목 | 상태 | 사유 |
 |---|---|---|
 | Apache prefork + mod_php 프로파일 | **완료** — 빌드·기동·A/B 재현 3/3 (§4.6) | — |
 | WAF vs PHP 파싱 차이 랩(WAFFLED) | **완료** — Apache+ModSecurity 2.9.7, 10변형 중 2건 규칙 누락(§4.10) |
 | FlowFusion/공식 Fuzzer 통합 | **부분 완료** — 공식 `php-fuzz-unserialize` 빌드·60초 스모크(485,434회, crash 0). FlowFusion 변형·축소 미통합(§4.11) |
-| ZendDiff식 JIT/non-JIT 비교 | `not_run` | JIT 빌드 필요 |
+| ZendDiff식 JIT/non-JIT 비교 | **부분 완료** — 출력 수준 3모드 동일(§4.12), 내부 상태 프로빙 미구현 | `linux/jit-compare.sh` |
 | `cleanup=Off` 세션 파일 내용 잔류 | `not_run` | 후속 1회 실행으로 확인 가능 |
 | 공식 패치 전후 비교 | `not_run` | 패치 미공개(23:00 KST 예정) |
 | HTTP 입력만으로 OOM(Arm 단계) | **측정 완료(음성)** | 901필드×4KB에서 OOM 없음(§4.9a); 더 큰 body·다른 SAPI는 미실시 |
