@@ -460,13 +460,28 @@ PHP 측은 `cleanup=Off`로 진행 키를 유지해, 요청 후 세션 파일에
 
 한계: 단일 WAF 버전·단일 규칙·로컬 환경이다. 상용 WAF/CRS의 정규화·디코딩 단계는 별도 검증이 필요하다.
 
-### 4.11 미구현·미검증 목록 (과장 금지)
+### 4.11 공식 Fuzzer 스모크 (2026-10-21 22:47 추가)
+
+`linux/build-fuzzer.sh`로 순정 8.4.4에 fuzzing SAPI를 빌드했다(`--enable-fuzzer --with-pic --enable-debug-assertions --enable-address-sanitizer`, clang). 산출물 `php-fuzz-unserialize`(59MB)로 60초 스모크:
+
+| 항목 | 결과 |
+|---|---|
+| 시드 Corpus | 19개 (`sapi/fuzzer/corpus/unserialize`) |
+| 실행 횟수 | **485,434** (약 7,957 exec/s) |
+| 신규 단위 | 2,893 |
+| peak RSS | 149MB |
+| crash artifact | **0** |
+| 종료 코드 | 0 |
+
+한계: `generate_unserialize_dict.php`가 최소 빌드에서 **빈 사전**을 출력해(클래스 목록 비어 있음) 사전 없이 실행했다. 60초 스모크는 “크래시가 없었다”는 관측일 뿐 취약점 부재의 증거가 아니며, FlowFusion의 데이터흐름 변형·테스트 축소는 통합하지 않았다.
+
+### 4.12 미구현·미검증 목록 (과장 금지)
 
 | 항목 | 상태 | 사유 |
 |---|---|---|
 | Apache prefork + mod_php 프로파일 | **완료** — 빌드·기동·A/B 재현 3/3 (§4.6) | — |
 | WAF vs PHP 파싱 차이 랩(WAFFLED) | **완료** — Apache+ModSecurity 2.9.7, 10변형 중 2건 규칙 누락(§4.10) |
-| FlowFusion/공식 Fuzzer 통합 | `not_run` | 별도 빌드·Corpus |
+| FlowFusion/공식 Fuzzer 통합 | **부분 완료** — 공식 `php-fuzz-unserialize` 빌드·60초 스모크(485,434회, crash 0). FlowFusion 변형·축소 미통합(§4.11) |
 | ZendDiff식 JIT/non-JIT 비교 | `not_run` | JIT 빌드 필요 |
 | `cleanup=Off` 세션 파일 내용 잔류 | `not_run` | 후속 1회 실행으로 확인 가능 |
 | 공식 패치 전후 비교 | `not_run` | 패치 미공개(23:00 KST 예정) |
