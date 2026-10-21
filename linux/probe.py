@@ -647,6 +647,62 @@ def probe_part_limit(lab, probes):
                      key_retained=(key in state))))
 
 
+def probe_cleanup_off(lab, probes):
+    """P13: with cleanup=Off the progress entry must REMAIN after completion."""
+    lab.request('/session')
+    sid = [c.value for c in lab.jar if c.name == 'PHPSESSID'][0]
+    key = 'co1'
+    payload = b'C' * (64 * 1024)
+    result = multipart(HTTP_PORT, '/upload',
+                       fields=[(PROGRESS_FIELD, key)],
+                       file_spec=('file', 'co.bin', payload),
+                       cookie=f'PHPSESSID={sid}')
+    time.sleep(0.4)
+    state = session_snapshot(lab, [key])
+    session_file = lab.out / 'sessions' / ('sess_' + sid)
+    text = session_file.read_text(errors='replace') if session_file.exists() else ''
+    probes.append(dict(
+        name='P13_cleanup_off_retention',
+        response_status=result['status'],
+        progress_key_after=state,
+        key_retained=(key in state),
+        done_flag=('done";b:1' in text),
+        verdict=dict(retention_confirmed=(key in state),
+                     done_flag_set=('done";b:1' in text))))
+
+
+def probe_http_only_arm(lab, probes):
+    """P12: can HTTP input alone (no forged session) produce a parse-time OOM?
+
+    Sends many large form fields plus a progress field. This exercises the
+    request parser's own allocations (post array growth), not session decode.
+    """
+    lab.request('/session')
+    sid = [c.value for c in lab.jar if c.name == 'PHPSESSID'][0]
+    fields = [(PROGRESS_FIELD, 'arm1')]
+    fields += [('f%03d' % i, 'x' * 4096) for i in range(900)]
+    result = multipart(HTTP_PORT, '/upload', fields=fields,
+                       file_spec=('file', 'arm.bin', b'A' * 1024),
+                       cookie=f'PHPSESSID={sid}', chunk_size=65536, chunk_delay=0.0)
+    time.sleep(0.5)
+    log = lab.php_error_log()
+    oom = 'Allowed memory size of' in log
+    health = None
+    try:
+        health = lab.request('/health', timeout=5)
+    except Exception as exc:
+        health = str(exc)
+    probes.append(dict(
+        name='P12_http_only_arm',
+        field_count=len(fields),
+        response_status=result['status'],
+        oom_from_http_only=oom,
+        worker_alive_after=(isinstance(health, dict) and health.get('ok') is True),
+        worker_pid=worker_pid(lab.out),
+        verdict=dict(http_only_oom_observed=oom,
+                     worker_survived=(isinstance(health, dict) and health.get('ok') is True))))
+
+
 PROFILES = {
     'standard': dict(ini_extra=['session.upload_progress.min_freq=0'], probes=lambda lab, p: (
         probe_reachability(lab, p),
@@ -675,6 +731,14 @@ PROFILES = {
     'parts': dict(ini_extra=['session.upload_progress.min_freq=0',
                              'max_multipart_body_parts=3'], probes=lambda lab, p: (
         probe_part_limit(lab, p),
+    )),
+    'cleanup': dict(ini_extra=['session.upload_progress.min_freq=0',
+                               'session.upload_progress.cleanup=Off'], probes=lambda lab, p: (
+        probe_cleanup_off(lab, p),
+    )),
+    'arm': dict(ini_extra=['session.upload_progress.min_freq=0',
+                           'memory_limit=8M'], probes=lambda lab, p: (
+        probe_http_only_arm(lab, p),
     )),
 }
 

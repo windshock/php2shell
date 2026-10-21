@@ -410,7 +410,24 @@ ASAN 스택:
 - 코드 근거: `--body_parts_cnt < 0` → `goto fileupload_done`(rfc1867.c:795-797)이고, `fileupload_done` 라벨이 `MULTIPART_EVENT_END`를 호출한다(1267-1272). 즉 END는 생략되지 않으며 cleanup도 실행된다.
 - 판정: “부품 수 제한 초과로 END가 생략되어 세션 데이터가 보존된다”는 설명은 8.4.4 원본에서 성립하지 않는다. 다른 원인으로 잔류가 관측됐다면 세션 저장 실패 등 별도 경로를 조사해야 한다.
 
-### 4.9 미구현·미검증 목록 (과장 금지)
+### 4.9 HTTP-only Arm과 cleanup=Off 대조 (2026-10-21 22:36 추가)
+
+#### (a) HTTP 입력만으로 parse-time OOM 도달? — **음성**
+
+위조 세션 없이, 901개 필드(각 4KB, 합계 약 3.6MB) + progress 필드 + 1KB 파일을 FPM(`memory_limit=8M`, `post_max_size=4M`)에 전송했다.
+
+- 응답 200, `Allowed memory size ... exhausted` **없음**, 워커 생존(PID 440).
+- 해석: 이 입력 형태만으로는 파서 자체 할당이 한도에 도달하지 않았다. “HTTP만으로 Arm 단계 도달” 주장은 더 큰 body·더 낮은 한도·다른 SAPI(Apache 버퍼링)에서 별도 검증이 필요하다.
+- 구조적 요점: OOM이 `php_var_serialize`/`php_var_unserialize`의 INIT→DESTROY 윈도우 **밖**에서 발생하면 잔류가 만들어지지 않는다. 따라서 “OOM 발생”과 “잔류 재사용”은 별개 조건이다.
+
+#### (b) `cleanup=Off`에서 진행 데이터 잔류 — **확인**
+
+동일 업로드(64KB)에서 `session.upload_progress.cleanup=Off`:
+
+- 완료 후에도 `upload_progress_co1` 키 유지, `bytes_processed=65805`, `done=true`.
+- 기본값(On)에서는 완료 시 키가 제거된다(§2.2와 대조).
+
+### 4.10 미구현·미검증 목록 (과장 금지)
 
 | 항목 | 상태 | 사유 |
 |---|---|---|
@@ -420,5 +437,5 @@ ASAN 스택:
 | ZendDiff식 JIT/non-JIT 비교 | `not_run` | JIT 빌드 필요 |
 | `cleanup=Off` 세션 파일 내용 잔류 | `not_run` | 후속 1회 실행으로 확인 가능 |
 | 공식 패치 전후 비교 | `not_run` | 패치 미공개(23:00 KST 예정) |
-| HTTP 입력만으로 OOM(Arm 단계, 로컬 세션 위조 없이) | `not_run` | P1 후속 — body 크기·설정만으로 OOM 도달 여부 측정 |
+| HTTP 입력만으로 OOM(Arm 단계) | **측정 완료(음성)** | 901필드×4KB에서 OOM 없음(§4.9a); 더 큰 body·다른 SAPI는 미실시 |
 

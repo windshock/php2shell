@@ -227,7 +227,8 @@
 | Apache prefork + mod_php | 완료(3/3+2/2, 프로세스 유지 확인) | §4.6 |
 | PoC 재현율 판정기 결함 | 수정 완료(회차별 신규 보고서·PID 일치) | `verify-evidence.py` |
 | 19h “부품 수 제한 시 END 생략” | **반박** — 코드상 `goto fileupload_done`이 END를 실행(rfc1867.c:795-797→1267-1272), 동적 대조(P11)에서도 cleanup 실행 | `probe.py --profile parts`: `key_removed=true` |
-| HTTP 입력만으로 OOM(Arm 단계) | 미실시 | P1 후속: 로컬 세션 위조 없이 body 크기만으로 OOM 도달 여부 측정 |
+| HTTP 입력만으로 OOM(Arm 단계) | **측정 완료(음성)** — 901필드×4KB에서 OOM 없음 | `probe.py --profile arm` |
+| `cleanup=Off`에서 진행 키 잔류 | **확인** — 완료 후에도 키·done 유지 | `probe.py --profile cleanup` |
 | Zend vs 계측 할당기 구분 | 부분 완료 | zend 모드에서 decode OOM로 다른 지점임을 확인(§2.7c) |
 
 ## 10. 산출물 목록
