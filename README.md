@@ -1,6 +1,8 @@
-# PHP 분석 및 E2E 준비 환경
+# PHP2Shell 분석 랩 (PHP 8.4.4 / 8.5.4 → 8.4.27 검증)
 
-사용자 요청 범위는 **취약점 검증을 위한 환경 구축과 문서화**이다. 보고된 CVE의 트리거, OOM, RCE 재현은 수행하지 않는다. ASAN 계측 확인에는 별도의 작은 C 프로그램으로 의도적인 UAF 오류를 발생시킨다.
+이 저장소는 PHP2Shell(CVE-2026-109618 / CVE-2026-109619) 이슈를 **격리된 로컬 랩**에서 독립 검증한 기록이다. 초기 환경 구축에서 시작해 코드 경로 계측, 두 직렬화 컨텍스트의 요청 간 UAF 재현, **공식 8.4.27 패치 전후 비교**까지 수행했다.
+
+**범위 경계:** 트리거 수준의 메모리 오류 재현과 패치 전후 비교는 수행했다. **무기화된 익스플로잇(RCE 체인) 작성·실행과 운영/외부 시스템 시험은 수행하지 않는다.** ASAN 계측 확인에는 별도의 작은 C 프로그램으로 의도적인 UAF 오류를 발생시킨다.
 
 작업 위치: `C:\Users\user\Downloads\php`
 
@@ -48,11 +50,16 @@ curl -F "file=@README.md" http://127.0.0.1:18084/upload
 
 ## 분석 자료
 
-- **분석 계획**: [docs/php2shell-analysis-plan.md](docs/php2shell-analysis-plan.md) — 패치 전 확인·분석·E2E 테스트 계획(외부 검토 의견 반영 포함).
-- **분석 결과**: [docs/php2shell-analysis-findings.md](docs/php2shell-analysis-findings.md) — 정적 분석(S1~S8), 동적 E2E(P1~P8), 주장별 판정표.
-- **E2E 프로브**: `linux/probe.py`(HTTP), `linux/gdb-probe.py`(GDB 상태 계측), `linux/probe-matrix.sh`(순차 매트릭스).
-- **증적**: `var/linux-evidence/` + `evidence-manifest.sha256`(SHA-256).
-- 원본 소스: `sources/php-src-php-8.4.4/` (ZIP 내부 디렉터리 이름 기준).
+읽는 순서와 도구 위치는 [docs/README.md](docs/README.md)에 정리되어 있다.
+
+- **경영 요약**: [docs/php2shell-executive-summary.md](docs/php2shell-executive-summary.md)
+- **분석 계획**: [docs/php2shell-analysis-plan.md](docs/php2shell-analysis-plan.md)
+- **분석 결과**: [docs/php2shell-analysis-findings.md](docs/php2shell-analysis-findings.md) — 정적(S1~S8), 동적(P1~P13), **Phase 4(8.4.27) 결과**
+- **E2E/계측**: `linux/probe.py`, `linux/gdb-probe.py`, `linux/gdb-unserialize.py`, `linux/poc-bgserialize.py`
+- **SAPI/WAF/Fuzzer**: `linux/apache-lab.sh`, `linux/waf-compare.py`, `linux/fuzz-smoke.sh`
+- **패치 검증**: `linux/phase4.sh`, `linux/patch-diff.sh`, `linux/verify-evidence.py`
+- **증적**: `var/linux-evidence/` + `docs/evidence-manifest-20261021.sha256`
+- 원본 소스: `sources/php-src-php-8.4.4/` (ZIP 내부 디렉터리 이름 기준)
 - 우선 검토 위치: `ext/session/session.c`, `ext/session/php_session.h`, `ext/standard/var.c`, `ext/standard/basic_functions.c`, `main/main.c`, `main/php_variables.c`, `main/rfc1867.c`.
 - 보고서의 `Z_TRY_ADDREF(progress->data)` 포인터 수명 가설과 `BG(serialize)` 요청 간 상태 가설을 별도로 검증해야 한다.
 - 소스는 원본 상태를 유지한다. 향후 공식 수정 버전이 확정되면 별도 소스/런타임을 준비해 비교한다.
