@@ -1,0 +1,8 @@
+runtime/
+downloads/
+sources/
+var/
+__pycache__/
+/.zwork/
+.env
+.env.*
