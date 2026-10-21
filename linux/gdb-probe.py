@@ -266,20 +266,34 @@ def main():
                                  expected=7, levels_at_request_start=levels_at_start))
     callback_events = [e for r in requests for e in r['callbacks']]
     report['checks'].append(dict(name='rfc1867_callback_events', events=callback_events))
-    init_reuse = [(i, r['ser_init']) for i, r in enumerate(requests)
-                  if any(as_int(f.get('ser_level')) > 0 for f in r['ser_init'])]
-    post_oom_reuse = [item for item in init_reuse if item[0] >= 4]
+    # Identify the OOM request by its recorded transition, not by a fixed index:
+    # it entered serialize, never destroyed, and ended with level > 0.
+    oom_index = None
+    for index, request in enumerate(requests):
+        shutdown_level = as_int((request['shutdown'] or {}).get('ser_level'))
+        if request['ser_init'] and not request['ser_destroy'] and shutdown_level > 0:
+            oom_index = index
+            break
+    next_index = (oom_index + 1) if oom_index is not None and oom_index + 1 < len(requests) else None
+    reuse_indexes = [index for index, request in enumerate(requests)
+                     if any(as_int(field.get('ser_level')) > 0 for field in request['ser_init'])]
+    control_indexes = list(range(oom_index)) if oom_index is not None else list(range(len(requests)))
     oom_bailout = 'Allowed memory size of' in report['php_error_log']
     report['verdict'] = dict(
         callback_reached=bool(callback_events),
         callback_events_seen=sorted({int(e) for e in callback_events if e is not None}),
-        control_state_clean=all(level == 0 for level in levels_at_start[:4]),
+        control_state_clean=all(levels_at_start[i] == 0 for i in control_indexes),
         oom_bailout_logged=oom_bailout,
-        residue_level_at_next_request_start=(levels_at_start[4] if len(levels_at_start) > 4 else None),
-        serialize_context_reuse_request_indexes=[i for i, _ in init_reuse],
-        post_oom_reuse_observed=bool(post_oom_reuse),
+        oom_request_index=oom_index,
+        reuse_request_index=next_index,
+        residue_level_at_next_request_start=(levels_at_start[next_index]
+                                             if next_index is not None else None),
+        serialize_context_reuse_request_indexes=reuse_indexes,
+        post_oom_reuse_observed=(oom_index is not None
+                                 and any(index > oom_index for index in reuse_indexes)),
         asan_report_count=len(report['asan_reports']),
-        memory_error_observed=bool(report['asan_reports']))
+        memory_error_observed=bool(report['asan_reports']),
+        request_levels=levels_at_start)
     (out / 'result.json').write_text(json.dumps(report, indent=2))
     print(json.dumps({k: report[k] for k in ('evidence', 'checks', 'verdict')}, indent=2))
     return report

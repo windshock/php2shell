@@ -43,6 +43,7 @@ def error_signatures(text, limit=8):
 def run_progress(lab, tag):
     """Deterministic single upload-progress request; stable observations only."""
     first = lab.request('/session')['visits']
+    pid_first = worker_pid(lab.out)
     sid = [c.value for c in lab.jar if c.name == 'PHPSESSID'][0]
     payload = b'Z' * (64 * 1024)
     result = multipart(18085, '/upload',
@@ -53,6 +54,7 @@ def run_progress(lab, tag):
                        chunk_size=32768, chunk_delay=0.05)
     mid = [s for s in result['samples'] if 'cmp1' in s]
     after_visits = lab.request('/session')['visits']
+    pid_last = worker_pid(lab.out)
     stable = dict(
         upload_status=result['status'],
         upload_ok=(b'"ok":true' in result['body']),
@@ -60,10 +62,13 @@ def run_progress(lab, tag):
         progress_key_cleaned=(not session_snapshot(lab, ['cmp1'])),
         visits_increment=(after_visits - first),
         asan_reports=len(lab.asan_reports()),
-        error_signatures=error_signatures(lab.php_error_log()),
-        worker_reused=(worker_pid(lab.out) is not None))
+        error_signatures=error_signatures(lab.php_error_log()))
+    runtime = dict(worker_pid_first=pid_first, worker_pid_last=pid_last,
+                   worker_reused=(pid_first is not None and pid_first == pid_last),
+                   worker_restarted=(pid_first != pid_last))
     status = 'code_path_reached' if mid else 'not_run'
-    return dict(tag=tag, scenario='progress-lifecycle', observations=stable, status=status)
+    return dict(tag=tag, scenario='progress-lifecycle', observations=stable,
+                runtime=runtime, status=status)
 
 
 def run_oom(lab, tag):
@@ -103,7 +108,10 @@ def run_oom(lab, tag):
         status = 'code_path_reached'
     else:
         status = 'not_run'
-    return dict(tag=tag, scenario='oom-residue', observations=stable, status=status)
+    return dict(tag=tag, scenario='oom-residue', observations=stable,
+                runtime=dict(worker_pid_before=pid_before,
+                             worker_pid_after=worker_pid(lab.out)),
+                status=status)
 
 
 SCENARIOS = {'progress-lifecycle': run_progress, 'oom-residue': run_oom}
@@ -136,6 +144,9 @@ def main():
     parser.add_argument('--buffering', choices=['on', 'off'], default='off')
     parser.add_argument('--after-ini', action='append', default=[],
                         help='extra INI for the after run (control experiments only)')
+    parser.add_argument('--advisory', type=Path, default=None,
+                        help='optional JSON with affected_version/fixed_version; only then '
+                             'may a difference be called regression_difference_observed')
     parser.add_argument('--before-version', default=None,
                         help='override version for the before build (default: from --before)')
     args = parser.parse_args()
@@ -171,9 +182,18 @@ def main():
     else:
         result['differences'] = compare(runs['before']['observations'],
                                         runs['after']['observations'])
+        result['runtime'] = {tag: runs[tag].get('runtime') for tag in runs}
         if result['differences']:
-            same_build = args.before == args.after
-            result['status'] = 'difference_observed' if same_build else 'regression_difference_observed'
+            mapped = False
+            advisory = None
+            if args.advisory:
+                advisory = json.loads(args.advisory.read_text())
+                mapped = (advisory.get('affected_version') == runs['before']['observations'].get('version')
+                          or advisory.get('affected_version') == args.before.split('-')[0]) \
+                    and (advisory.get('fixed_version') == args.after.split('-')[0])
+            result['advisory'] = advisory
+            result['status'] = ('regression_difference_observed' if mapped
+                                else 'difference_observed')
         else:
             result['status'] = 'identical'
     result['evidence'] = str(out)

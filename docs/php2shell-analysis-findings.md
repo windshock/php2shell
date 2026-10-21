@@ -248,7 +248,7 @@ ASAN 보고서(`asan.1087`)의 3개 스택이 가설과 정확히 일치한다:
 
 - “HTTP 200 + 진행 상태 갱신” → **코드 경로 도달** 확인.
 - “ASAN 동일 주소 해제 후 접근” → **해당 빌드·조건에서 메모리 오류 재현** 확인(8.4.4/8.5.4, CLI server, tracked, memory_limit).
-- “수정되지 않은 정식 PHP에서 반복 재현” → 2개 버전·2회 재현. 다만 SAPI가 CLI server이고 FPM에서는 워커 종료로 경로가 소멸하므로 **“강하게 뒷받침” 단계로 한정**한다.
+- “수정되지 않은 정식 PHP에서 반복 재현” → CLI server 5/5, **Apache mod_php 3/3**, 두 SAPI·두 버전에서 재현. FPM은 워커 종료로 경로 자체가 소멸한다. 따라서 **“강하게 뒷받침” 단계로 한정**한다(SAPI 의존성 명시).
 - “공식 패치 전 재현·후 소멸” → **미확인**(패치 미공개). Phase 4 항목.
 - “공식 코드 변경·공지와 원인 일치” → **미확인**. 따라서 **CVE-2026-109618/109619의 근본 원인으로 확정하지 않는다.**
 
@@ -315,15 +315,23 @@ ASAN 보고서(`asan.1087`)의 3개 스택이 가설과 정확히 일치한다:
 
 대신 다음으로 “운영 영향” 질문에 답한다: 트리거 재현성·반복성, 영향 등급(요청 실패/워커 종료/프로세스 크래시), SAPI·버전·할당기·INI 조건 지도, 패치 전후 회귀, 탐지·완화 규칙 검증.
 
-### 4.5 PoC 재현율과 조건 민감도 (2026-10-21 23:10 추가)
+### 4.5 PoC 재현율과 조건 민감도 (2026-10-21 22:12 추가, 22:35 증거 연결 정정)
 
-`linux/poc-bgserialize.py`로 동일 시퀀스를 5회 반복(매회 새 프로세스)했다.
+> **시각 정정:** 이전 판에 `23:10 추가`로 기재했으나 이는 오기다. 증적 타임스탬프 기준 실제 실행 시각은 22:10 KST이며, 최초 커밋 시각도 22:11 KST다. 이후 `00:12`로 적은 Apache 절도 실제로는 22:20 KST다.
 
-| 회차 | 요청 A | OOM 로그 | 요청 B | 결과 | 첫 ASAN 프레임 |
-|---|---|---|---|---|---|
-| 1~5 | 500 | 확인 | 연결 종료(프로세스 abort) | **uaf_reproduced** | `php_add_var_hash` var.c:732 |
+`linux/poc-bgserialize.py`로 동일 시퀀스를 5회 반복(매회 새 프로세스)했다. **초기 집계 코드는 회차별 보고서를 구분하지 않고 첫 ASAN 파일을 재사용하는 결함이 있었다.** 수정 후 재실행(22:22 KST)에서 회차별로 새로 생성된 보고서만 판정에 사용했고, 프로세스 PID와 ASAN 파일 PID가 1:1로 일치했다.
 
-**재현율 5/5 = 100%.** ASAN 보고서도 5개(`asan.469`~`asan.484`) 생성되었고, 모두 동일한 3종 스택(할당 `php_var_serialize_init` / 해제 `php_request_shutdown`→`tracked_free_all` / 사용 `php_add_var_hash`)을 가진다.
+| 회차 | 요청 A | OOM | 요청 B | 프로세스 PID | ASAN 파일 | 결과 |
+|---|---|---|---|---|---|---|
+| 1 | 500 | 확인 | 연결 리셋 | 412 | `asan.412` | uaf_reproduced |
+| 2 | 500 | 확인 | 연결 리셋 | 414 | `asan.414` | uaf_reproduced |
+| 3 | 500 | 확인 | 연결 리셋 | 416 | `asan.416` | uaf_reproduced |
+| 4 | 500 | 확인 | 연결 리셋 | 418 | `asan.418` | uaf_reproduced |
+| 5 | 500 | 확인 | 연결 리셋 | 420 | `asan.420` | uaf_reproduced |
+
+**재현율 5/5 = 100%** (회차별 독립 보고서 5개, 모두 `php_add_var_hash` var.c:732). 자동 검증: `linux/verify-evidence.py` → `poc.status=passed, claimed=5, verified=5`.
+
+> 이전 실행(13:09:43)은 디렉터리에 ASAN 보고서 5개가 실제로 존재했지만 집계 JSON은 0/5로 기록했다(같은 결함의 다른 증상). 해당 원본은 덮어쓰지 않고 보존했다.
 
 #### 재현 조건의 민감도 — 실측으로 확인한 두 가지
 
@@ -335,11 +343,47 @@ ASAN 보고서(`asan.1087`)의 3개 스택이 가설과 정확히 일치한다:
 - **증명:** 순정 PHP 8.4.4(및 8.5.4)에서, 파싱 중 직렬화 컨텍스트가 요청 종료로 해제된 뒤 다음 요청의 파싱 단계에서 재사용되어 ASAN이 `heap-use-after-free`를 보고한다.
 - **증명하지 않음:** 원격 무인증 단독 재현(위조 세션 파일에 대한 로컬 쓰기 필요), 임의 코드 실행, 다른 SAPI·버전·설정에서의 동일 동작.
 
-### 4.6 미구현·미검증 목록 (과장 금지)
+### 4.6 Apache prefork + mod_php 결과 (2026-10-21 22:20 추가)
+
+빌드: `linux/build-apache.sh 8.4.4` — `--with-apxs2=/usr/bin/apxs2`, `--enable-debug --enable-address-sanitizer`, `-O1`, 프리픽스 `install/8.4.4-apache`. httpd는 `LD_PRELOAD=libasan.so.8`, `ASAN_OPTIONS log_path`, `USE_ZEND_ALLOC=0`/`USE_TRACKED_ALLOC=1`로 **단일 프로세스(`-X`)** 실행, loopback 18088.
+
+| 단계 | 관측 |
+|---|---|
+| 요청 A (3MB 세션 + progress) | 500, PHP Fatal “Allowed memory size ... 3149568 bytes” |
+| 요청 A 직후 프로세스 | **생존** (FPM exit 70과 대조) |
+| 요청 B (같은 프로세스) | 연결 리셋 = 프로세스 abort |
+| ASAN | **3/3 보고서**(22:20), 추가 검증 2/2(22:24) — 각 회차 보고서가 해당 httpd PID와 일치 |
+
+ASAN 스택도 CLI 서버와 동일하다: 할당 `ps_srlzr_encode_php` session.c:1068 ← `php_session_rfc1867_update` 3192 ← `php_request_startup` main.c:1871 / 사용 `php_var_serialize_intern` var.c:1060 ← `php_add_var_hash` 732 ← … ← main.c:1871.
+
+#### SAPI별 비교 (이번 실측)
+
+| SAPI | 요청 실패 후 프로세스 | 잔류 재사용 | 재현율 |
+|---|---|---|---|
+| CLI 내장 서버 | 유지 | 관측 | **5/5** |
+| Apache mod_php (`-X`, prefork) | 유지 | 관측 | **3/3** |
+| PHP-FPM | **종료(exit 70)** | 불가(잔류 소멸) | 0/4 |
+
+→ 이 결함의 성립 여부는 “FPM인가”가 아니라 **SAPI가 요청 시작 실패 후 프로세스를 유지하는가**에 달려 있다. 배포 환경 판단 시 이 차이가 핵심이다.
+
+### 4.7 판정 정확도 수정 (외부 검토 반영, 22:35)
+
+| 지적 | 수정 내용 | 검증 |
+|---|---|---|
+| P0 회차별 ASAN 재사용 가능 | `snapshot_asan`/`wait_new_asan`으로 회차 시작 전 존재하던 보고서를 제외하고, **새로 생성된 보고서만** 사용. PID 일치 검사 | `verify-evidence.py` 5/5, pid 412·414·416·418·420 |
+| P0 `gdb-probe.py` 고정 인덱스 `[4]` | 기록된 전이(serialize init 후 destroy 없음 + shutdown level>0)로 OOM 요청을 **식별**하고 다음 요청 인덱스를 계산 | `oom_request_index=5`, `reuse_request_index=6`, `residue_level=1` |
+| P0 `probe-matrix.sh` 종료 코드 | `pipefail` + `PIPESTATUS[0]` 집계, 실패 시 비종료 코드로 종료 | `runs/failures` 요약 출력 |
+| P1 `http-compare.py` `worker_reused` | PID 최초·최종 비교(`worker_pid_first/last`, `worker_restarted`)로 교체 | 음성 대조 `identical` 재확인 |
+| P1 비교 판정 남용 | `--advisory` 없으면 `difference_observed`, 공식 영향/수정 버전이 일치할 때만 `regression_difference_observed` | 음성/양성 대조 |
+| P1 PoC 워밍업 세션 미유지 | 쿠키 자를 사용해 동일 세션 2회 왕복, 방문 카운터 증가 검증(`session_roundtrip_ok`) | 각 회차 기록 |
+| P1 매니페스트 BOM | UTF-8(BOM 없음)으로 재생성, 검증기가 BOM을 오류로 판정 | 첫 바이트 `00 62`, 1044개 해시 일치 |
+| P1 원본 증적 부재 | `docs/evidence-manifest-20261021.sha256`(1044개) + `verify-evidence.py`로 재검증 절차 제공 | 전체 해시 검사 통과 |
+
+### 4.8 미구현·미검증 목록 (과장 금지)
 
 | 항목 | 상태 | 사유 |
 |---|---|---|
-| Apache prefork + mod_php 프로파일 | `not_run` | 빌드·패키지 설치 필요(시간) — FPM이 startup 실패 시 워커를 종료하므로 프로세스 유지형 SAPI 검증은 필수 후속 |
+| Apache prefork + mod_php 프로파일 | **완료** — 빌드·기동·A/B 재현 3/3 (§4.6) | — |
 | WAF vs PHP 파싱 차이 랩(WAFFLED) | `not_run` | 로컬 WAF 구성 필요 |
 | FlowFusion/공식 Fuzzer 통합 | `not_run` | 별도 빌드·Corpus |
 | ZendDiff식 JIT/non-JIT 비교 | `not_run` | JIT 빌드 필요 |

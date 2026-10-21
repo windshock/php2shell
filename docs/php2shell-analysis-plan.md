@@ -123,7 +123,7 @@
 | P0: 정상 업로드 검증에 `PHP_SESSION_UPLOAD_PROGRESS` 필드가 없어 콜백 도달 증거 없음 | `linux/probe.py` P1/P2가 진행 필드를 포함한 multipart로 도달성·수명 주기를 관측. 추가로 GDB 브레이크포인트로 `php_session_rfc1867_callback` 호출 자체를 증명(P8) | 이번 턴 |
 | P0: `BG(serialize).level/.data/serialize_lock` 요청 단계별 관측 불가 | `linux/gdb-probe.py` 신설: `php_request_startup` 진입·`php_var_serialize_init/destroy`·콜백에서 상태를 출력해 **정상 대조군 + OOM 잔류** 전이를 기록(P8) | 이번 턴 |
 | P0: CLI/PHPT 기반 compare.py만으로는 HTTP 계층 패치 비교 불가 | `probe.py`가 HTTP E2E이므로, 공식 패치 후 **동일 프로파일·동일 입력을 수정 빌드에 재실행**하는 방식으로 전후 비교(Phase 4). 필요 시 응답·ASAN·워커 상태 3종 대조 | Phase 4 |
-| P1: Apache mod_php(prefork) 프로파일 부재 | FPM과 프로세스 수명 모델이 다른 Apache prefork + mod_php 빌드 프로파일을 Phase 4 선행 작업으로 추가(소스 빌드, 동일 ASAN/디버그 모드) | Phase 4 (패치 후 우선순위 조정) |
+| Apache prefork + mod_php(prefork) 프로파일 부재 | **구축·실행 완료**: `linux/build-apache.sh`(apxs2·ASAN), `linux/apache-lab.sh`(httpd -X, loopback 18088), `linux/apache-poc-matrix.sh`. A/B 재현 3/3, 동일 ASAN 스택 | 이번 턴 |
 | P1: INI 조합 부족(직렬화 핸들러·메모리 한도·기능 On/Off) | `probe.py` 프로파일에 `oom`(php 핸들러)·`oomps`(`php_serialize` 핸들러)·`lax`(strict Off) 추가. `session.upload_progress.enabled=Off` 대조는 Phase 4 매트릭스로 | 이번 턴 + Phase 4 |
 | P1: 증적 재검증성(해시·요약) | `linux-export` 후 `var/linux-evidence/evidence-manifest.sha256` 생성(모든 증적 파일 SHA-256). 실행 요약은 findings 문서에 기록 | 이번 턴 |
 | Calif 정적 분석 방법론(`php-unserialize-audit`) | `Serializable::unserialize()` 재진입·`__wakeup/__destruct` 상태 변경·`var_hash` 수명·세션 디코더 차이를 정적 체크리스트로 추가(S9). 자동 스캔 결과는 취약점 확정이 아니라 가설로만 취급 | Phase 4 |
@@ -184,7 +184,9 @@
 | `root_cause_confirmed` | 공식 패치·공지와 원인 일치 | 미도달(패치 전) |
 | `inconclusive` / `not_run` | 증거 부족 / 미실행 | 패치 비교, Apache |
 
-### 9.6 PoC 트랙 (2026-10-21 23:10 추가)
+### 9.6 PoC 트랙 (2026-10-21 22:12 추가, 22:35 증거 연결 정정)
+
+> 시각 정정: 이전 판의 `23:10`은 오기이며 실제 추가 시각은 22:12 KST다(증적 타임스탬프·커밋 시각 기준).
 
 **PoC의 정의와 계층** — “증명”을 한 덩어리로 보지 않고 4단계로 나눈다.
 
@@ -205,6 +207,17 @@
 
 **도구:** `linux/poc-bgserialize.py` (`--iterations N`, 기본 5). 각 회차는 새 프로세스로 시작하며, 요청 A/B 상태·OOM 로그·ASAN 요약·첫 프레임을 `result.json`에 기록한다.
 
+### 9.7 판정 정확도와 자동 검증 (외부 검토 반영)
+
+| 항목 | 도구/규칙 | 상태 |
+|---|---|---|
+| 회차별 ASAN 증거 연결 | `poc-bgserialize.py` — 회차 시작 전 스냅샷 제외, 신규 보고서만 채택, PID 일치 | 적용·검증 |
+| GDB 판정 인덱스 | `gdb-probe.py` — 전이 기반 OOM 요청 식별(고정 인덱스 제거) | 적용·검증 |
+| 매트릭스 종료 코드 | `probe-matrix.sh` — `pipefail` + `PIPESTATUS` 집계 | 적용 |
+| HTTP 비교 판정 분리 | `http-compare.py` — `--advisory` 없으면 `difference_observed`만 | 적용·검증 |
+| 증적 자동 감사 | `verify-evidence.py` — PoC 회차/PID, GDB 인덱스, 매니페스트 해시·BOM | **passed** |
+| 원본 증적 보관 | `docs/evidence-manifest-20261021.sha256`(1044개) — 저장소에는 해시만, 원본은 `var/linux-evidence/` | 적용 |
+
 ## 10. 산출물 목록
 
 1. `docs/php2shell-analysis-plan.md` — 이 문서.
@@ -212,6 +225,8 @@
 3. `linux/gdb-probe.py` (+ `linux-gdb.cmd`) — 요청 수명·직렬화 상태 계측 하네스(P8).
 4. `linux/http-compare.py` — 동일 입력 HTTP 전후 비교 도구(판정 어휘 포함).
 5. `linux/poc-bgserialize.py` — L0 트리거 PoC 러너(재현율 측정, 익스플로잇 아님).
+6. `linux/build-apache.sh`, `linux/apache-lab.sh`, `linux/apache-poc-matrix.sh` — Apache mod_php 랩(빌드·기동·재현율).
+7. `linux/verify-evidence.py` — 증적 자동 감사(회차별 ASAN·PID, GDB 인덱스, 매니페스트).
 5. `var/linux-evidence/evidence/probe-*/`, `probe-gdb-*/` — 프로브 실행 증적.
 6. `var/linux-evidence/evidence-manifest.sha256` — 증적 해시 매니페스트.
 7. `docs/php2shell-analysis-findings.md` — 정적·동적 분석 결과 및 주장별 판정표.
