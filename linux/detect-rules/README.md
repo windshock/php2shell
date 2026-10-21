@@ -9,7 +9,7 @@ and not a virtual patch.**
 | Rule set | Blocked | PHP-reachable bypasses |
 |---|---|---|
 | naive `ARGS_NAMES @streq` | 5/10 | **2** (duplicate `name`, extra parameter) |
-| `modsecurity-php2shell.conf` (this dir) | 6/10 | **2** (same) |
+| `modsecurity-php2shell.example.conf` (this dir) | 6/10 | **2** (same) |
 
 The sixth block is the `filename="x"; name="…"` shape, which PHP **never** used
 as the progress field. So the change adds a block but **removes no verified
@@ -52,7 +52,7 @@ condition references defined selections, no list-of-mappings OR traps).
 
 | File | Purpose |
 |---|---|
-| `modsecurity-php2shell.conf` | Baseline blocking rules (5→6/10, gap unchanged) |
+| `modsecurity-php2shell.example.conf` | Example blocking rules (5→6/10, gap unchanged). **Do not deploy**: loading it blocks traffic |
 | `sigma-php2shell.yml` | 4 experimental log rules |
 | `../validate-rules.py` | Structural validator (run after every edit) |
 | `../waf-lab.sh`, `../waf-compare.py` | Lab used to measure the numbers above |

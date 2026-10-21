@@ -19,10 +19,18 @@ def latest(pattern, root):
     return matches[-1] if matches else None
 
 
-def check_poc(root):
+def _result_paths(root, pattern):
+    """Support both the exported layout (<root>/evidence/...) and the live one (<root>/...)."""
+    return (sorted(root.glob('evidence/%s/result.json' % pattern))
+            + sorted(root.glob('%s/result.json' % pattern)))
+
+
+def check_poc(root, since=None):
     results = []
     by_target = {}
-    for path in sorted(root.glob('evidence/poc-*/result.json')):
+    for path in _result_paths(root, 'poc-*'):
+        if since is not None and path.parent.stat().st_mtime < since:
+            continue
         data = json.loads(path.read_text())
         target = data.get('target', 'cli-server')
         by_target[target] = (path, data)  # sorted() keeps the newest per target
@@ -67,9 +75,11 @@ def check_poc(root):
     return dict(status='passed' if not problems_all else 'failed', targets=results)
 
 
-def check_gdb(root):
+def check_gdb(root, since=None):
     by_mode = {}
-    for path in sorted(root.glob('evidence/probe-gdb-*/result.json')):
+    for path in _result_paths(root, 'probe-gdb-*'):
+        if since is not None and path.parent.stat().st_mtime < since:
+            continue
         data = json.loads(path.read_text())
         mode = data.get('verdict', {}).get('mode', 'serialize')
         by_mode[mode] = (path, data)  # newest per mode wins
@@ -113,7 +123,9 @@ def check_gdb(root):
     return dict(status='passed' if not problems_all else 'failed', modes=results)
 
 
-def check_manifest(root):
+def check_manifest(root, skip=False):
+    if skip:
+        return dict(status='not_run', reason='manifest check skipped (fresh-evidence mode)')
     manifest = root / 'evidence-manifest.sha256'
     if not manifest.exists():
         return dict(status='not_run', reason='no manifest')
@@ -143,19 +155,34 @@ def check_manifest(root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=REPO / 'var/linux-evidence')
+    parser.add_argument('--since', type=float, default=None,
+                        help='only audit evidence created after this unix timestamp '
+                             '(used by phase4 to prove this run produced its own evidence)')
+    parser.add_argument('--skip-manifest', action='store_true',
+                        help='skip the SHA-256 manifest check (live evidence directory has no manifest)')
     args = parser.parse_args()
     summary = dict(scope='evidence audit; fails on inconsistency',
-                   poc=check_poc(args.root), gdb=check_gdb(args.root),
-                   manifest=check_manifest(args.root))
+                   since=args.since,
+                   poc=check_poc(args.root, args.since), gdb=check_gdb(args.root, args.since),
+                   manifest=check_manifest(args.root, args.skip_manifest))
     parts = (summary['poc'], summary['gdb'], summary['manifest'])
-    checked = [part for part in parts if part['status'] != 'not_run']
-    if not checked:
-        summary['status'] = 'not_run'
-        summary['reason'] = 'no evidence was found to audit'
-    elif any(part['status'] == 'failed' for part in parts):
-        summary['status'] = 'failed'
+    if args.since is not None:
+        # Phase 4 mode: this run must have produced both PoC and GDB evidence.
+        fresh_ok = (summary['poc']['status'] == 'passed'
+                    and summary['gdb']['status'] == 'passed'
+                    and summary['manifest']['status'] in ('passed', 'not_run'))
+        summary['status'] = 'passed' if fresh_ok else 'failed'
+        if not fresh_ok:
+            summary['reason'] = 'evidence from this run is missing or invalid (--since)'
     else:
-        summary['status'] = 'passed'
+        checked = [part for part in parts if part['status'] != 'not_run']
+        if not checked:
+            summary['status'] = 'not_run'
+            summary['reason'] = 'no evidence was found to audit'
+        elif any(part['status'] == 'failed' for part in parts):
+            summary['status'] = 'failed'
+        else:
+            summary['status'] = 'passed'
     print(json.dumps(summary, indent=2))
     if summary['status'] == 'passed':
         return 0

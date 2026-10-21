@@ -636,3 +636,17 @@ PHPAPI void php_basic_early_rinit(void)
 | 문서 시각·커밋 불일치 | §6 머리글을 커밋 기준으로, Executive Summary는 해시 대신 매니페스트 참조 | — |
 
 **남은 한계:** Sigma 규칙은 구조 검증만 거쳤고 SIEM 변환·실행은 미실시다. ModSecurity 룰은 여전히 검증된 우회 2건을 막지 못하므로 **운영 차단 통제로 배포하면 안 된다**.
+
+### 6.6 2차 검토 반영 — 증적 귀속·PoC 판정 (2026-10-21, 커밋 기준)
+
+| 지적 | 수정 | 검증 |
+|---|---|---|
+| PoC 결과가 최종 성공 판정에 미반영 | `poc_valid`(이번 실행 결과 JSON 존재 + 5회 + 회차별 `result` 필드)를 `harness_ok`에 포함. PoC **실행 실패**와 **미재현**을 구분 | 8.4.27 실행: `poc_valid=true`, exit 0 / PoC 산출물이 없으면 inconclusive |
+| `verify-evidence`가 이전 증적을 검사 | `--since <epoch>`·`--root <라이브 경로>`·`--skip-manifest` 추가. Phase 4는 **이번 실행 이후 생성된** PoC/GDB 증적만 인정 | `--since` 미래값 → `failed`(exit 1), 정상 실행 → `passed` |
+| Phase 4 증적 경로 미연결 | 원본 증적 루트(`/home/phplab/php-lab/evidence`)를 직접 검사하고, 내보낸 사본과 분리 | 정상 exit 0 / 음성 대조 exit 2 재확인 |
+| Sigma 규칙 4의 `.php` 경로 필터 | 경로 조건 제거(모든 multipart POST), 프론트 컨트롤러 재작성·로그 본문 PII 주의 명시 | 구조 검증 PASS |
+| `validate-rules.py`가 구조 검사만 수행 | `sigma-cli` 변환을 시도했으나 기본 이미지에 `pip`가 없어 설치 실패 → **구조 검증만** 수행함을 명시 | 미완(한계로 기록) |
+| ModSecurity 파일이 실제 `deny` 동작 | `modsecurity-php2shell.example.conf`로 개칭, “운영 적용 금지” 헤더 추가, 랩 기본 경로 갱신 | `waf-compare` 6/10·PHP 도달 2건 유지 |
+| 문서 증적 개수 불일치 | 하드코딩 제거(매니페스트 참조) | — |
+
+**남은 한계:** Sigma의 SIEM 변환·실행 검증과 109618 고유 손상 경로 재현은 여전히 미완이다.

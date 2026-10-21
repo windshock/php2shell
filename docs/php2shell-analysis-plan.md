@@ -267,6 +267,10 @@
 | CVE-2026-109618 고유 경로 | **부분** — 조건·처리 차이 재현, 손상 미재현 | `probe.py --profile oomparse` (findings §6.2) |
 | 109619 다른 변형 | **정적 조사 완료** — 시작 단계 (un)serialize는 session.c가 유일, url_scanner/fatal backtrace는 별도 상태류 | `linux/serialize-sites.sh` (findings §6.3) |
 | 탐지 룰 | **구축·부분 검증** — ModSecurity 6/10(우회 2건 유지, 통제 아님), Sigma 4종(구조 검증) | `linux/detect-rules/`, `linux/validate-rules.py` (findings §6.4·§6.5) |
+| Phase 4 PoC 판정 | **완료** — `poc_valid`(결과 JSON·5회·회차별 result)를 harness 조건에 포함 | findings §6.6 |
+| Phase 4 증적 귀속 | **완료** — `verify-evidence --since/--root`로 이번 실행 증적만 인정 | 음성 대조 exit 2 |
+| Sigma 운영 호환 | **부분** — `.php` 경로 필터 제거, SIEM 변환·실행은 미검증 | validate-rules 구조 PASS |
+| ModSecurity 예제 표기 | **완료** — `*.example.conf`, “운영 적용 금지” 헤더 | waf-compare 6/10 유지 |
 
 ## 10. 산출물 목록
 

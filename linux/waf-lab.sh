@@ -8,7 +8,7 @@ port=${2:-18090}
 base=/home/phplab/php-lab
 prefix="$base/install/8.4.4-apache"
 run="$base/evidence/waf-lab"
-rules=${RULES_FILE:-/mnt/c/Users/user/Downloads/php/linux/detect-rules/modsecurity-php2shell.conf}
+rules=${RULES_FILE:-/mnt/c/Users/user/Downloads/php/linux/detect-rules/modsecurity-php2shell.example.conf}
 mkdir -p "$run/tmp" "$run/data" "$run/sessions" "$run/uploads"
 
 cat > "$run/php.ini" <<INI

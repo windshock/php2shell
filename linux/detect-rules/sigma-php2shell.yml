@@ -83,13 +83,15 @@ falsepositives:
 level: high
 
 ---
-title: Multipart POST to a PHP endpoint (correlation counterpart)
+title: Multipart POST to a PHP-handled endpoint (correlation counterpart)
 id: c9e4b7a3-2f61-4d8c-9a47-5b1e3f8d2c06
 status: experimental
 description: >
-  Counterpart for joining with the worker-termination rule: flags multipart POST
-  requests to PHP-handled paths. Join on host and a short time window in the SIEM;
-  tune the URI condition to the deployment.
+  Counterpart for joining with the worker-termination rule. Matches multipart
+  POSTs regardless of the visible path: front-controller rewriting means the URL
+  often has no .php suffix (the lab serves /upload through index.php). Join on
+  host plus a short window in the SIEM. Expected to be high volume; use only as
+  a correlation input, never as a standalone alert.
 logsource:
   category: webserver
 detection:
@@ -97,12 +99,10 @@ detection:
     cs-method: POST
   selection_type:
     cs-content-type|contains: 'multipart/form-data'
-  selection_path:
-    cs-uri-stem|endswith: '.php'
-  condition: selection_method and selection_type and selection_path
+  condition: selection_method and selection_type
 fields:
   - c-ip
   - cs-uri-stem
 falsepositives:
-  - Normal file uploads (expected high volume; use only as a correlation input)
+  - Normal file uploads (expected high volume)
 level: low

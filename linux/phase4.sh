@@ -79,7 +79,7 @@ run_step compare_progress python3 linux/http-compare.py --before "$affected-$fla
 run_step compare_oom python3 linux/http-compare.py --before "$affected-$flavor" --after "$ver-$flavor" \
   --scenario oom-residue --advisory "$advisory"
 
-run_step verify python3 linux/verify-evidence.py
+run_step verify python3 linux/verify-evidence.py --root /home/phplab/php-lab/evidence --since "$T0" --skip-manifest
 [ "${STEP_RC[verify]}" -eq 0 ] || fail "verify-evidence failed"
 
 # ---------- aggregate verdict ----------
@@ -106,6 +106,10 @@ def load(path):
 summary['probes'] = probe_rcs
 summary['steps']['poc_rc'] = int(poc_rc)
 poc = load(fresh('/home/phplab/php-lab/evidence/poc-*-%s-tracked/result.json' % ver))
+poc_valid = bool(poc and poc.get('iterations') == 5
+                 and len(poc.get('results', [])) == 5
+                 and all('result' in item for item in poc.get('results', [])))
+summary['poc_valid'] = poc_valid
 if poc:
     summary['poc_reproduced'] = poc.get('reproduced')
     summary['poc_iterations'] = poc.get('iterations')
@@ -144,15 +148,17 @@ statuses = (summary['compare_progress'], summary['compare_oom'])
 all_probes_ok = all(rc == 0 for rc in probe_rcs.values())
 comparisons_ok = (int(cmp1_rc) in (0, 2) and int(cmp2_rc) in (0, 2)
                   and all(statuses) and 'inconclusive' not in statuses)
-harness_ok = (all_probes_ok and int(gdbs_rc) == 0 and int(gdbu_rc) == 0 and comparisons_ok)
+harness_ok = (all_probes_ok and int(gdbs_rc) == 0 and int(gdbu_rc) == 0 and comparisons_ok
+              and poc_valid)
 summary['steps']['all_probes_ok'] = all_probes_ok
 summary['steps']['comparisons_ok'] = comparisons_ok
 
 if not harness_ok:
     summary['verdict'] = 'inconclusive'
     summary['reason'] = ('probe or comparison step did not complete: probes=%s '
-                         'gdbs=%s gdbu=%s compare=%s/%s' %
-                         (probe_rcs, gdbs_rc, gdbu_rc, summary['compare_progress'], summary['compare_oom']))
+                         'gdbs=%s gdbu=%s poc_valid=%s compare=%s/%s' %
+                         (probe_rcs, gdbs_rc, gdbu_rc, poc_valid,
+                          summary['compare_progress'], summary['compare_oom']))
 elif 'regression_difference_observed' in statuses or 'difference_observed' in statuses:
     summary['verdict'] = 'regression_difference_observed'
 else:

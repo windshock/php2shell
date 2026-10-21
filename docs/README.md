@@ -9,7 +9,7 @@ PHP2Shell 분석 산출물의 읽는 순서와 역할입니다.
 | [php2shell-analysis-plan.md](php2shell-analysis-plan.md) | 분석 수행자 | 단계별 계획, 판정 어휘, 외부 연구 방법론 통합표, Phase 4 엄격 판정 규칙 |
 | [linux-environment.md](linux-environment.md) | 인프라·랩 운영 | WSL2/ASAN/FPM 빌드·검증 환경과 증적 수집 |
 | [php2shell-llm-handoff.md](php2shell-llm-handoff.md) | 후속 담당자 | 인수인계, 검토 지적별 처리 내역, 모니터링 이력 |
-| [evidence-manifest-20261021.sha256](evidence-manifest-20261021.sha256) | 검증 담당자 | 증적 2,839개 SHA-256 목록(원본은 `var/linux-evidence/`) |
+| [evidence-manifest-20261021.sha256](evidence-manifest-20261021.sha256) | 검증 담당자 | 증적 SHA-256 목록(개수는 파일 참조, 원본은 `var/linux-evidence/`) |
 
 ## 도구 위치
 
