@@ -427,12 +427,45 @@ ASAN 스택:
 - 완료 후에도 `upload_progress_co1` 키 유지, `bytes_processed=65805`, `done=true`.
 - 기본값(On)에서는 완료 시 키가 제거된다(§2.2와 대조).
 
-### 4.10 미구현·미검증 목록 (과장 금지)
+### 4.10 WAF 파싱 대조 (WAFFLED 방식, 2026-10-21 22:37 추가)
+
+환경: Apache 2.4.58 + mod_php 8.4.4 + **ModSecurity 2.9.7**, loopback 18090, 규칙:
+
+```apache
+SecRule ARGS_NAMES "@streq PHP_SESSION_UPLOAD_PROGRESS" "id:1001,phase:2,deny,status:403"
+```
+
+PHP 측은 `cleanup=Off`로 진행 키를 유지해, 요청 후 세션 파일에서 `upload_progress_<value>` 존재 여부로 **PHP 실제 도달**을 판정했다.
+
+| 변형 (Content-Disposition) | HTTP | PHP 도달 | 판정 |
+|---|---|---|---|
+| `name="PHP_SESSION_UPLOAD_PROGRESS"` (기준) | 403 | 아니오 | WAF 차단 |
+| `name=PHP_SESSION_UPLOAD_PROGRESS` (비인용) | 403 | 아니오 | WAF 차단 |
+| `name = "…"` (공백) | 403 | 아니오 | WAF 차단 |
+| `filename="x"; name="…"` (순서) | 200 | 아니오 | PHP가 진행 필드로 인식 안 함 |
+| `name="php_session_upload_progress"` (소문자) | 200 | 아니오 | PHP는 대소문자 구분 |
+| **`name="foo"; name="…"` (중복)** | **200** | **예** | **규칙 누락 — PHP는 처리** |
+| `name*=UTF-8''…` (RFC2231) | 400 | 아니오 | 양쪽 미처리 |
+| `name="…"\t` (탭) | 403 | 아니오 | WAF 차단 |
+| `name="…";` (세미콜론) | 403 | 아니오 | WAF 차단 |
+| **`foo="bar"; name="…"` (추가 파라미터)** | **200** | **예** | **규칙 누락 — PHP는 처리** |
+
+**요약:** 10개 중 5개 차단, **2개는 WAF를 통과하면서 PHP는 진행 필드로 처리**했다(`passed_and_reached`).
+
+해석:
+
+1. 필드 이름 문자열 매칭(`ARGS_NAMES @streq`) 규칙은 **파라미터 순서·중복**에 취약하다. ModSecurity의 multipart 이름 해석과 PHP rfc1867의 해석이 다르기 때문에, 같은 요청을 한쪽은 일반 필드로, 다른 쪽은 진행 필드로 본다.
+2. 따라서 이런 유형의 WAF 규칙을 “PHP2Shell 가상패치”라고 부를 수 없다(보고서 §13.3의 경고와 일치).
+3. `filename_first`는 양쪽 모두 진행 필드로 보지 않았으므로 차단 누락이 아니라 **PHP 쪽 미도달**이다. 판정을 “WAF 차단/허용”과 “PHP 도달”로 분리한 이유다.
+
+한계: 단일 WAF 버전·단일 규칙·로컬 환경이다. 상용 WAF/CRS의 정규화·디코딩 단계는 별도 검증이 필요하다.
+
+### 4.11 미구현·미검증 목록 (과장 금지)
 
 | 항목 | 상태 | 사유 |
 |---|---|---|
 | Apache prefork + mod_php 프로파일 | **완료** — 빌드·기동·A/B 재현 3/3 (§4.6) | — |
-| WAF vs PHP 파싱 차이 랩(WAFFLED) | `not_run` | 로컬 WAF 구성 필요 |
+| WAF vs PHP 파싱 차이 랩(WAFFLED) | **완료** — Apache+ModSecurity 2.9.7, 10변형 중 2건 규칙 누락(§4.10) |
 | FlowFusion/공식 Fuzzer 통합 | `not_run` | 별도 빌드·Corpus |
 | ZendDiff식 JIT/non-JIT 비교 | `not_run` | JIT 빌드 필요 |
 | `cleanup=Off` 세션 파일 내용 잔류 | `not_run` | 후속 1회 실행으로 확인 가능 |

@@ -165,7 +165,7 @@
 | Calif MAD Bugs / php-unserialize-audit | `Serializable` 재진입, `__wakeup/__destruct`, `var_hash` 수명, 세션 디코더 차이 | 정적 체크리스트(S9, 문서) | 문서만 | 자동 스캔 |
 | ZendDiff | 내부 상태 프로빙·차등 비교, 비결정성 제거 | `linux/gdb-probe.py`, `linux/http-compare.py` | **실행 검증** | JIT 비교 |
 | ATROPOS / PHUZZ | 상태 유지 HTTP 시퀀스, 스냅샷·복원, 오류 수집 | `linux/probe.py` P4(교차 요청) | **실행 검증** | 커버리지 계측 |
-| WAFFLED | 원문 바이트 보존, WAF vs PHP 파싱 비교, 오탐/누락 평가 | `linux/waf-lab.py`(예정) | 미실행 | 로컬 WAF 구성 |
+| WAFFLED | 원문 바이트 보존, WAF vs PHP 파싱 비교, 오탐/누락 평가 | `linux/waf-lab.sh`, `linux/waf-compare.py` | **실행 검증** (10변형, 2건 누락) | CRS/상용 WAF |
 | FUGIO / FUSE | 애플리케이션 의존 조건 분리, 확장 지점 | 설계 문서(§3.1) | — | 낮은 우선순위 |
 | Check Point unserialize | `zval`/`HashTable` 소유권, 참조 카운트, 재진입 | findings §1(S3·S4) | **정적 검증** | — |
 
@@ -241,6 +241,7 @@
 6. `linux/build-apache.sh`, `linux/apache-lab.sh`, `linux/apache-poc-matrix.sh` — Apache mod_php 랩(빌드·기동·재현율).
 7. `linux/verify-evidence.py` — 증적 자동 감사(회차별 ASAN·PID, GDB 인덱스, 매니페스트).
 8. `linux/gdb-unserialize.py` — `BG(unserialize)`(Bug U) 상태 계측·재현 하네스.
+9. `linux/waf-lab.sh`, `linux/waf-compare.py` — ModSecurity vs PHP 파싱 대조 랩.
 5. `var/linux-evidence/evidence/probe-*/`, `probe-gdb-*/` — 프로브 실행 증적.
 6. `var/linux-evidence/evidence-manifest.sha256` — 증적 해시 매니페스트.
 7. `docs/php2shell-analysis-findings.md` — 정적·동적 분석 결과 및 주장별 판정표.
