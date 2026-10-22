@@ -282,7 +282,7 @@
 |---|---|---|---|
 | A. 부분 초기화 HashTable (109618) | `_zend_hash_str_add_or_update_i`가 count를 먼저 올리고 key 할당에서 fatal → teardown이 미초기화 Bucket 소비 | mod_php (≥7.3) | **미재현** (P14는 FPM) |
 | B. Session 전역 상태 (109619) | 파싱 중 `PS(id)`·`PS(http_session_vars)`가 요청 힙을 가리킴 → fatal로 END/RSHUTDOWN 생략 → 워커 생존 → 다음 요청 END cleanup이 소비 | mod_php (≥5.4) | **미검증** |
-| C. `BG(unserialize)` post-RINIT (109619) | RINIT 이후 앱 실행 중 unserialize fatal → FPM 워커 생존 → 다음 요청 재사용 | PHP-FPM | **부분** (pre-RINIT만 재현) |
+| C. `BG(unserialize)` post-RINIT (109619) | RINIT 이후 앱 실행 중 unserialize fatal → 워커 생존(FPM·mod_php 공통, 앱 의존 — §9.14-5 정정) → 다음 요청 재사용 | PHP-FPM·mod_php (앱 의존) | **부분** (pre-RINIT만 재현; FPM이 자체 미커버 SAPI라 P17 대상) |
 
 #### (2) OOM 전달 기법 (Calif) vs 우리 실험
 
@@ -292,14 +292,14 @@
 | `filename=""` 빈 업로드 + 중첩 필드명 | `$_FILES` 6항목 × 중첩 HashTable/Bucket/키 할당 → 본문 8MiB 미만으로 128MiB 소진 | **미시험** (P14는 일반 필드 30k) |
 | 일반 필드 다수 | 파서 배열 오버헤드 | 시험(8.4.4 OOM/8.4.27 조기 종료) |
 
-#### (3) 신규 실험 설계 (미실시, 우선순위 순)
+#### (3) 신규 실험 설계 — **실행 완료(2026-10-22, 결과는 §(6)·findings §8)**
 
 | ID | 목표 | 설계 | 판정 기준 |
 |---|---|---|---|
-| **P15** | 109618 Path A 재현 | Apache mod_php(ASAN/tracked) + `filename=""` 중첩 업로드로 key 할당 OOM 유도. 8.4.4 vs 8.4.27 | ASAN이 mod_php request shutdown의 Bucket 소비를 보고하면 “재현” |
-| **P16** | 109619 Path B(PS 상태) | mod_php: 요청 A(파일 파트+progress → early session init 후 파싱 fatal), 요청 B(파일 파트 없는 progress)로 END cleanup 유도. GDB로 `PS(id)`/`PS(http_session_vars)` 관측 | PS가 해제 힙을 가리키며 소비되면 “재현” |
-| **P17** | 109619 Path C(post-RINIT, FPM) | 랩 전용 엔드포인트에서 unserialize 도중 OOM fatal → 워커 생존 확인 → 다음 요청에서 `BG(unserialize)` 재사용 관측 | 워커 동일 PID + 다음 요청 ASAN UAF |
-| **P18** | OOM 전달 matrix | chunked/lengthless, 압축 해제 필터, 빈 업로드 중첩 각각의 OOM 도달 여부 | 본문/힙 비율과 도달 지점 기록 |
+| **P15** | 109618 Path A 재현 | Apache mod_php(ASAN/tracked) + `filename=””` 중첩 업로드로 key 할당 OOM 유도 — memory_limit×부품 수×중첩 깊이 스윕으로 fatal 지점 조준. 8.4.4 vs 8.4.27 | ① 백트레이스로 fatal 사이트가 key 할당(`zend_hash.c:958`, 8.4.4 기준)임을 확인(resize `:952`와 구분) ② ASAN Bucket 소비 보고 **또는** GDB 미초기화 bucket 소비 관찰 시 “재현” (§9.14-5a) |
+| **P16** | 109619 Path B(PS 상태) | mod_php: 요청 A(파일 파트+progress → early session init 후 파싱 fatal)는 findings §4.6 Apache Bug S 재현과 동일 형상 재사용, 요청 B(파일 파트 없는 progress + 폼 필드 `PHPSESSID`)만 신규. GDB로 `PS(id)`/`PS(http_session_vars)`·`PG(modules_activated)` 관측. 8.4.4 vs 8.4.27 | PS가 해제 힙을 가리키며 소비되면 “재현” (§9.14-5b) |
+| **P17** | 109619 Path C(post-RINIT, FPM) | 랩 전용 엔드포인트에서 unserialize 도중 OOM fatal(런타임 fatal → 정상 shutdown 후 워커 생존 기대) → 다음 요청(파싱 중 decode, `gdb-unserialize.py` 소비자와 동일 형상)에서 `BG(unserialize)` 재사용 관측. `pm.max_children=1`·A/B 사이 타 요청 금지. 8.4.4 vs 8.4.27 | 워커 동일 PID + 다음 요청 ASAN UAF (§9.14-5c) |
+| **P18** | OOM 전달 matrix | chunked/lengthless, 압축 해제 필터, 빈 업로드 중첩 각각의 OOM 도달 여부 + **배포 가능 조합** 표기(mod_php=prefork↔HTTP/2 충돌, FPM은 프록시 `CONTENT_LENGTH` 합성 의존). 빈 업로드 증폭 arm은 P15와 통합 실행 | 본문/힙 비율, 도달 지점, 실배포 성립 여부 기록 (§9.14-5e) |
 
 **안전 경계:** P15~P17도 **메모리 오류 관측까지**이며 RCE 체인 작성·실행은 계속 비목표다.
 
@@ -307,6 +307,37 @@
 
 - 109618/109619 매핑 정정(§5.1), FPM 문구에 “이 시퀀스에서는” 한정(§2.7, §3.2, §4.6), P12/P14 음성 결과에 전달 형태·SAPI 한정(§4.9a, §6.2).
 - findings §7에 Calif 대조·커버리지 표·문구 정정 기록.
+
+#### (5) 재검토 보강 (2026-10-22, 원문·공식 advisory·8.4.4 소스 대조)
+
+P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
+
+**a. P15 — fatal 지점 조준과 판정 이중화.** 8.4.4 `Zend/zend_hash.c:955-956`(`nNumUsed++`·`nNumOfElements++`)가 `:958`(key `zend_string_init`)보다 먼저 실행되는 것이 Path A의 전제다. 단 `:952`의 `ZEND_HASH_IF_FULL_DO_RESIZE`(realloc) 실패는 bucket을 남기지 않는 **다른 지점**이므로:
+
+- **조준:** memory_limit × 빈 업로드 부품 수 × 중첩 깊이를 스윍해 fatal이 key 할당에 착지하는 매개변수를 탐색. resize·값 문자열 등 인접 할당에 걸리면 조정.
+- **판정:** ① 백트레이스로 fatal 사이트가 key 할당임을 확인(P14 "일반 파싱 OOM"과의 차별화 근거). ② "재현" = ASAN Bucket 소비 보고 **또는** GDB로 `zend_hash_destroy`가 `nNumUsed`까지 순회하며 미초기화 bucket을 소비하는 관찰. stale bucket이 우연히 유효·미포이즌 메모리를 가리키면 ASAN이 침묵할 수 있어 음성을 부정 증거로 쓰지 않는다("이 조건에서 미재현"으로 한정).
+- **8.4.27 해석:** 소멸 형태가 전달 차단형(fatal 자체 미발생, P14의 8.4.27 결과 방식)인지 소비 지점 제거형인지 구분해 기록 → `root_cause_confirmed`(109618) 승격 근거를 깨끗하게 유지.
+
+**b. P16 — 생산자 재사용·GDB 체크리스트·8.4.27 대조.** 요청 A(생산자)는 findings §4.6 Apache Bug S 재현과 동일 요청 형상을 그대로 쓰고 요청 B(소비자)만 신규 구현한다. GDB 관측에 `PS(id)`·`PS(http_session_vars)` 외에 ① `PG(modules_activated)=0` 게이트(모듈 RSHUTDOWN 생략 원인), ② Session RSHUTDOWN 실제 스킵, ③ 요청 B의 END cleanup이 댕글링 PS를 소비하는 지점을 추가한다. 요청 B의 SID는 폼 필드 `PHPSESSID`로 전달(S7/P7에서 재현). 8.4.27 대조 포함.
+
+**c. P17 — 소비자 형상·타이밍 제약·8.4.27 대조.** 소비자 재사용 지점은 파싱 중 decode 경로(업로드 진행)로 `gdb-unserialize.py`의 소비자와 동일 형상임을 명시한다(원문 Path C도 소비자는 파싱 중 세션 시작 경로). 타이밍 제약 "A/B 사이 타 요청 금지"(findings §4.5 학습 — basic RINIT의 memset이 잔류를 지움)가 FPM에도 동일 적용되므로 `pm.max_children=1` + 순차 요청을 조건으로 명시. 요청 A는 런타임 fatal이므로 정상 shutdown 후 워커 생존(500 응답 + PID 동일)이 기대값이다. 8.4.27 대조: 생산자(앱 OOM fatal)는 그대로 발생해도 `php_basic_early_rinit()` 재설정으로 재사용 소멸 예상 — 잔류 생존과 소비 차단이 분리된 patch_effect 시험이 된다.
+
+**d. 8.4.27 대조 공통화.** 기존 P15에만 있던 수정 빌드 비교를 P16/P17에도 추가해 3실험 공통으로 만든다(Phase 4 판정 방법론 — 재현→수정 빌드 소멸→`patch_effect` — 과 정합). 예상 소멸 형태: P16은 P15와 마찬가지로 전달 차단형 가능, P17은 생산자 잔존 + 재사용 소멸형.
+
+**e. P18 — 배포 가능 조합 표기.** 결과가 위험 평가로 연결되도록 각 arm에 "실제 배포에서 성립하는 조합인가"를 기록한다. mod_php는 prefork 강제·HTTP/2는 event/worker 필요 → "lengthless HTTP/2 + mod_php"는 실배포 불가 조합. FPM은 앞단(nginx/Apache)이 dechunk 후 `CONTENT_LENGTH`를 합성하는 구성이 많아 chunked 불일치 arm은 프록시 구성 의존으로 기록. 압축 해제 mismatch는 Apache 입력 필터로 랩 재현 가능 arm. 빈 업로드 증폭 arm은 P15의 전제 기법이므로 P15와 통합 실행.
+
+**f. 우선순위 참고.** CVE 커버리지 기준(109618이 유일한 미재현 CVE이므로 P15 우선)은 유지하되, 비용·확정 속도 기준으로는 P16(생산자 이미 확보, 소비자만 신규)을 먼저 확정하고 P15 조준 스윕을 병행하는 순서도 합리적이다. → 실제 실행은 P16 → P15 → P17 → P18 순으로 진행했다.
+
+#### (6) 실행 결과 (2026-10-22, 상세는 findings §8)
+
+| ID | 8.4.4 | 8.4.27 (소멸 형태) | 핵심 증거 |
+|---|---|---|---|
+| **P16** Path B | **재현 3/3** (ASAN UAF `ps_files_close` + 3종 스택) | 소멸 0/3 — MULTIPART_EVENT_START `php_rinit_session_globals()` 선행 리셋(소비 지점 리셋형) | GDB ①`modules_activated=0` ②RSHUTDOWN 스킵 ③요청 B가 요청 A와 동일 `PS(id)` 포인터·sid 사용 |
+| **P15** Path A | **재현 3/3** (fatal 328B 키 할당 → `zend_array_destroy` SEGV) | 소멸 — 400·fatal 없음(`ZEND_HAS_OOM` 조기 종료, 전달 차단형) | GDB fatal 사이트 = `_zend_hash_str_add_or_update_i` **zend_hash.c:958**(nNumUsed++ 이후). 28M 대조(new_array 착지)는 크래시 없음 — 인과 입증 |
+| **P17** Path C | **재현 3/3** (FPM 워커 생존 → 요청 B `tmp_var` UAF) | 소멸 0/3 — `php_basic_early_rinit()` BG 리셋(생산자 잔존+소비 차단형) | 3종 스택: 할당 `zif_unserialize`(앱 실행 중) / 해제 요청 A 종료 / 사용 요청 B 파싱 중 decode |
+| **P18** 매트릭스 | mod_php+chunked **우회 실증**(경고 없이 실제 5.77MB 도달·fatal); nginx(버퍼링 on)은 413로 중화; gzip arm은 이 랩 구성에서 미성립; 빈 업로드 증폭 2.56MB→32MB+ | — | `oom-delivery-*` 증적 |
+
+**판정 갱신:** `root_cause_confirmed`(CVE-2026-109618) 성립(랩 조건 한정). 109619는 세 경로 모두 재현. 안전 경계(관측까지, RCE 비목표)는 전 실험에서 유지됐다.
 
 ## 10. 산출물 목록
 

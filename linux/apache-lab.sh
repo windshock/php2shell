@@ -5,8 +5,10 @@ set -euo pipefail
 action=${1:-start}
 port=${2:-18088}
 base=/home/phplab/php-lab
-prefix="$base/install/8.4.4-apache"
-run="$base/evidence/apache-lab"
+# Overrides let the same lab drive other builds (e.g. 8.4.27) without
+# touching the default 8.4.4 layout.
+prefix="${APACHE_LAB_PREFIX:-$base/install/8.4.4-apache}"
+run="${APACHE_LAB_RUN:-$base/evidence/apache-lab}"
 mkdir -p "$run"
 ini="$run/php.ini"
 conf="$run/httpd.conf"
@@ -17,7 +19,7 @@ display_errors=Off
 log_errors=On
 error_reporting=E_ALL
 expose_php=Off
-memory_limit=8M
+memory_limit=${APACHE_LAB_MEMORY_LIMIT:-8M}
 max_execution_time=30
 file_uploads=On
 upload_max_filesize=2M
@@ -66,6 +68,10 @@ LogLevel warn
     SetHandler application/x-httpd-php
 </FilesMatch>
 CONF
+# Optional extra directives (e.g. input filters for the P18 delivery matrix).
+if [[ -n "${APACHE_LAB_EXTRA_CONF:-}" ]]; then
+  printf '%s\n' "$APACHE_LAB_EXTRA_CONF" >> "$conf"
+fi
 
 asan=$(ls /usr/lib/x86_64-linux-gnu/libasan.so.8 2>/dev/null || true)
 [[ -n "$asan" ]] || { echo 'libasan.so.8 not found'; exit 1; }
