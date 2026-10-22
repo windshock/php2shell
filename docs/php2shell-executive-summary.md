@@ -19,7 +19,7 @@
 
 | 구분 | 공식 확인 | 자체 검증 결과 |
 |---|---|---|
-| **CVE-2026-109618** (OOM corruption, GHSA-w8hw-w9fx-j79w) | OOM으로 요청 내부 데이터가 부분 초기화된 채 정리되어 RCE 가능 | OOM bailout이 직렬화 윈도우에 걸리는 조건을 재현했으나, **109618 고유 손상 경로는 별도 재현하지 않음** |
+| **CVE-2026-109618** (OOM corruption, GHSA-w8hw-w9fx-j79w) | `_zend_hash_str_add_or_update_i`의 **count-before-key-allocation** → 부분 초기화 Bucket을 mod_php 종료가 소비 | OOM 조건·처리 차이만 관측(FPM에서 시도). **고유 손상 경로는 미재현** — 대표 소비 SAPI는 mod_php(§7.1 A) |
 | **CVE-2026-109619** (stale global state, GHSA-6wmf-4rv5-p3rp) | 해제된 메모리를 가리키는 요청 소유 상태가 후속 요청에서 재사용 | **재현·패치 후 소멸 확인** (`BG(serialize)`·`BG(unserialize)`, ASAN UAF) |
 | 초기 공개 PoC(포인터 UAF) | 공식 원인 아님 | 원본 코드 참조 카운트 분석으로 **반박** |
 | WAF 필드명 룰 | 완전한 완화책 아님 | 10변형 중 **2건 통과·PHP 도달** 실측 |
@@ -55,7 +55,7 @@
 
 이 사안은 **공개 PoC의 진위 논쟁이 아니라 공식 확인된 Critical RCE 위험**으로 관리해야 한다. 자체 분석의 기여는 ① 잘못된 PoC 원인 설명의 반박, ② 요청 간 내부 상태와 SAPI 차이를 계측 대상으로 전환, ③ 패치 전후 소멸 검증, ④ WAF 룰의 실제 한계 실측이다.
 
-**남은 검증:** ① CVE-2026-109618 고유 손상 경로의 독립 재현, ② 배포판 패키지·백포트 버전의 실제 적용 확인, ③ 실서비스 WAF와 PHP의 파싱 일치 점검·오탐 평가, ④ Sigma 룰의 SIEM 적용 검증.
+**남은 검증:** ① CVE-2026-109618 Path A(mod_php)와 109619 Path B(PS 상태)·Path C(post-RINIT FPM) 재현, ② 배포판 패키지·백포트 버전의 실제 적용 확인, ③ 실서비스 WAF와 PHP의 파싱 일치 점검·오탐 평가, ④ Sigma 룰의 SIEM 적용 검증.
 
 ---
 
@@ -67,5 +67,6 @@
 [4] [자체 분석 결과 보고서](https://github.com/windshock/php2shell/blob/main/docs/php2shell-analysis-findings.md)
 [5] [분석 계획 및 판정 기준](https://github.com/windshock/php2shell/blob/main/docs/php2shell-analysis-plan.md)
 [6] [증적 SHA-256 매니페스트](https://github.com/windshock/php2shell/blob/main/docs/evidence-manifest-20261021.sha256)
+[7] [Calif — A Tale of Two PHP Remote Vulnerabilities](https://calif.io/php2shell/) — 3개 중단 지점·OOM 전달 기법 대조(§7, §9.14)
 
 *검증 경계: 자체 실험은 격리 환경의 메모리 오류·요청 처리·WAF 동작을 대상으로 하며, 자체 RCE 또는 실제 운영 환경의 침해를 입증하지 않는다. 공식 권고의 RCE 확인과 자체 실험의 재현 수준은 구분해 해석해야 한다.*

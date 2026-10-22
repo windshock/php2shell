@@ -180,7 +180,7 @@ WARNING: [pool lab] child 833 exited with code 70 after 0.480847 seconds from st
 → nginx 502, 워커 재기동(833→856), 다음 요청 200
 ```
 
-**exit code 70 = FPM_EXIT_SOFTWARE_ERROR** — `php_request_startup()` 실패 시 FPM이 워커 프로세스를 종료한다. 따라서 BG(serialize) 잔류를 보유한 프로세스가 사라져 **FPM에서는 요청 간 재사용 경로가 성립하지 않는다.** 이것이 이번 CVE의 안전 근거는 아니며, SAPI 의존성의 증거다.
+**exit code 70 = FPM_EXIT_SOFTWARE_ERROR** — `php_request_startup()` 실패 시 FPM이 워커 프로세스를 종료한다. 따라서 BG(serialize) 잔류를 보유한 프로세스가 사라져 **이번에 시험한 요청 초기화 실패 시퀀스에서는** 요청 간 재사용이 성립하지 않는다. RINIT **이후** fatal 경로는 별개이며(§7.1 Path C), 이것이 이번 CVE의 안전 근거는 아니다.
 
 #### (b) CLI 내장 서버: 잔류 → 재사용 → ASAN UAF 재현 (확인, B)
 
@@ -248,13 +248,13 @@ ASAN 보고서(`asan.1087`)의 3개 스택이 가설과 정확히 일치한다:
 
 - “HTTP 200 + 진행 상태 갱신” → **코드 경로 도달** 확인.
 - “ASAN 동일 주소 해제 후 접근” → **해당 빌드·조건에서 메모리 오류 재현** 확인(8.4.4/8.5.4, CLI server, tracked, memory_limit).
-- “수정되지 않은 정식 PHP에서 반복 재현” → CLI server 5/5, **Apache mod_php 3/3**, 두 SAPI·두 버전에서 재현. FPM은 워커 종료로 경로 자체가 소멸한다. 따라서 **“강하게 뒷받침” 단계로 한정**한다(SAPI 의존성 명시).
+- “수정되지 않은 정식 PHP에서 반복 재현” → CLI server 5/5, **Apache mod_php 3/3**, 두 SAPI·두 버전에서 재현. FPM은 **startup 실패 시퀀스에서** 워커 종료로 경로가 소멸한다(RINIT 이후 fatal 경로는 §7.1 Path C로 별도). 따라서 **“강하게 뒷받침” 단계로 한정**한다(SAPI 의존성 명시).
 - “공식 패치 전 재현·후 소멸” → **미확인**(패치 미공개). Phase 4 항목.
 - “공식 코드 변경·공지와 원인 일치” → **미확인**. 따라서 **CVE-2026-109618/109619의 근본 원인으로 확정하지 않는다.**
 
 ### 3.3 한계
 
-1. 이번 UAF 재현은 **CLI 내장 서버 + ASAN + tracked 할당기 + `memory_limit` OOM** 조건이다. FPM은 `php_request_startup()` 실패 시 워커를 종료(exit 70)해 요청 간 잔류가 성립하지 않았고, Apache mod_php는 아직 구축하지 않았다. 배포 환경별 결론은 SAPI별로 달라질 수 있다.
+1. 이번 UAF 재현은 **CLI 내장 서버 + ASAN + tracked 할당기 + `memory_limit` OOM** 조건이다. FPM은 `php_request_startup()` 실패 시 워커를 종료(exit 70)해 **이 시퀀스에서는** 요청 간 잔류가 이어지지 않았다. 배포 환경별 결론은 SAPI별로 달라질 수 있다.
 2. OOM 지점은 할당기 회계 방식에 따라 decode/encode로 달라진다(zend에서는 decode). “어떤 조건에서 encode 도중 bailout이 나는가”가 잔류 성립의 핵심 변수다.
 3. 어떤 단계에서도 코드 실행(RCE)·힙 그루밍·주소 조작을 시도하지 않았다. “UAF 재현”과 “익스플로잇 가능성”은 다른 문제이며, 이 보고서는 전자만 다룬다.
 4. 이번 관측은 8.4.4/8.5.4 두 버전에 한정된다. 다른 버전·배포판 백포트·확장 구성은 별도 검증이 필요하다.
@@ -362,7 +362,7 @@ ASAN 스택도 CLI 서버와 동일하다: 할당 `ps_srlzr_encode_php` session.
 |---|---|---|---|
 | CLI 내장 서버 | 유지 | 관측 | **5/5** |
 | Apache mod_php (`-X`, prefork) | 유지 | 관측 | **3/3** |
-| PHP-FPM | **종료(exit 70)** | 불가(잔류 소멸) | 0/4 |
+| PHP-FPM | **종료(exit 70)** | 불가(이 시퀀스 한정) | 0/4 |
 
 → 이 결함의 성립 여부는 “FPM인가”가 아니라 **SAPI가 요청 시작 실패 후 프로세스를 유지하는가**에 달려 있다. 배포 환경 판단 시 이 차이가 핵심이다.
 
@@ -417,7 +417,7 @@ ASAN 스택:
 위조 세션 없이, 901개 필드(각 4KB, 합계 약 3.6MB) + progress 필드 + 1KB 파일을 FPM(`memory_limit=8M`, `post_max_size=4M`)에 전송했다.
 
 - 응답 200, `Allowed memory size ... exhausted` **없음**, 워커 생존(PID 440).
-- 해석: 이 입력 형태만으로는 파서 자체 할당이 한도에 도달하지 않았다. “HTTP만으로 Arm 단계 도달” 주장은 더 큰 body·더 낮은 한도·다른 SAPI(Apache 버퍼링)에서 별도 검증이 필요하다.
+- 해석: 이 입력 형태만으로는 파서 자체 할당이 한도에 도달하지 않았다. Calif는 **`filename=""` 빈 업로드 + 중첩 필드명**으로 본문 8MiB 미만에서 128MiB 힙을 소진했다고 보고했으므로(§7.2), 이 음성 결과를 일반화할 수 없다.
 - 구조적 요점: OOM이 `php_var_serialize`/`php_var_unserialize`의 INIT→DESTROY 윈도우 **밖**에서 발생하면 잔류가 만들어지지 않는다. 따라서 “OOM 발생”과 “잔류 재사용”은 별개 조건이다.
 
 #### (b) `cleanup=Off`에서 진행 데이터 잔류 — **확인**
@@ -517,7 +517,10 @@ PHP 보안팀은 2026-10-21 **PHP 8.5.12 / 8.4.27 / 8.3.36 / 8.2.35**를 공개�
 |---|---|
 | Bug S — `BG(serialize)` 잔류·재사용(§2.7, §4.5) | **CVE-2026-109619** (stale global state) |
 | Bug U — `BG(unserialize)` 잔류·재사용(§4.8a) | **CVE-2026-109619** (동일 계열) |
-| 파싱 중 OOM bailout → 컨텍스트 정리 누락(§2.7, §4.8) | **CVE-2026-109618** (OOM corruption) |
+| 파싱 중 OOM bailout으로 직렬화 컨텍스트 정리 누락 — **109619의 전제 조건** | **CVE-2026-109619** (109618 아님) |
+| 부분 초기화된 HashTable Bucket이 종료에서 소비(§7 Path A) | **CVE-2026-109618** — Calif 확인, **자체 미재현** |
+
+> **정정:** 이전 판은 “OOM bailout → 컨텍스트 정리 누락”을 109618로 표기했으나 잘못이다. 109618의 대표 원인은 **`_zend_hash_str_add_or_update_i`의 count-before-key-allocation**으로 생기는 부분 초기화 Bucket이며(mod_php 종료에서 소비), 우리가 재현한 직렬화 상태 잔류는 **109619**다.
 
 ### 5.2 공식 Diff가 가리키는 원인 (8.4.4 → 8.4.27)
 
@@ -598,6 +601,8 @@ PHPAPI void php_basic_early_rinit(void)
 
 → **조건과 처리 차이는 재현**했으나(수정 빌드는 조기 종료로 fatal 없음), 109618 고유의 메모리 손상은 관측되지 않았다. **고유 경로 재현은 미완**으로 남긴다.
 
+**SAPI·전달 형태 주의:** Calif가 지목한 대표 소비 지점은 **Apache mod_php**이고, 이 실험은 **FPM**에서 수행됐다. 또한 OOM 전달은 “일반 필드 다수” 방식이었으며, Calif의 `filename=""` 빈 업로드 + 중첩 필드명(본문 8MiB 미만으로 128MiB 소진), chunked/lengthless, 압축 해제 불일치 기법은 **미시험**이다(§7.2).
+
 ### 6.3 CVE-2026-109619 “다른 변형” 후보 — 정적 조사
 
 시작 단계(파싱, RINIT 이전)에서 (un)serialize에 도달하는 호출지를 조사했다(`linux/serialize-sites.sh`).
@@ -650,3 +655,44 @@ PHPAPI void php_basic_early_rinit(void)
 | 문서 증적 개수 불일치 | 하드코딩 제거(매니페스트 참조) | — |
 
 **남은 한계:** Sigma의 SIEM 변환·실행 검증과 109618 고유 손상 경로 재현은 여전히 미완이다.
+
+## 7. Calif 연구 대조와 3경로 재분류 (2026-10-22)
+
+원문: [calif.io/php2shell](https://calif.io/php2shell/) — PHP 2004/2020/2024 계보, 2026-08 발견, 10월 릴리스. Calif·OpenAI·Wiz 공동 연구.
+
+### 7.1 Calif가 정의한 세 중단 지점
+
+| 경로 | 메커니즘(원문 요약) | SAPI | 자체 상태 |
+|---|---|---|---|
+| **A. 부분 초기화 HashTable** (109618) | `_zend_hash_str_add_or_update_i`가 `nNumUsed++`/`nNumOfElements++` 후 `p->key = zend_string_init(...)`에서 fatal → Bucket은 teardown에 보이지만 key/val 미초기화. mod_php는 startup 실패 후에도 `php_request_shutdown()`이 돌아 malformed `$_POST/$_FILES`를 파괴 | mod_php (PHP ≥ 7.3) | **미재현** — P14는 **FPM**에서 시도해 소비 지점을 관찰하지 못했음 |
+| **B. Session 전역 상태 잔류** (109619) | 업로드 진행이 파싱 중 `php_rinit_session(0)`으로 `PS(id)`·`PS(http_session_vars)`를 요청 힙에 묶음 → 이후 fatal로 END 콜백·Session RSHUTDOWN 생략(`PG(modules_activated)=0`) → 힙 해제, **Apache 워커 생존** → 다음 multipart(파일 파트 없음)의 END cleanup이 댕글링 PS를 소비 | mod_php (PHP ≥ 5.4) | **미검증** — 우리는 BG 상태만 계측 |
+| **C. `BG(unserialize)` post-RINIT** (109619) | RINIT **이후** 애플리케이션 실행 중 unserialize 도중 fatal이 나면 컨텍스트가 남고, **FPM 워커가 살아남아** 다음 요청이 재사용 | PHP-FPM | **부분** — 우리는 **pre-RINIT**(파싱 중 decode) OOM으로만 재현. post-RINIT 생산자/소비자 경로는 미검증 |
+
+### 7.2 OOM 전달 기법 — 우리 P12 음성 결과의 해석 정정
+
+Calif 원문의 전달 기법:
+
+1. **post_max_size vs 실제 소비 바이트 불일치**: `Content-Length` 선언만 검사하고 실제 소비량은 제한하지 않음 → chunked HTTP/1.1·lengthless HTTP/2, 입력 압축 해제 필터로 우회.
+2. **`filename=""` 빈 업로드 + 중첩 필드명**: 파일 데이터가 없어 `max_file_uploads`에 계산되지 않지만 `$_FILES` 6개 항목(name, full_path, type, tmp_name, error, size)이 생성되고, `files[a][b][c]…` 중첩 시 각 항목마다 HashTable/Bucket/키 문자열이 할당된다. **본문 8MiB 미만으로 128MiB 힙을 소진**할 수 있다.
+
+→ 우리 P14/P12는 “파라미터 수” 방식만 시험했고, **전달 형태가 달라** 음성 결과를 일반화할 수 없다. 이 정정을 §6.2·§4.9a에 반영한다.
+
+### 7.3 커버리지 표 (자체 검증 기준)
+
+| 항목 | 자체 결과 | Calif | 비고 |
+|---|---|---|---|
+| 초기 포인터 UAF 주장 반박 | **확인**(`Z_TRY_ADDREF`) | 동일 결론 | 일치 |
+| `BG(serialize)` pre-RINIT 잔류 | **재현**(CLI 5/5, Apache 3/3) | Session 경로의 일부 | 일치 |
+| `BG(unserialize)` pre-RINIT 잔류 | **재현**(CLI) | — | 자체 추가 |
+| `BG(unserialize)` post-RINIT (FPM) | **미검증** | RCE까지 검증 | 최대 공백 |
+| `PS(id)`/`PS(http_session_vars)` | **미검증** | RCE(mod_php) | 공백 |
+| HashTable 부분 Bucket (109618) | **미재현** | RCE(mod_php) | 공백 |
+| 공식 패치 전후 회귀 | **완료**(8.4.27/8.5.12) | 발견·신고 주체 | 자체 강점 |
+| WAF 파싱 불일치 | **실측**(6/10, 우회 2) | 범위 밖 | 자체 강점 |
+| multipart END | 부품 수 제한 시 **실행** 확인 | **fatal 중단 시 미도달** | 모순 아님(오류 종류 차이) |
+
+### 7.4 보고서 문구 정정
+
+- **“FPM에서는 요청 간 잔류가 성립하지 않는다”** → **“이번에 시험한 요청 초기화 실패 시퀀스에서는”**을 반드시 붙인다. RINIT 이후 fatal 경로(FPM)는 별개다.
+- **P12(HTTP-only OOM 음성)** → “이 입력 형태에서는”으로 한정. Calif의 빈 업로드/청크/압축 기법은 미시험.
+- **multipart END** → 부품 수 제한(경고 후 goto)과 fatal 중단은 다른 경로. 둘 다 참일 수 있다.

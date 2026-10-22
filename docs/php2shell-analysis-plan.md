@@ -272,6 +272,42 @@
 | Sigma 운영 호환 | **부분** — `.php` 경로 필터 제거, SIEM 변환·실행은 미검증 | validate-rules 구조 PASS |
 | ModSecurity 예제 표기 | **완료** — `*.example.conf`, “운영 적용 금지” 헤더 | waf-compare 6/10 유지 |
 
+### 9.14 Calif 연구 대조 반영 (2026-10-22)
+
+원문: [A Tale of Two PHP Remote Vulnerabilities](https://calif.io/php2shell/) (Calif·OpenAI·Wiz, 2026-08 발견 → 10월 릴리스).
+
+#### (1) 3경로 분류와 우리 커버리지
+
+| 경로 | 원인 | SAPI | 우리 상태 |
+|---|---|---|---|
+| A. 부분 초기화 HashTable (109618) | `_zend_hash_str_add_or_update_i`가 count를 먼저 올리고 key 할당에서 fatal → teardown이 미초기화 Bucket 소비 | mod_php (≥7.3) | **미재현** (P14는 FPM) |
+| B. Session 전역 상태 (109619) | 파싱 중 `PS(id)`·`PS(http_session_vars)`가 요청 힙을 가리킴 → fatal로 END/RSHUTDOWN 생략 → 워커 생존 → 다음 요청 END cleanup이 소비 | mod_php (≥5.4) | **미검증** |
+| C. `BG(unserialize)` post-RINIT (109619) | RINIT 이후 앱 실행 중 unserialize fatal → FPM 워커 생존 → 다음 요청 재사용 | PHP-FPM | **부분** (pre-RINIT만 재현) |
+
+#### (2) OOM 전달 기법 (Calif) vs 우리 실험
+
+| 기법 | 원리 | 우리 시험 |
+|---|---|---|
+| post_max_size vs 실제 소비 불일치 | `Content-Length`만 검사, chunked/lengthless·압축 해제로 실제 바이트 초과 | **미시험** |
+| `filename=""` 빈 업로드 + 중첩 필드명 | `$_FILES` 6항목 × 중첩 HashTable/Bucket/키 할당 → 본문 8MiB 미만으로 128MiB 소진 | **미시험** (P14는 일반 필드 30k) |
+| 일반 필드 다수 | 파서 배열 오버헤드 | 시험(8.4.4 OOM/8.4.27 조기 종료) |
+
+#### (3) 신규 실험 설계 (미실시, 우선순위 순)
+
+| ID | 목표 | 설계 | 판정 기준 |
+|---|---|---|---|
+| **P15** | 109618 Path A 재현 | Apache mod_php(ASAN/tracked) + `filename=""` 중첩 업로드로 key 할당 OOM 유도. 8.4.4 vs 8.4.27 | ASAN이 mod_php request shutdown의 Bucket 소비를 보고하면 “재현” |
+| **P16** | 109619 Path B(PS 상태) | mod_php: 요청 A(파일 파트+progress → early session init 후 파싱 fatal), 요청 B(파일 파트 없는 progress)로 END cleanup 유도. GDB로 `PS(id)`/`PS(http_session_vars)` 관측 | PS가 해제 힙을 가리키며 소비되면 “재현” |
+| **P17** | 109619 Path C(post-RINIT, FPM) | 랩 전용 엔드포인트에서 unserialize 도중 OOM fatal → 워커 생존 확인 → 다음 요청에서 `BG(unserialize)` 재사용 관측 | 워커 동일 PID + 다음 요청 ASAN UAF |
+| **P18** | OOM 전달 matrix | chunked/lengthless, 압축 해제 필터, 빈 업로드 중첩 각각의 OOM 도달 여부 | 본문/힙 비율과 도달 지점 기록 |
+
+**안전 경계:** P15~P17도 **메모리 오류 관측까지**이며 RCE 체인 작성·실행은 계속 비목표다.
+
+#### (4) 문서 정정 반영
+
+- 109618/109619 매핑 정정(§5.1), FPM 문구에 “이 시퀀스에서는” 한정(§2.7, §3.2, §4.6), P12/P14 음성 결과에 전달 형태·SAPI 한정(§4.9a, §6.2).
+- findings §7에 Calif 대조·커버리지 표·문구 정정 기록.
+
 ## 10. 산출물 목록
 
 1. `docs/php2shell-analysis-plan.md` — 이 문서.
