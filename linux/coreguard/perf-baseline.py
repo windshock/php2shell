@@ -37,6 +37,7 @@ BASE = Path('/home/phplab/php-lab')
 REPO = HERE.parents[1]
 FPM_PORT, HTTP_PORT = 19100, 18190
 MODS = '/usr/lib/apache2/modules'
+CG_MODE = os.environ.get('COREGUARD_MODE')  # C builds: disabled / observe / enforce
 
 
 def write_configs(run, prefix):
@@ -55,7 +56,9 @@ def write_configs(run, prefix):
     (run / 'php-fpm.conf').write_text(
         '[global]\npid=%s\nerror_log=%s\ndaemonize=no\n'
         '[www]\nlisten=127.0.0.1:%d\npm=static\npm.max_children=4\n'
-        'catch_workers_output=yes\n' % (run / 'fpm.pid', run / 'fpm.log', FPM_PORT))
+        'catch_workers_output=yes\n' % (run / 'fpm.pid', run / 'fpm.log', FPM_PORT)
+        # fpm clears the worker environment: pass the CoreGuard mode explicitly
+        + ('env[COREGUARD_MODE]=%s\n' % CG_MODE if CG_MODE else ''))
     (run / 'httpd.conf').write_text('''ServerRoot {h}
 PidFile {h}/httpd.pid
 Listen 127.0.0.1:{port}
@@ -131,7 +134,8 @@ def main():
         print(json.dumps(dict(error='build missing', prefix=str(prefix))))
         return 1
     stamp = time.strftime('%Y%m%dT%H%M%S', time.gmtime())
-    run = BASE / 'evidence' / ('coreguard-perf-%s-%s' % (stamp, args.build))
+    run = BASE / 'evidence' / ('coreguard-perf-%s-%s%s' % (stamp, args.build,
+                                                           '-' + CG_MODE if CG_MODE else ''))
     run.mkdir(parents=True)
     write_configs(run, prefix)
     bodies = run / 'bodies'
@@ -200,7 +204,7 @@ def main():
                                          opcache=False))
     manifest = prefix / 'build-manifest.json'
     summary = dict(scope='CoreGuard Phase 0 performance baseline (relative use only)',
-                   build=args.build, status=status, n=args.n, c=args.c, repeats=args.repeats,
+                   build=args.build, coreguard_mode=CG_MODE, status=status, n=args.n, c=args.c, repeats=args.repeats,
                    host=dict(nproc=os.cpu_count(), uname=os.uname().release),
                    build_manifest=json.loads(manifest.read_text()) if manifest.exists() else None,
                    results=results, **provenance.provenance())
