@@ -151,9 +151,9 @@ def sweep(name, code, php, args, out):
                 r = run_one(php, code, n, t)
             rows.append(r)
             # a fallible failure can also be handled cleanly ("ok"): stop only
-            # after the dense range and 3 consecutive clean completions
+            # after the dense range and --ok-streak consecutive clean completions
             ok_streak = ok_streak + 1 if r['kind'] == 'ok' else 0
-            if ok_streak >= 3 and i >= len(ns) - 1:
+            if ok_streak >= args.ok_streak and i >= len(ns) - 1:
                 break
             i += 1
             n = ns[i] if i < len(ns) else n + args.stride
@@ -174,6 +174,8 @@ def main():
     parser.add_argument('--stride', type=int, default=7)
     parser.add_argument('--max-n', type=int, default=6000)
     parser.add_argument('--jobs', type=int, default=4)
+    parser.add_argument('--ok-streak', type=int, default=25,
+                        help='clean completions in a row that end a workload sweep')
     parser.add_argument('--workloads', nargs='*')
     args = parser.parse_args()
     php = BASE / 'install' / args.build / 'bin/php'
@@ -196,6 +198,7 @@ def main():
         results = list(ex.map(lambda nm: sweep(nm, WORKLOADS[nm], php, args, out), names))
     summary = dict(scope='CoreGuard Phase 2 allocation-failure sweep (analysis; D1 for signatures)',
                    build=args.build, dense=args.dense, stride=args.stride, max_n=args.max_n,
+                   ok_streak=args.ok_streak,
                    controls=controls, results=results, **provenance.provenance())
     (out / 'summary.json').write_text(json.dumps(summary, indent=2))
     for r in results:
