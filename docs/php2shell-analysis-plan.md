@@ -572,6 +572,8 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 
 #### 12.6.6 진행 상태 (게이트별, 상세는 findings §10.6~)
 
+> **[§13.2, 2026-10-23]** Issue #5 리뷰로 판정기 결함이 확인됐다. 아래 G3·G5 "통과", FlowFusion "100/100 clean"(실제 유효 분모 ≤ 약 91), 트리아지 `residue_not_formed` 명칭, 커버리지 맵 "도달" 수치는 v2.1(§13.3) 재산출 전까지 **잠정**이다. 1f differential 2건은 점검 결과 유지된다.
+
 | 게이트 | 상태 | 증거 |
 |---|---|---|
 | **G0** v1.2 (Issue #1 후속) | **통과 (2026-10-23, `1aa256e`)** | 픽스처: ground-truth-eval 12/12, fuzz-phase5 9/9, matrix-fixtures 3/3, gdb-patha 5/5, fault-site-map 2/2. 재실행: 8.4.4 재현 3/3, 8.4.27 소멸 3/3(차단 지점 분류 포함), 둘 다 exit 0. 매니페스트 10,699/10,699 검증(WSL). 추가 발견: 구 ground-truth의 `no_fatal` 부분문자열 오판, v1.2 작업 중 `fault-site-map.json` 1건 덮어씀(경로 타임스탬프화로 수정). findings §10.6 |
@@ -586,3 +588,124 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 §12.6.2 정정표 갱신(G5 이후): v2 Stage 1은 "고정 회귀 매트릭스"에서 **피드백 탐색 루프 구현·실증(G1~G3)**으로 갱신한다. 단, 피드백 ON의 효과는 G4에서 입증되지 않았다(열세). 탐색 결과는 모든 프로파일에서 **신규 경로 `not_found`(스코프 한정)**이고, 새로 관측된 것은 알려진 Path B 부류의 영향 변형(자기 교착 DoS)뿐이다.
 
 이전 갱신: v2 Stage 0은 "재검증 필요"에서 **유지(재검증 완료)**로, 이슈 #1 완료 기준 2~4는 "부분"에서 **충족(v1.2)**으로 바뀌었다. v2 Stage 1 "고정 회귀 매트릭스" 표기는 G1~G2 통과 전까지 유지한다.
+
+## 13. GitHub 이슈 2차 반영 (2026-10-23, Issues #2 코멘트·#3·#4·#5)
+
+> 검토 대상:
+> - [#2 코멘트](https://github.com/windshock/php2shell/issues/2): Historical regression corpus 연계
+> - [#3](https://github.com/windshock/php2shell/issues/3): PHP CoreGuard 구조적 하드닝 연구, 연계 코멘트 포함
+> - [#4](https://github.com/windshock/php2shell/issues/4): PHP Core Memory-Safety Historical Corpus 2016–2026
+> - [#5](https://github.com/windshock/php2shell/issues/5): G0–G5 판정·증적 신뢰성 리뷰(`d0755a0` 기준). 후속 코멘트는 `2288d8c` 기준의 Stage 4 리뷰다.
+>
+> #1에는 새 외부 지적이 없다(마지막 코멘트는 우리 반영 답글).
+>
+> **반영 전 #5의 11개 지적을 현행 코드에서 모두 확인했다(§13.2).** 이미 보고한 결과에 실제로 영향이 있었는지도 점검했다.
+
+### 13.1 이슈 역할 분담 (이슈 본문 정의 수용)
+
+| 이슈 | 책임 | 이 계획에서의 위치 |
+|---|---|---|
+| #1 | 증적 검증·재현 신뢰성 | §12(완료: G0). 새 지적 없음 |
+| #2 | 탐색(발견) 능력: stateful fuzzing, fault injection | §12.6(G1~G5 수행). §13.4에서 #4 코퍼스로 평가 확장 |
+| #5 | Phase 5 v2 판정기의 실패-닫힘(fail-closed) 보강 | **§13.3: 최우선 v2.1** |
+| #4 | 2016–2026 결함 계보: 원문·패치·재현 상태 검증, ground-truth·hold-out 공급 | §13.4 |
+| #3 | 방어(CoreGuard): 불변조건 강제·실패 원자성·격리와 그 효과 평가 | §13.5 |
+
+### 13.2 #5 사실 확인 (현행 코드, 이력 재작성 후 HEAD `2288d8c`)
+
+| # | 지적 | 확인 결과 | 판정 |
+|---|---|---|---|
+| 1 | replay differential의 거짓 `extinct` | `sig_of()`는 시그니처 목록만 반환한다(`lifecycle-explore.py:854-859`). `extinct=target not in sigs`(`:887`)라서 수정 버전 서버가 기동하지 않아도 True가 된다 | 수용(P0) |
+| 2 | FlowFusion 브리지의 거짓 `clean` | `run_program()`은 예외를 `harness_error` 단계로 남긴다(`flowfusion-bridge.py:179`). `classify()`(`:196`)는 이를 검사하지 않고, generator의 `returncode`도 미검사다(`:212`) | 수용(P0) |
+| 3 | G3 재발견이 단계와 무관한 함수명 히트로 성립 | `hit = any(func in sig for s in steps)`(`explore-report.py:136`). `producer_landed`는 failure_sites가 비어 있지 않은지만, consumer는 단계 기록이 있는지만 본다(`:146`) | 수용(P1) |
+| 4 | ground-truth 차단 지점이 ASAN 부재에 의존 | P16·P17 라벨은 이미 `consumption_absent`로 중립화했다(§10.11). P15의 `delivery_blocked`는 여전히 "OOM 없음 + 스크립트 도달"에서 추론한 것이다 | 부분 수용(관측·추론·검증 칼럼 분리) |
+| 5 | 배치 러너의 실패 전파 | `explore-g34.sh`·`explore-g5.sh`는 `set -u`만 쓰고, 개별 rc를 출력만 한 채 최종 rc에 반영하지 않는다 | 수용(P1) |
+| 6 | sancov 수집 실패와 "새 edge 0건"을 구분하지 않음 | `read_sancov()`가 glob 파일 수를 반환한다(`lifecycle-explore.py:318`). 매직 불일치나 부재도 빈 집합으로 처리된다 | 수용(P1) |
+| 7 | readiness·PID 귀속의 fail-open | 아무 `HTTPError`나 ready로 처리한다(`:427`). PID가 없으면 귀속 검사를 생략한다(`:670`) | 수용(P1) |
+| 8 | G5 통과 조건이 불충분 | `passed`는 SAPI 3종 + 중단 없음 + 하네스 오류 0만 요구한다(`explore-report.py:194`). 유효 실행 수·대상 도달 여부는 보지 않는다 | 수용(P2) |
+| 9 | 차등 트리아지의 오분류 | `fixed_k`가 없어도 이후 분기로 진행한다. 수정 버전의 **다른** ASAN 시그니처는 경고하지 않는다(`differential-triage.py:85`). `carried`만 보고 `reset_inside_startup`으로 판정한다(`:93`). 종료 시점 NULL만으로 `residue_not_formed`라 부른다(`:108`) | 수용(P0) |
+| 10 | 커버리지 맵의 근접 줄 = 도달 혼동 | 후보 줄 +6줄 창으로 판정한다(`coverage-map.py:120`). symbolizer·nm의 rc와 출력 수, 바이너리 동일성은 미검사다 | 수용(P1) |
+| 11 | 메커니즘 정정의 근거 수준, G4 해석 범위 | §10.11의 "잔류 미생성"은 종료 시점 관측에 패치 소스 추론을 결합한 것이다. G4는 "이 문법·예산에서 우위가 입증되지 않음"이지 상태 피드백 일반의 무효가 아니다 | 수용(문서) |
+
+**기보고 결과 영향 점검(이번 반영 중 수행):**
+
+| 대상 | 점검 | 결과 |
+|---|---|---|
+| FlowFusion "100/100 clean"(§10.10) | 프로그램별 요청 0 응답과 관측된 요청 시작 수 | 요청 0이 **HTTP 500인 프로그램 8개**와 소비자 요청 일부만 관측된 프로그램 1개도 `clean`으로 집계됐다. **유효 분모는 최대 약 91개**이며, v2.1 재산출 전까지 "100/100"을 인용하지 않는다 |
+| 1f differential 2건(§10.9) | 수정 버전 단계 실행 여부 | 두 건 모두 8.4.27에서 모든 단계가 실행되고 응답을 받았다(`runtime_oom 500 → parse_oom 200`, `session 200 → parse_oom 500 → upload_cookie 200`). **결론 유지**. 도구 결함은 별도로 수정한다 |
+| 차등 트리아지 6건(§10.11) | 수정 버전 단계 누락 여부 | 누락 0건이므로 판정은 도달 상태에서 내려졌다. 단 `residue_not_formed`라는 **명칭이 메커니즘을 과대 귀속**하므로 관측명 `absent_at_observed_shutdown`과 추론명을 분리한다(#5-9·11) |
+| G3·G5 `passed` | 판정식 | 게이트 산식의 결함(#5-3·8)이 확인됐다. §12.6.6의 G3·G5 "통과"는 v2.1 재산출 전까지 **잠정**이다 |
+
+### 13.3 v2.1 작업 계획 — #5 실패-닫힘(fail-closed) 보강 (최우선)
+
+원칙(`docs/lab-engineering-rules.md` R1·R2·R5·R6 적용):
+- 실행 실패·미도달·관측기 실패·귀속 불명은 결코 성공·clean·extinct로 집계하지 않는다.
+- 결과 어휘에 `harness_failed | not_reached | inconclusive | attribution_unknown`을 공통으로 둔다.
+- 모든 수정에는 **의도적 실패 주입 픽스처**를 함께 둔다.
+
+| 우선 | 항목(#5 번호) | 작업 | 완료 기준(픽스처) |
+|---|---|---|---|
+| P0 | 1 replay | `sig_of()`가 `harness_error`·서버 기동·단계 도달·생산자 착지·소비자 실행·ASAN 수집 상태를 함께 반환한다. 결과는 `reproduced / extinct_at_verified_block_point / not_reached / inconclusive / harness_failed`로 나눈다 | 수정 버전 바이너리 없음, 기동 실패, 소비자 미실행, 관측기 실패 → `extinct=false` + 비정상 종료 코드 |
+| P0 | 2 FlowFusion | 결과를 `harness_failed / not_generated / parse_invalid(요청 0 비-200) / not_reached / consumer_incomplete / clean`으로 나눈다. generator rc 확인, 생성 0건이면 실패. `clean` 분모는 기동 → `/fused` 200 → 소비자 3단계 완료가 모두 확인된 실행만 | 서버 미기동, 요청 0 미실행, 생성기 비정상 종료, 후속 요청 미실행 → `clean` 불가 |
+| P0 | 9 triage | 양쪽의 harness·PID·단계 수·소비자 도달·관측기 유효성을 먼저 확인한다. 수정 버전의 **모든 ASAN**을 기록하고 `NOT_FIXED`와 `NEW_MEMORY_ERROR`를 구분한다. 칼럼은 `observed_state_at_shutdown` / `inferred_fix_mechanism` / `verified_block_point`로 나누고, verified는 해당 지점의 계측 이벤트(할당·해제·리셋 브레이크포인트)가 있을 때만 붙인다 | 수정 버전 소비자 생략, 기동 실패, 다른 ASAN, 양쪽 하네스 실패, "종료 시점 NULL이지만 해제 경로 불명" → 거짓 성공 불가. 이후 양성 5종·음성 1종 재산출 |
+| P1 | 3 G3 인과 | 재발견 = 생산자 실패 지점(경로별 기대 위치) 확인 → 동일 워커·pid → 소비자 단계 실행 → **그 단계의** ASAN 시그니처. 함수명 단독 히트는 `signature_only`로 따로 기록한다. 게이트 `passed`는 경로별 재발견률과 분리해 보고하고, "P16 또는 P17 중 1건 허용" 기준은 계획 문구 그대로 유지한다 | 단계가 섞인 ASAN, 생산자 미착지, 다른 pid → `rediscovered=false` |
+| P1 | 4 ground-truth | `observed_outcome` / `inferred_block_mechanism` / `verified_block_point` 칼럼을 분리한다. 음성 대조군은 정상 요청, 소비자 미도달, 관측기 미작동, 다른 지점 OOM | 각 대조군이 `verified`로 판정되지 않음 |
+| P1 | 7 readiness·귀속 | 준비 판정을 분리한다. 워밍업 health 200을 단언하고(R1), 주입 fault로 인한 500은 `fault_expected`로 기록한다. PID를 얻지 못하면 `attribution_unknown`으로 하고 `memory_error_confirmed` 대신 쓴다 | 500만 나오는 readiness, PID 미관측 + ASAN 파일 존재 |
+| P1 | 5 배치 | 개별 rc·`aborted`·`harness_errors`를 모아 배치 최종 rc와 `batch.json`에 반영한다 | rc=3 하위 실행, summary 누락, 실행 0건 → 배치 실패 |
+| P1 | 6 sancov | `coverage_not_collected / coverage_invalid / coverage_valid_no_new_edges`로 나눈다. 유효 파일 수를 센다. 커버리지 양성 대조군(health 1회의 edge 수 > 0)이 확인되기 전에는 code-edge 평가를 하지 않는다 | 잘못된 magic, 누락, 0바이트, 정상 파일 |
+| P1 | 10 coverage map | `nearby_source_coverage / exact_site_covered / fault_path_reached`(실행 증거 필요)로 나눈다. symbolizer·nm의 rc·출력 수·미해석 비율을 검사한다. 바이너리 SHA-256·버전·flavor·run_id를 묶는다. §10.11의 14/44 등은 "근접 소스 줄"로 표기를 정정한다 | 후보 줄 실행, 주변 줄만 실행, 심볼 실패, 다른 바이너리 |
+| P2 | 8 G5 | `valid_executions`, `target_reached`, `worker_identity_checked`, `observation_available`를 추가한다. "3종 환경 구성 성공"과 "기존 결함 경로 비교 검증 성공"을 별도 게이트로 둔다 | 실행 0건·미도달 프로파일 → 실패 |
+| P2 | 11 문서 | §10.9~10.11의 `100/100 clean`, `G3 passed`, `G5 passed`, `14/44`, `residue_not_formed` 표기를 분모·범위·`validated / incomplete / inferred` 상태와 함께 재기재한다. G4 해석 범위도 명시한다 | 문서가 재산출 수치와 일치 |
+
+**v2.1 완료(Done):**
+- 위 실패 주입 픽스처가 모두 기대한 `not_reached / inconclusive / harness_failed`를 반환한다.
+- 양성 대조군(P15~P17, Bug S, Path B 교착)의 8.4.4 재현과 8.4.27 소멸이 유지된다.
+- **같은 소스 SHA·환경·run_id 체계로 G3·G4·G5, FlowFusion, 트리아지를 재실행해 게이트를 재산출**한다. 그 전까지 해당 수치는 "잠정"이다.
+
+### 13.4 #4 Historical Corpus — 계획 반영
+
+**목표:** 2016–2026 공개 기록에서 반복된 실패 패턴을 검증된 ground-truth·hold-out으로 바꿔 #2(탐색)와 #3(방어)의 평가 기반으로 쓴다. 공식 패치를 대체하지 않으며, 신규 결함은 책임 신고한다.
+
+| 단계 | 작업 | 우리 스코프 결정 |
+|---|---|---|
+| H0 목록 확보 | 이슈는 "선별 58건"을 언급하지만 본문에는 대표 링크 약 20건만 있다(#76846, #12073, #79760, #10026, #24361, #72530, #16726, #20018, PR #6903·#12805, #76167, GHSA-6wmf, #14083, PR #14304, #24488, #24492, PR #10283·#24338·#22710) | **58건 원목록이 필요하다(결정 필요 §13.7).** 우선 대표 약 20건으로 H1을 시작한다 |
+| H1 코퍼스 검증 | 건별 원문 URL·보고일·영향 버전·현재 상태·관련 PR/커밋·수정 버전을 확인한다. 분류 축은 `fixed / open / duplicate / unverified / design-discussion` × `crash / sanitizer-confirmed / exploitability-assessed` × 노출 조건(원격 요청 / 앱 콜백 / CLI·확장 전용). 같은 root cause, 유사 증상, 키워드 일치를 구분한다 | `docs/historical-corpus.md` + 기계 판독용 `linux/corpus/records.json`. bugs.php.net의 오래된 상태만으로 현재 취약을 단정하지 않는다 |
+| H2 독립 재현 | 우선순위는 이슈 순서를 따른다: #79760, #10026, #12073, #24361, PR #22710 → 재진입 계열 #16726, #20018, PR #6903·#12805 → #76167, #14083, PR #14304. 수정 전 버전 / 공식 수정 버전 / 현재 HEAD를 분리해 PHPT·ASAN·GDB로 `reproduced / not_reproduced / not_reached`를 판정한다 | 빌드 비용이 크다(버전마다 ASAN 빌드). 기존 `build.sh` 흐름을 따르고, 원본 소스는 수정하지 않는다. 재현 실패를 안전 판정으로 쓰지 않는다. 판정기는 v2.1 이후의 fail-closed 버전만 쓴다 |
+| H3 #2 연결 | 검증된 사례만 ground-truth로 받는다. **튜닝용과 독립 hold-out을 분리한다.** 원인별 회귀 세트: bailout·GC, OOM·부분 초기화, 재진입, 요청 수명 | G3의 약점(정답이 길이 2 쌍이라 문법 밀도로 재발견, §10.9)을 #4의 hold-out으로 재평가한다. 즉 G4의 "피드백 무효" 여부를 더 어려운 공간에서 다시 판단할 근거가 된다 |
+| H4 #3 연결 | 패턴별 방어 가설을 `prevention / pre-dereference enforcement / detection / containment`로 분류한다. 공식 패치로 이미 해결된 것은 신규 효과로 세지 않는다 | §13.5 Phase 0·5의 입력 |
+
+### 13.5 #3 PHP CoreGuard — 계획 반영
+
+**목표:** 109618·109619에서 확인된 일반 불변조건 위반(부분 초기화 상태 소비, 요청 메모리 수명 후 전역 참조)에 대해 미발견 동류 결함을 사전 차단하거나 영향을 축소하는 보호 기능을 연구한다.
+- 하지 않는 것: 공식 패치 재구현, "모든 제로데이 방어" 주장.
+- 안전 경계: 격리 랩, RCE 무기화 비목표, 신규 결함 상세 비공개.
+
+| Phase | 작업 | 선행 조건·스코프 결정 |
+|---|---|---|
+| 0 기준선 | 실험군 3종을 분리한다: 8.4.4(취약) / 8.4.27(공식 수정; 필요 시 8.5.12) / 8.4.27 + CoreGuard. 공식 패치가 이미 막는 것과 잔존 구조적 공백을 소스 위치·조건으로 문서화한다. 현재 근거: §10.11 트리아지에서 8.4.27 소멸은 fallible 할당 + 지연 OOM이었고, 조기 리셋은 미실행 이중 방어였다. 모든 시험에 `mode=observe / enforce / disabled`, run_id, SHA, SAPI, pid, 소유 요청, 할당·해제 지점을 기록한다 | **#5 v2.1(fail-closed 오라클) 완료가 선행 조건**이다. #4의 H1이 공백 후보를 공급한다 |
+| 1 Request Ownership Guard | ZendMM의 request/persistent 모델 위에 `request_epoch`·`allocation_owner`를 둔다. 등록된 전역(BG serialize/unserialize, PS id/mod_data, 일부 EG)의 접근 지점에 검사 훅을 둔다. `observe`로 정확도·오탐을 먼저 재고, 역참조 전에 거부할 수 있는 지점부터 `enforce`를 적용한다 | **원본 소스 수정 금지(§3.2) 규칙과 충돌한다** → 예외가 필요하다(결정 필요 §13.7). 사본 트리 + `linux/coreguard/*.patch`로 관리하고, 빌드명은 `8.4.27-coreguard`로 따로 둔다. 등록되지 않은 raw pointer, 확장의 직접 `malloc`, JIT/FFI는 잔여 위험으로 보고한다 |
+| 2 Failure-atomic | count-before-init 후보(fault-site-map·커버리지 맵 공백)에 `prepare → validate → commit`을 적용할 수 있는지 분석한다. 8.4.27의 지연 soft OOM과 차별화한다. 주입은 `ZEND_MM_MAX_ALLOCS`(사후 시작 한정, pre-RINIT은 별도 계측)를 쓴다 | 정상 API 의미 보존을 PHPT로 검증한다 |
+| 3 Containment | `worker_integrity_state = clean / suspect / poisoned`. 위험한 정리 **이전**에 격리한다. 단순 OOM이 워커 재시작 DoS로 증폭되지 않는지 확인한다 | §10.10 관측과 연결: FPM에서는 파싱 fatal에 워커가 교체된다. 가용성 회귀 측정이 필수다 |
+| 4 Allocator·HW | ZendMM 대 `USE_ZEND_ALLOC=0` + GWP-ASan·Scudo 비교. 샘플링 검출과 강제 차단의 보장 수준을 구분한다 | 낮은 우선순위. MTE·CHERI·샌드박스는 장기 과제 |
+| 5 반증 가능한 평가 | #4·#2의 **튜닝에 쓰지 않은 hold-out**에서 `disabled / observe / enforce`를 동일 입력·동일 예산·독립 반복으로 대조한다. 결과 분류: `prevented_before_invalid_access / detected_only / worker_contained / not_reached / not_protected / test_failed`. PHPT·세션·업로드·JIT·3 SAPI 호환성과 req/s·p95·RSS·재시작률을 함께 잰다 | Go/No-Go는 이슈 §단계별 판정을 그대로 따른다 |
+
+### 13.6 실행 순서
+
+1. **#5 v2.1 P0**(1·2·9) + 픽스처
+2. #5 P1(3·4·7 → 5·6 → 10)
+3. #5 P2(8·11)
+4. **재산출:** 같은 SHA·run_id 체계로 G3·G4·G5·FlowFusion·트리아지를 재실행하고, §12.6.6과 findings를 갱신한다. 커밋·푸시는 요청이 있을 때만 한다(R10)
+5. #4 H0(목록 확보) → H1(코퍼스 검증)
+6. #4 H2(재현) → H3(#2 hold-out 재평가, G4 재판단 근거)
+7. #3 Phase 0 → Phase 1(observe) → 2 → 3 → 5. Phase 4는 병행 저우선
+
+각 단계 종료 시 §13 표를 갱신한다. 결과는 findings의 새 절(§11 이후 "Phase 6 — Corpus·CoreGuard")에 v2와 구분해 기록한다.
+
+### 13.7 결정 필요 사항 (사용자)
+
+| 항목 | 선택지 | 권고 |
+|---|---|---|
+| G4 피드백 전략 | 폐기 / 보완 후 재평가 / 보류 | **보류.** #5-11의 지적처럼 현 결과는 "이 문법·예산에서 미입증"이다. #4 hold-out(H3)으로 더 어려운 공간에서 재평가한 뒤 결정한다 |
+| CoreGuard 수정 빌드 허용 | §3.2 "원본 소스 수정 금지"의 예외 신설 여부 | 예외를 허용하되 원본 `sources/`는 불변으로 두고, 사본 트리 + 패치 파일 + 별도 빌드명으로 격리한다 |
+| #4의 58건 원목록 | 이슈 작성 측 자료 제공 / 대표 약 20건으로 시작 | 대표 약 20건으로 H1을 시작하고, 원목록을 받는 대로 확장한다 |
+| 커밋·푸시 | R10: 요청 단위 | 이번 계획 반영분은 커밋하지 않고 대기한다 |
