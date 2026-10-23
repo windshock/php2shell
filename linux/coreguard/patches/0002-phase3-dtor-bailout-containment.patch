@@ -1,0 +1,57 @@
+diff --git a/Zend/zend.c b/Zend/zend.c
+index 49946641..b6c352af 100644
+--- a/Zend/zend.c
++++ b/Zend/zend.c
+@@ -1252,8 +1252,52 @@ ZEND_COLD void zenderror(const char *error) /* {{{ */
+ }
+ /* }}} */
+ 
++/* CoreGuard Phase 3 (lab experiment, docs/coreguard/phase3-design.md).
++ * Containment: a bailout raised while a user destructor runs leaves the
++ * cleanup that called it (container clean, object store, GC) interrupted
++ * half-way; continuing teardown on that state is the dangerous step. The
++ * worker is then "poisoned".
++ * COREGUARD_MODE=disabled (default) | observe (log) | enforce (log, then
++ * end the process before any further cleanup: _exit(70); under FPM the
++ * master replaces the worker). COREGUARD_LOG=<file> appends events there. */
++static void cg3_bailout_check(void)
++{
++	static int mode = -1;
++	zend_execute_data *ex;
++
++	if (mode < 0) {
++		const char *m = getenv("COREGUARD_MODE");
++		mode = (m && !strcmp(m, "enforce")) ? 2 : (m && !strcmp(m, "observe")) ? 1 : 0;
++	}
++	if (!mode) {
++		return;
++	}
++	for (ex = EG(current_execute_data); ex; ex = ex->prev_execute_data) {
++		zend_function *f = ex->func;
++		if (f && f->common.scope && f->common.scope->destructor == f) {
++			const char *path = getenv("COREGUARD_LOG");
++			FILE *out = path ? fopen(path, "a") : NULL;
++			fprintf(out ? out : stderr,
++				"COREGUARD event=bailout_in_destructor mode=%s in_shutdown=%d pid=%d\n",
++				mode == 2 ? "enforce" : "observe",
++				(EG(flags) & EG_FLAGS_IN_SHUTDOWN) ? 1 : 0, (int) getpid());
++			if (out) {
++				fclose(out);
++			} else {
++				fflush(stderr);
++			}
++			if (mode == 2) {
++				fflush(stdout);
++				_exit(70);
++			}
++			return;
++		}
++	}
++}
++
+ ZEND_API ZEND_COLD ZEND_NORETURN void _zend_bailout(const char *filename, uint32_t lineno) /* {{{ */
+ {
++	cg3_bailout_check();
+ 
+ 	if (!EG(bailout)) {
+ 		zend_output_debug_string(1, "%s(%d) : Bailed out without a bailout address!", filename, lineno);
