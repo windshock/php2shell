@@ -11,7 +11,7 @@ PHP2Shell 분석 산출물의 읽는 순서와 역할입니다.
 | [php2shell-llm-handoff.md](php2shell-llm-handoff.md) | 후속 담당자 | 인수인계, 검토 지적별 처리 내역, 모니터링 이력 |
 | [evidence-manifest-20261023-v21.sha256](evidence-manifest-20261023-v21.sha256) | 검증 담당자 | 증적 SHA-256 목록(최신 46,172행, 원본은 `var/linux-evidence/`; 과거 스냅샷 20261021·20261022·20261023·-v12·-g2·-g4·-g5·-final 보관). 검증은 WSL `python3`로(PoC 증적이 Linux 절대 경로 참조) |
 
-> 기준 시점: 2026-10-23(Phase 5 v2.1 재도출 완료, 계획 §13.8·findings §10.12; #4 코퍼스는 `docs/historical-corpus.md`). 증적 감사는 `python3 linux/verify-evidence.py --root var/linux-evidence`, 검증기 자가 테스트는 `--self-test`.
+> 기준 시점: 2026-10-23(Phase 5 v2.1 재도출 완료, 계획 §13.8·findings §10.12; #4 코퍼스는 `docs/historical-corpus.md`). 증적 갱신·감사(계획 §13.9): 일상은 WSL `python3 linux/evidence-sync.py` → Windows `python linux/verify-evidence.py --incremental --manifest-only` → WSL `--skip-manifest`. 매니페스트 스냅샷 전에는 `evidence-sync.py --audit-dest` + WSL 전체 검증 `python3 linux/verify-evidence.py --root var/linux-evidence`. 검증기 자가 테스트는 `--self-test`.
 
 ## 도구 위치
 

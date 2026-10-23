@@ -755,3 +755,23 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 | 5. #4 H2 → H2.5 → #3 사전 등록 | **진행 중** | H2.5 데스크 분류 `1c3020b`: 현재 탐색기 도달 가능 3/58. 사전 등록 v0 `fc7e896`(hold-out 공란) |
 | 6. #4 H3 | 대기 | — |
 | 7. #3 Phase 0~5 | 대기(Phase 0-평가 초안만) | — |
+
+### 13.9 증적 처리 증분화 (2026-10-23, 사용자 요청 반영)
+
+**문제:** 증적이 46,172개 파일을 넘으면서 매번 export(`export.py`: 전 파일 복사)와 매니페스트(drvfs 너머 전 파일 `sha256sum`)·검증(전 파일 재해시)에 수십 분이 걸렸다. 단계마다 반복 시간을 잠식했다.
+
+**원인 측정:** 비용의 대부분은 복사·해시가 아니라 **WSL에서 drvfs(9P)를 통한 파일별 stat·읽기**였다. 첫 증분 구현에서 복사는 6개뿐이었는데도 9분이 걸렸고, 그 시간은 대상 stat이 차지했다.
+
+**구현:**
+
+| 도구 | 동작 | 측정(46,172파일) |
+|---|---|---|
+| `linux/evidence-sync.py` | 소스(ext4) stat을 캐시(`.manifest-cache.json`: 경로 → 대상 크기·mtime·sha256·소스 크기·mtime)와 비교해 **바뀐 소스만** 1회 읽어 쓰고, 같은 바이트를 해시한다. 대상은 stat하지 않는다. `--audit-dest`는 대상 전체를 순회해 대상에만 있는 파일·삭제된 파일을 반영한다. `--full-rehash`는 캐시를 무시한다. 자체 테스트 7/7 | 최초 구축(전체) 25분 1회 → **이후 10.6초** |
+| `verify-evidence.py --incremental --manifest-only` | Windows 네이티브 Python으로 실행한다(NTFS stat이 빠름). 캐시와 크기·mtime·digest가 같은 항목은 `stat_unchanged`, 나머지는 해시한다. 결과는 **`passed_incremental`**로 구분한다. 대소문자만 다른 경로 쌍(예: fuzz 코퍼스 `lab-references-r`/`-R`)은 Windows에서 구별할 수 없으므로 `deferred_to_wsl`로 분리한다 | 4분(WSL) → **7.6초**(Windows), 6건 deferred |
+| `verify-evidence.py --skip-manifest`(WSL) | PoC·GDB 증적 검사만 수행한다(Linux 절대 경로 필요) | 짧음 |
+
+**운용 규칙:**
+- **일상(단계 중간):** WSL `evidence-sync.py` → Windows `verify-evidence --incremental --manifest-only` → WSL `verify-evidence --skip-manifest`.
+- **매니페스트 스냅샷 커밋 전(필수):** WSL `evidence-sync.py --audit-dest` → WSL `verify-evidence`(전체 해시 모드). 증분 결과(`passed_incremental`)는 스냅샷의 근거가 될 수 없다. mtime을 보존한 내용 변조는 전체 모드에서만 잡힌다.
+
+**남은 과제(파일 수 자체 축소):** 종료된 캠페인의 `exec-*`, FlowFusion `fused/`처럼 시드로 다시 만들 수 있는 산출물을 캠페인 단위 아카이브(tar + 내부 매니페스트)로 묶는 방식이다. 증적 형식과 검사기(R2)를 함께 바꿔야 하므로 별도 단계로 둔다.

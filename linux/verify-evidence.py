@@ -8,6 +8,7 @@ Usage:
 import argparse
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
@@ -128,7 +129,7 @@ def check_gdb(root, since=None):
 _MANIFEST_LINE = re.compile(r'^([0-9a-f]{64})(?:  | \*)(.+)$')
 
 
-def check_manifest(root, skip=False):
+def check_manifest(root, skip=False, incremental=False):
     if skip:
         return dict(status='not_run', reason='manifest check skipped (fresh-evidence mode)')
     manifest = root / 'evidence-manifest.sha256'
@@ -138,7 +139,26 @@ def check_manifest(root, skip=False):
     problems = []
     if raw.startswith(b'\xef\xbb\xbf'):
         problems.append('manifest has a UTF-8 BOM')
-    entries = checked = missing = mismatched = 0
+    entries = checked = missing = mismatched = stat_unchanged = 0
+    # --incremental (plan §13.9): trust entries whose size/mtime still match
+    # the evidence-sync cache with the same digest; everything else is
+    # hashed. A speed device for routine checks - snapshot commits need the
+    # full mode (mtime-preserving tampering is only caught there).
+    cache = {}
+    if incremental and (root / '.manifest-cache.json').exists():
+        cache = json.loads((root / '.manifest-cache.json').read_text())
+    # Windows-native runs open paths case-insensitively: entries that differ
+    # only by case (e.g. fuzz corpus lab-references-r / -R, kept apart by
+    # WSL) cannot be told apart there and are deferred to a WSL run.
+    deferred = []
+    collide = set()
+    if os.name == 'nt':
+        seen = {}
+        for line in raw.decode('utf-8-sig').splitlines():
+            m = _MANIFEST_LINE.match(line)
+            if m:
+                seen.setdefault(m.group(2).lower(), []).append(m.group(2))
+        collide = {r for group in seen.values() if len(group) > 1 for r in group}
     for lineno, line in enumerate(raw.decode('utf-8-sig').splitlines(), 1):
         if not line.strip():
             continue
@@ -148,10 +168,20 @@ def check_manifest(root, skip=False):
             continue
         entries += 1
         digest, rel = match.groups()
+        if rel in collide:
+            deferred.append(rel)
+            continue
         path = root / rel
         if not path.exists():
             missing += 1
             continue
+        entry = cache.get(rel)
+        if entry and entry[2] == digest:
+            st = path.stat()
+            if entry[0] == st.st_size and entry[1] == st.st_mtime_ns:
+                stat_unchanged += 1
+                checked += 1
+                continue
         if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
             mismatched += 1
             problems.append('hash mismatch: ' + rel)
@@ -162,9 +192,14 @@ def check_manifest(root, skip=False):
         problems.append('manifest contains no parseable entries')
     elif checked == 0:
         problems.append('manifest verification matched 0 files (entries=%d)' % entries)
-    return dict(status='passed' if not problems else 'failed', manifest=str(manifest),
-                entries=entries, checked=checked, missing=missing,
-                mismatched=mismatched, problems=problems)
+    if incremental and not cache:
+        problems.append('incremental mode requested but no evidence-sync cache')
+    ok_status = 'passed_incremental' if incremental else 'passed'
+    return dict(status=ok_status if not problems else 'failed', manifest=str(manifest),
+                mode='incremental' if incremental else 'full',
+                entries=entries, checked=checked, hashed=checked - stat_unchanged,
+                stat_unchanged=stat_unchanged, missing=missing,
+                mismatched=mismatched, deferred_to_wsl=deferred, problems=problems)
 
 
 def run_self_test():
@@ -208,6 +243,12 @@ def main():
     parser.add_argument('--since', type=float, default=None,
                         help='only audit evidence created after this unix timestamp '
                              '(used by phase4 to prove this run produced its own evidence)')
+    parser.add_argument('--manifest-only', action='store_true',
+                        help='check only the manifest (e.g. from Windows-native Python, '
+                             'where NTFS stat is fast; PoC/GDB checks need WSL paths)')
+    parser.add_argument('--incremental', action='store_true',
+                        help='hash only entries whose size/mtime changed since evidence-sync '
+                             '(routine checks; snapshot commits need the full mode)')
     parser.add_argument('--skip-manifest', action='store_true',
                         help='skip the SHA-256 manifest check (live evidence directory has no manifest)')
     args = parser.parse_args()
@@ -216,8 +257,11 @@ def main():
         return run_self_test()
     summary = dict(scope='evidence audit; fails on inconsistency',
                    since=args.since,
-                   poc=check_poc(args.root, args.since), gdb=check_gdb(args.root, args.since),
-                   manifest=check_manifest(args.root, args.skip_manifest))
+                   poc=(dict(status='not_run', reason='--manifest-only') if args.manifest_only
+                        else check_poc(args.root, args.since)),
+                   gdb=(dict(status='not_run', reason='--manifest-only') if args.manifest_only
+                        else check_gdb(args.root, args.since)),
+                   manifest=check_manifest(args.root, args.skip_manifest, args.incremental))
     parts = (summary['poc'], summary['gdb'], summary['manifest'])
     if args.since is not None:
         # Phase 4 mode: this run must have produced both PoC and GDB evidence.
@@ -234,10 +278,12 @@ def main():
             summary['reason'] = 'no evidence was found to audit'
         elif any(part['status'] == 'failed' for part in parts):
             summary['status'] = 'failed'
+        elif summary['manifest']['status'] == 'passed_incremental':
+            summary['status'] = 'passed_incremental'   # not a snapshot-grade result
         else:
             summary['status'] = 'passed'
     print(json.dumps(summary, indent=2))
-    if summary['status'] == 'passed':
+    if summary['status'] in ('passed', 'passed_incremental'):
         return 0
     if summary['status'] == 'not_run':
         return 2
