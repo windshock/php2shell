@@ -57,6 +57,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from probe import multipart  # noqa: E402
 import explore_sapi  # noqa: E402
+import verdicts  # noqa: E402
 
 REPO = HERE.parent
 BASE = Path('/home/phplab/php-lab')
@@ -244,8 +245,30 @@ class StateBP(gdb.Breakpoint):
         sys.stdout.flush()
         return False
 
+class EventBP(gdb.Breakpoint):
+    # Instrumentation events for verified block points (issue #5-9): the
+    # producer's (un)serialize context destroyed, the 8.4.27 early reset.
+    def __init__(self, loc):
+        super().__init__(loc, internal=True)
+        self.name = loc
+    def stop(self):
+        out = dict(name=self.name)
+        try:
+            uri = gdb.parse_and_eval('sapi_globals')['request_info']['request_uri']
+            out['uri'] = uri.string() if _ptr(uri) else ''
+        except Exception as exc:
+            out['error'] = str(exc)[:120]
+        print('EVENT ' + json.dumps(out))
+        sys.stdout.flush()
+        return False
+
 StateBP('php_request_startup', 'startup')
 StateBP('php_request_shutdown', 'shutdown')
+for _loc in ('php_var_unserialize_destroy', 'php_var_serialize_destroy', 'php_basic_early_rinit'):
+    try:
+        EventBP(_loc)
+    except Exception:
+        pass
 end
 file {php}
 set args -c {ini} -S 127.0.0.1:{port} -t {docroot} {router}
@@ -626,16 +649,18 @@ def execute(seq, prefix, out, observer, sapi='cli', version=None, cov=False):
         steps.append(dict(harness_error=str(exc)))
     finally:
         proc.stop()
-    states = []
+    states, events = [], []
     if observer == 'gdb' and (out / 'observer.log').exists():
         for line in (out / 'observer.log').read_text(errors='replace').splitlines():
-            if line.startswith('STATE '):
+            if line.startswith('STATE ') or line.startswith('EVENT '):
                 try:
-                    states.append(json.loads(line[6:]))
+                    (states if line.startswith('STATE ') else events).append(
+                        json.loads(line[6:]))
                 except ValueError:
                     pass
     edges, cov_files = read_sancov(out / 'cov') if cov else (set(), 0)
-    return dict(steps=steps, states=states, elapsed=round(time.time() - started, 2),
+    return dict(steps=steps, states=states, events=events,
+                elapsed=round(time.time() - started, 2),
                 sapi=sapi, worker_pid=worker, edges=edges, cov_files=cov_files)
 
 
@@ -851,17 +876,28 @@ def replay(args):
     report = dict(seq=seq, signature=target, version=args.version, replays=[], minimize=[])
     counter = [0]
 
-    def sig_of(s, version_prefix=prefix):
+    def run_once(s, version_prefix=prefix):
+        """Signatures plus execution integrity (issue #5-1): a run that
+        did not reach its steps can never vote for 'extinct'."""
         counter[0] += 1
         res = execute(s, version_prefix, out / ('run-%03d' % counter[0]), args.observer,
                       args.sapi, version_prefix.name.rsplit('-', 1)[0])
         _, steps, found = observe(res, s)
-        return sorted({f['sig'] for f in found}), steps
+        integ = verdicts.integrity(s, steps, res.get('states'), args.observer)
+        return sorted({f['sig'] for f in found}), steps, integ
 
+    def sig_of(s, version_prefix=prefix):
+        sigs, _, integ = run_once(s, version_prefix)
+        # Minimization only accepts verified executions as votes.
+        return sigs if integ['status'] == 'executed' else []
+
+    replay_runs = []
     for _ in range(args.replays):
-        sigs, _ = sig_of(seq)
-        report['replays'].append(sigs)
-    stable = all(target in r for r in report['replays'])
+        sigs, steps, integ = run_once(seq)
+        replay_runs.append(dict(sigs=sigs, steps=steps, integrity=integ))
+        report['replays'].append(dict(signatures=sigs, integrity=integ['status']))
+    stable = all(target in r['sigs'] and r['integrity']['status'] == 'executed'
+                 for r in replay_runs)
     report['stable'] = stable
     current = seq
     if stable:
@@ -872,7 +908,7 @@ def replay(args):
                 cand = dict(current, steps=current['steps'][:i] + current['steps'][i + 1:])
                 if validate(cand):
                     continue
-                sigs, _ = sig_of(cand)
+                sigs = sig_of(cand)
                 report['minimize'].append(dict(removed=i, steps=[s['a'] for s in cand['steps']],
                                                kept_signature=target in sigs))
                 if target in sigs:
@@ -881,21 +917,30 @@ def replay(args):
                     break
     report['minimal'] = current
     if args.diff_version:
+        # Vulnerable reference run of the minimal form, then the fixed run.
+        _, v_steps, v_int = run_once(current)
         dprefix = BASE / 'install' / (args.diff_version + '-asan')
-        sigs, steps = sig_of(current, dprefix)
-        report['differential'] = dict(version=args.diff_version, signatures=sigs,
-                                      extinct=target not in sigs,
+        f_sigs, f_steps, f_int = run_once(current, dprefix)
+        verdict = verdicts.differential(target, v_steps, v_int, f_steps, f_int)
+        report['differential'] = dict(version=args.diff_version, signatures=f_sigs,
+                                      **verdict,
                                       steps=[dict(a=s.get('a'), response=s.get('response'),
                                                   failure_sites=s.get('failure_sites'),
                                                   state=s.get('state'))
-                                             for s in steps])
+                                             for s in f_steps])
     out.mkdir(parents=True, exist_ok=True)
     (out / 'replay.json').write_text(json.dumps(report, indent=2))
     print(json.dumps(dict(stable=stable, replays=report['replays'],
                           minimal=[s['a'] for s in current['steps']],
-                          differential=report.get('differential', {}).get('extinct'),
+                          differential=report.get('differential', {}).get('verdict'),
+                          extinct=report.get('differential', {}).get('extinct'),
                           out=str(out)), indent=2))
-    return 0 if stable else 2
+    diff = report.get('differential')
+    if diff and diff.get('verdict') == 'harness_failed':
+        return 1
+    if not stable or (diff and not diff.get('extinct')):
+        return 2
+    return 0
 
 
 # -------------------------------------------------------------- self-test

@@ -12,12 +12,17 @@ the Stage 1 executor:
   step 1.. consumers    - progress upload, no-file upload, session request
                           on the SAME process (no request in between)
 
-Classification per program:
-  intra_request          memory error during step 0 (FlowFusion's domain)
-  cross_request          memory error only in a later step (our target)
-  carried_state          gdb sees request-owned state live at a later
-                         startup (invariant candidate, no memory error)
-  clean
+Classification per program (fail-closed, verdicts.flowfusion; issue #5-2):
+three axes from LOG/OBSERVATION evidence, never from the HTTP status alone
+  generation   generated | not_generated
+  request 0    server_start_failed | request0_not_executed | request0_timeout
+               | program_compile_error (generated program invalid)
+               | program_runtime_fatal (valid exploration case, even as 500)
+               | program_completed
+  consumers    consumers_observed | consumer_incomplete | ended_by_memory_error
+and the summary verdict harness_failed | not_reached | consumer_incomplete |
+intra_request | cross_request | carried_state | clean. Denominators are
+reported separately: lifecycle observed vs program executed.
 
 Fused programs come from php-src tests; they run with exec/network
 functions disabled and allow_url_fopen=Off. --INI-- sections of the fused
@@ -29,6 +34,7 @@ Usage:
 Observation only; findings stay in the local evidence tree (§11.2 D1).
 """
 import argparse
+import glob
 import http.cookiejar
 import importlib.util
 import json
@@ -48,6 +54,7 @@ sys.path.insert(0, str(HERE))
 _spec = importlib.util.spec_from_file_location('lifecycle_explore', HERE / 'lifecycle-explore.py')
 ex = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ex)
+import verdicts  # noqa: E402
 
 BASE = ex.BASE
 FF = BASE / 'ext' / 'flowfusion'
@@ -142,6 +149,7 @@ def run_program(code, prefix, out, limit='16M'):
     ctx['jar'] = http.cookiejar.CookieJar()
     ctx['opener'] = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(ctx['jar']))
     steps = []
+    step0_log = ''
     actions = ('fused',) + CONSUMERS
     # Fused php-src tests write relative files (e.g. phar tests): run the
     # server from the program's own docroot, never from the repository.
@@ -169,6 +177,8 @@ def run_program(code, prefix, out, limit='16M'):
                 with proc.error_log.open('rb') as handle:
                     handle.seek(before_log)
                     log_text = handle.read().decode('utf-8', 'replace')
+            if idx == 0:
+                step0_log = log_text
             alive = proc.alive()
             steps.append(dict(i=idx, a=action, response=response,
                               failure_sites=ex.failure_sites(log_text), asan=asan,
@@ -190,17 +200,59 @@ def run_program(code, prefix, out, limit='16M'):
                     pass
     seq = dict(limit=limit, steps=[{'a': a} for a in actions])
     _, observed, findings = ex.observe(dict(steps=steps, states=states), seq)
-    return observed, findings
+    (out / 'steps.json').write_text(json.dumps(dict(steps=observed, step0_log=step0_log)))
+    return observed, findings, states, step0_log
 
 
-def classify(observed, findings):
-    if any(f['step'] == 0 for f in findings):
-        return 'intra_request'
-    if findings:
-        return 'cross_request'
-    if any(s.get('i', 0) > 0 and s.get('violations') for s in observed):
-        return 'carried_state'
-    return 'clean'
+def reclassify(root):
+    """Re-derive verdicts for an existing run from its evidence (observer
+    log, php-error.log, recorded findings) - no rerun."""
+    root = Path(root)
+    rows = [json.loads(line) for line in (root / 'results.jsonl').read_text().splitlines()
+            if line.strip()]
+    out = []
+    for r in rows:
+        d = root / ('prog-%04d' % r['n'])
+        if r.get('status') == 'no_file_section':
+            out.append(dict(r, **verdicts.flowfusion(False, [], [], '')))
+            continue
+        states = []
+        if (d / 'observer.log').exists():
+            for line in (d / 'observer.log').read_text(errors='replace').splitlines():
+                if line.startswith('STATE '):
+                    try:
+                        states.append(json.loads(line[6:]))
+                    except ValueError:
+                        pass
+        if (d / 'steps.json').exists():
+            data = json.loads((d / 'steps.json').read_text())
+            steps, log0 = data['steps'], data['step0_log']
+        else:
+            seen = sorted({int(m.group(1)) for st in states if st.get('tag') == 'startup'
+                           for m in [re.search(r'[?&]step=(\d+)', st.get('uri') or '')] if m})
+            sig_by_step = {f['step']: f['sig'] for f in r.get('findings', [])}
+            steps = [dict(i=i, response=(r.get('fused_response') if i == 0 else 'unknown'),
+                          asan=(dict(sig=sig_by_step[i]) if i in sig_by_step else None),
+                          violations=r.get('violations') if i > 0 else [],
+                          alive_after=True) for i in seen]
+            log0 = (d / 'php-error.log').read_text(errors='replace') if (
+                d / 'php-error.log').exists() else ''
+        v = verdicts.flowfusion(True, steps, states, log0)
+        out.append(dict(n=r['n'], strategy=r.get('strategy'), old_verdict=r.get('verdict'),
+                        **v))
+    return out
+
+
+def summarize(rows):
+    count = lambda key: {k: sum(1 for r in rows if r.get(key) == k)  # noqa: E731
+                         for k in sorted({r.get(key) for r in rows})}
+    return dict(total=len(rows), verdicts=count('verdict'), request0=count('request0'),
+                consumers=count('consumers'),
+                lifecycle_observed=sum(1 for r in rows if r.get('lifecycle_observed')),
+                program_executed=sum(1 for r in rows if r.get('program_executed')),
+                clean_of_lifecycle_observed=sum(1 for r in rows if r.get('verdict') == 'clean'),
+                clean_of_program_executed=sum(1 for r in rows if r.get('verdict') == 'clean'
+                                              and r.get('program_executed')))
 
 
 def run(args):
@@ -216,23 +268,29 @@ def run(args):
     (root / 'generate.log').parent.mkdir(parents=True, exist_ok=True)
     (root / 'generate.log').write_text(gen.stdout + '\n--stderr--\n' + gen.stderr)
     programs = [line.split('\t') for line in gen.stdout.splitlines() if '\t' in line]
+    if gen.returncode != 0 or not programs:
+        # Generator failure is not an empty clean run (issue #5-2).
+        print(json.dumps(dict(error='generator failed', rc=gen.returncode,
+                              programs=len(programs), out=str(root))))
+        return 1
     results = []
     started = time.time()
     for n, row in enumerate(programs):
         phpt, strategy = row[0], row[1]
         code, ini = file_section(phpt)
         if code is None:
-            results.append(dict(n=n, phpt=phpt, strategy=strategy, status='no_file_section'))
+            results.append(dict(n=n, phpt=phpt, strategy=strategy, status='no_file_section',
+                                **verdicts.flowfusion(False, [], [], '')))
             continue
         out = root / ('prog-%04d' % n)
         for item in Path(phpt).parent.iterdir():
             if item.is_file() and item.suffix != '.phpt':
                 (out / 'docroot').mkdir(parents=True, exist_ok=True)
                 shutil.copy(item, out / 'docroot' / item.name)
-        observed, findings = run_program(code, prefix, out)
-        verdict = classify(observed, findings)
+        observed, findings, states, log0 = run_program(code, prefix, out)
+        v = verdicts.flowfusion(True, observed, states, log0)
         results.append(dict(n=n, phpt=phpt, strategy=strategy, parents=row[4:5],
-                            ini_ignored=bool(ini), verdict=verdict,
+                            ini_ignored=bool(ini), **v,
                             fused_response=(observed[0].get('response') if observed else None),
                             findings=[dict(sig=f['sig'], step=f['step']) for f in findings],
                             violations=sorted({v for s in observed for v in s.get('violations', [])
@@ -250,8 +308,7 @@ def run(args):
                          'lifecycle sequence; observation only',
                    version=args.version, seed=args.seed, generated=len(programs),
                    executed=len(results), wall_s=round(time.time() - started, 1),
-                   verdicts=counts,
-                   fused_parse_ok=sum(1 for r in results if str(r.get('fused_response', '')) == 's200'),
+                   verdicts=counts, denominators=summarize(results),
                    signatures={k: dict(first=v['first'], steps=sorted(v['steps']))
                                for k, v in sigs.items()},
                    strategies=sorted({r['strategy'] for r in results}),
@@ -260,7 +317,8 @@ def run(args):
     (root / 'results.jsonl').write_text('\n'.join(json.dumps(r) for r in results) + '\n')
     (root / 'summary.json').write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary | {'out': str(root)}, indent=2))
-    return 0
+    bad = sum(1 for r in results if r.get('verdict') in ('harness_failed', 'not_reached'))
+    return 2 if bad else 0
 
 
 def main():
@@ -276,7 +334,15 @@ def main():
     r.add_argument('--seed', type=int, default=1)
     r.add_argument('--version', default='8.4.4')
     r.add_argument('--time-limit', type=float, default=0)
+    c = sub.add_parser('reclassify', help='re-derive verdicts of an existing run')
+    c.add_argument('dir')
     args = parser.parse_args()
+    if args.cmd == 'reclassify':
+        rows = reclassify(args.dir)
+        (Path(args.dir) / 'reclassified.jsonl').write_text(
+            '\n'.join(json.dumps(r) for r in rows) + '\n')
+        print(json.dumps(summarize(rows), indent=2))
+        return 0
     return prepare(args) if args.cmd == 'prepare' else run(args)
 
 
