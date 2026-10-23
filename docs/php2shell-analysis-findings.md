@@ -782,3 +782,63 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 - **커버리지:** §7.3 표의 공백 3건(HashTable 부분 Bucket, PS 상태, post-RINIT FPM)이 모두 재현으로 닫혔다. 패치 효과는 세 실험 모두 8.4.27에서 소멸 — 형태는 각각 ① P16: MULTIPART_EVENT_START 상태 리셋(소비 지점), ② P17: `php_basic_early_rinit` BG 리셋(소비 지점), ③ P15: OOM 전달 차단(`ZEND_HAS_OOM` 조기 종료).
 - **`root_cause_confirmed`(CVE-2026-109618) 성립** — 지정 사이트(zend_hash.c:958) 재현 + 공식 Diff 영역(php_variables/rfc1867/zend_alloc) 변경 + 수정 빌드에서 소멸이 일치(랩 조건 한정, 수동 확인).
 - 한계(과장 금지): (1) P15의 착지는 memory_limit 조준이 필요한 **실험 조건**이며 임의 원격 조건의 재현률 주장이 아니다. (2) gzip arm의 미성립은 본 랩 구성의 결과이며 다른 입력 필터 구성은 미시험. (3) 세 실험 모두 위조 세션 파일/랩 엔드포인트 등 로컬 전제를 포함한다. (4) RCE 체인은 계속 비목표다.
+
+## 9. Phase 5 — 신규 경로 탐색 (2026-10-23, 계획 §11)
+
+두 기준(① 유계 잔존 위험 확인, ② 미지 부류 탐색 자동화)으로 수행했다. 도구: `linux/patch-protect-map.sh`, `linux/state-sites.sh`, `linux/ordering-sites.sh`, `linux/phase5-b1.sh`, `linux/phase5-b2b.sh`, `linux/fuzz-phase5.sh`, `linux/gdb-state-diff.py`. 안전 경계(관측까지만) 유지.
+
+### 9.1 A1 — 패치 보호 목록 역추출
+
+8.4.4→8.4.27 Diff에서 보호 관련 **57개 헝크**를 추출·분류했다(증적 `patch-protect-map/hunks.txt`). 보호 모델은 4계층:
+
+| 계층 | 내용 | 대표 지점 |
+|---|---|---|
+| 할당기 이중 한도 | soft limit(=memory_limit, 초과 시 `ZEND_HAS_OOM()` 플래그만) + hard limit(기본 200%/+1G, 여기서 bailout) + `zend_mm_delayed_error` 지연 처리 + `ZEND_MM_MAX_ALLOCS`(n번째 할당 강제 실패 — 업스트림 자체 시험용) | zend_alloc.c 7헝크, main.c INI `memory_hard_limit_percent` |
+| 호출부 가드 | **rfc1867.c 20곳**, php_variables.c 6곳의 `ZEND_HAS_OOM()` 조기 종료 + 등록 함수 bool화 + `safe_ferealloc(..., fallible)`(NULL 반환) | rfc1867.c:810/824/1075/1091/1218 등 |
+| 구조 축소 | `array_init_singleton()`(8버킷 해시 → 최소 할당) — 증폭 표면 자체 축소 | php_variables.c 4곳 |
+| 상태 조기 리셋 | `php_basic_early_rinit()`(BG serialize/unserialize·lock + `php_url_scanner_early_rinit()`), MULTIPART_EVENT_START의 `php_rinit_session_globals()`, `PS(in_rfc1867_update)` + `set_incomplete_classes_only()`(파싱 중 디코드는 미완성 클래스만, 사용자 코드 개입 차단) | main.c:1869, session.c:3280, var_unserializer.re |
+
+**핵심 관찰(A3 연계): `Zend/zend_hash.c` 자체에는 가드가 0개다.** count-before-key-allocation 구조(`:955-958`)는 8.4.27에도 그대로 있으며, 방어는 전적으로 호출부 사전 점검과 soft/hard 이중 한도에 의존한다.
+
+### 9.2 A2/A3 — 후보 열거와 S9 체크리스트
+
+- **A2(동형 stale-state)**: 잔류 부류는 "소비가 pre-RINIT인 상태"로 유계다(그 외는 모듈 RINIT이 리셋). pre-RINIT 도달 전역을 `php_hash_environment` 트리로 열거: 심볼 테이블, `SG(rfc1867_uploaded_files)`, PS 전역, BG(serialize/unserialize), url_scanner 상태(sid 등록: session.c:1604). **INIT/DESTROY 쌍 조사**: gmp·sysvshm·phar·spl·sysvmsg의 (un)serialize는 모두 공유 BG 컨텍스트를 쓰며(`php_var_(un)serialize_init`의 BG 캐시) 별도 상태가 아니다 — 생산자 다양성일 뿐 부류는 동일.
+- **S9 체크리스트 실행**(Calif php-unserialize-audit): ① `Serializable::unserialize` 재진입 — 실재(var_unserializer.re:776, decode 중 사용자 코드)하나 8.4.27에서 호출 후 `ZEND_HAS_OOM()` 점검 추가·rfc1867 컨텍스트는 `incomplete_classes_only`로 차단. ② `__wakeup`/dtor 지연 — `var_push_dtor` 목록은 var_hash 컨텍스트 수명에 귀속(기존 부류). ③ `var_hash` 수명 — 공유 BG 캐시(기존 부류). ④ 세션 디코더 차이 — **핸들러 간 보호 차이 없음**: `php_session_decode`가 전 핸들러를 동일 `zend_try`로 감쌈. → 신규 미보호 경로 없음(정적).
+- **A3(count-before-init)**: 99쌍 스캔(증적 `ordering-sites/pattern-hits.txt`). 유효 후보는 ① `rfc1867.c:1123`(lbuf 성장 — 8.4.27에서 fallible 전환 + NULL 점검) ② `SG(rfc1867_uploaded_files)` 삽입(:1105, 같은 zend_hash 부류 — 8.4.27은 FILE_END 가드가 등록 전 취소) ②' 심볼 테이블 삽입(P15 부류). 나머지 97쌍은 MINIT·컴파일 시점 또는 길이 대입 등 무해.
+
+### 9.3 Stage B — 후보 5개 동적 판정
+
+| # | 후보 | 구성 | 8.4.4 | 8.4.27 | 판정 |
+|---|---|---|---|---|---|
+| B1-1 | url_scanner 상태(trans_sid) | `use_trans_sid=1` + Path B 시퀀스 | 재현 3/3 — 단 스택은 기존 PS 경로와 동일(`php_session_initialize`/`ps_files_close`), url_scanner 단독 소비는 이 시퀀스에서 미관측 | 소멸 0/3 | `already_patched`(early reset) + 동일 부류 |
+| B1-2 | `php_serialize` 핸들러 | 핸들러별 위조 세션 형식 | 재현 3/3, 동일 스택 | 소멸 0/2 | `already_patched`(핸들러 무관 — S9④와 일치) |
+| B1-3 | `php_binary` 핸들러 | 〃 | 재현 3/3, 동일 스택 | (부류 동일로 생략) | `already_patched` |
+| B2-1 | `uploaded_files` 부분 초기화 | 실제 파일 파트(**`max_file_uploads=1000` 필요 — 실제 파일은 카운터를 소모함을 재확인**, 기본 20에선 도달 불가) | OOM 도달(2M~2.8M, tried=320/56/34B — 착지 분산), teardown 크래시는 이 조건들에서 미관측 | 정적으로 FILE_END 가드가 등록 전 취소 | `이 조건에서 미재현`(부류는 보호됨) |
+| B2-2 | hard limit 잔여 창 | chunked 18.9MB 본문 > soft 8M·hard 16M | fatal(500) 재현, 메모리 오류 없음 | **fatal(500) 재현** — hard bailout은 여전히 발생, 메모리 오류 없음 | 창 이론상 존재하나 **현실적 입력 상한에서 관측 못함**(아래 사유) |
+
+**B2-2 구조적 사유:** soft limit 초과 후에는 호출부 가드가 소규모 할당 성장을 차단하고(fatal까지의 8MB 여유분 동안 `ZEND_HAS_OOM()`=true), hard limit으로 한 번에 점프하는 단일 대형 할당은 값/파일명 문자열처럼 카운터 이전의 무해한 대상에만 발생하며, 입력 상한(부품 1020, 변수 1000) 안에서는 다중 MB 규모의 구조 성장이 불가능하다. 즉 8.4.27의 방어는 "fatal 방지"가 아니라 "fatal이 부분 초기화 구조에 착지할 가능성 제거"로 작동한다.
+
+### 9.4 C1/C2 — 탐색 자동화
+
+- **C1 퍼저**: 코퍼스 통합(공식 19 + 자체 9 = 28시드: 세션 핸들러 3종 형식·progress 구조·`R:`/`r:` 참조·`C:` Serializable·`__PHP_Incomplete_Class`·32단계 네스팅·64KB 문자열). 사전(dict) 생성 이슈는 최소 빌드에서 지속(빈 출력) → 코퍼스 강화 모드로 운용. 3회 장기 실행 결과는 아래 표.
+- **C2 `gdb-state-diff.py`**: 요청 경계마다 BG(serialize/unserialize)·PS(id/mod_data)·url_adapt 호스트 표·`modules_activated`를 덤프해 잔류를 가설 없이 diff. 8.4.4에서 **두 부류의 잔류를 자동 포착** — 파싱 중 생산자 후 `ser_level=1`+`ps_id`/`ps_mod` 댕글링 운반, 런타임 생산자 후 `unser_level=1`+`unser_data` 댕글링 운반. 8.4.27에서는 **모든 전이에서 잔류 0**(같은 fatal 발생 하에) — 패치 소멸의 자동 확인.
+
+| C1 실행 | 시간 | 실행 횟수 | crash artifact | 코퍼스 단위(누적) |
+|---|---|---|---|---|
+| run 1 | 25분 | 8,431,226 (5,617 exec/s) | **0** | 1,441 |
+| run 2 | 25분 | 7,672,622 (5,111 exec/s) | **0** | (증감 병합) |
+| run 3 | 25분 | 7,513,880 (5,005 exec/s) | **0** | 1,323 |
+
+총 약 **2,362만 회** 실행, 크래시 0 — 커버리지 cov:2,399/ft:8,510 수준에서 신규 단위는 계속 발견되나(누적 코퍼스 ~1.2MB) 메모리 오류 미발생. 음성은 "이 구성·시간에서 못 찾음"이다(야간 8h급은 미수행, `fuzz-phase5.sh`로 지속 가능).
+
+### 9.5 커버리지 보고 (봤음 / 못 봄)
+
+- **봤음**: 8.4.4↔8.4.27 전체 보안 Diff(57헝크), pre-RINIT 도달 전역, 전 확장 (un)serialize INIT/DESTROY 쌍, count-before-init 99쌍, 후보 5종 동적, 상태 잔류 자동 diff(양 버전), unserialize 퍼징(3회).
+- **못 봄(한계)**: 8.3/8.2 라인과 master 스캔(정적 스코프로도 미수행 — A4에서 8.4/8.5로 확정), 상용 WAF/CRS, multipart 직접 퍼저 타깃(신규 개발 = 비목표 유지), 야간 8h급 장기 퍼징(세션 내 25분×3으로 대체 — 아래 커밋 후 지속 실행 가능), 기타 확장(phar/spl 등)의 개별 동적 시험.
+
+### 9.6 종합 판정
+
+- **신규 경로(미보고 취약점): 발견 없음** — 판정 어휘 `not_found(못 찾음)`로 기록한다. 완전성은 원리적으로 불가하며 본 탐색의 음성은 "이 스코프에서 못 찾음"이다.
+- **기준 1(유계 잔존 확인): 충족** — 후보 열거 완료 + 상위 5종 동적 판정 완료. 모든 후보가 기존 2부류(stale-state·count-before-init)로 수렴하고 패치 범위 내다. 유일한 구조적 발견은 §9.3 B2-2(hard bailout은 존재하나 착지 무해성의 구조적 사유).
+- **기준 2(탐색 자동화): 충족** — C2 잔류 diff 도구 신설(양 부류 자동 포착·소멸 확인), C1 코퍼스 통합 퍼징 3회 가동.
+- 발견물 없음으로 D1(신고 절차)은 미발동. 재현 스크립트·증적은 `patch-protect-map/`, `state-sites/`, `ordering-sites/`, `poc-patha-*realtfiles`, `b2b-hardlimit-*`, `gdb-state-diff-*`, `fuzz-phase5-*`.

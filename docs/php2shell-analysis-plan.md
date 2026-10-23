@@ -359,3 +359,78 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 5. `var/linux-evidence/evidence/probe-*/`, `probe-gdb-*/` — 프로브 실행 증적.
 6. `var/linux-evidence/evidence-manifest.sha256` — 증적 해시 매니페스트.
 7. `docs/php2shell-analysis-findings.md` — 정적·동적 분석 결과 및 주장별 판정표.
+
+## 11. Phase 5 — 신규 경로 탐색 계획 (2026-10-23, 미실시)
+
+> 두 기준을 동시에 목표로 한다. **기준 1(유계)**: 패치가 덮지 않은 같은 부류의 잔존 위험 확인 — 열거 가능 공간, "충분" 판정 가능. **기준 2(무계)**: 미지 부류 탐색 자동화 — 완전성 보장 없음, 음성은 "못 찾음"으로만 기록.
+
+### 11.1 목표와 충족 정의
+
+| 기준 | 목표 | "충족"의 정의 (완료 판정) |
+|---|---|---|
+| 1. 잔존 위험 확인 | 8.4.27/8.5.12 패치가 보호하지 않는 ① stale-state 부류(생략된 정리로 잔류하는 요청 소유 상태) ② count-before-init 부류(증가 후 낙할 수 있는 할당 → 부분 초기화) 후보의 열거·판정 | 후보 열거 완료 + 우선순위 상위 5개의 동적 판정(재현/이 조건에서 미재현/도달 불가) + 전 후보의 정적 판정 기록 |
+| 2. 미지 부류 탐색 | 가설 없이 오류를 만들어내는 탐색 파이프라인(퍼징·상태 잔류 diff) 구축·가동 | 파이프라인 가동 + 야간 3회 이상 실행 + 발견물 전건의 부류 분류 완료. **"신규 경로 발견" 자체는 충족 조건이 아님** |
+
+### 11.2 공통 규칙
+
+- **안전 경계 유지**: 메모리 오류 관측까지만. 힙 그루밍·주소 조작·RCE 체인·운영/외부 시험은 계속 비목표.
+- **판정 어휘(신규 경로용)**: 공식 advisory가 없으므로 `candidate_identified`(정적) / `memory_error_observed_new_path`(동적, ASAN+재현성) / `already_patched`(A1 보호 목록과 일치) / `not_reachable` / `not_found(못 찾음)`. CVE 매핑·`root_cause_confirmed`는 공식 확인 전 불가.
+- **발견 시 처리 (D1)**: 관측 즉시 중단 → 증적 보존·재현 조건 기록 → **php.net 보안 채널(security@php.net) 책임 신고**(크래시 리포트·재현 스크립트 첨부, 익스플로잇 미포함) → 신고 확인 전 본 저장소의 해당 상세 비공개 전환 검토 → 업스트림 수정 공개 후 Phase 4 사다리로 소멸 확인.
+- **중단 기준**: Stage A 후보 소진 + Stage B 상위 5개 판정 + Stage C 야간 3회 음성, 또는 총 1주 경과 중 먼저 도래하는 지점. 연장은 별도 승인.
+
+### 11.3 Stage A — 정적 열거 (기준 1, 유계)
+
+| ID | 작업 | 방법 | 산출 |
+|---|---|---|---|
+| A1 | **패치 보호 목록 역추출** | 8.4.27 Diff에서 early-reset/가드 추가 지점 전수 목록화(`php_basic_early_rinit`, `php_url_scanner_early_rinit`, MULTIPART_EVENT_START의 `php_rinit_session_globals`, `ZEND_HAS_OOM` 각 삽입점, `memory_hard_limit_percent`, `in_rfc1867_update`) | "보호된 상태/지점 ↔ 막는 경로 유형" 표 — 이후 모든 후보의 `already_patched` 판정 기준 |
+| A2 | **동형 stale-state 스캔** (+ 기존 S9 흡수) | ① 모듈 전역(BG()·기타 ZEND_MODULE_GLOBALS) 중 "RINIT 전·파싱 중 초기화 가능 + fatal 시 정리 생략 가능 + 다음 요청이 소비 가능" 조건 스캔(`linux/state-sites.sh` — `serialize-sites.sh` 확장). ② S9 체크리스트 실행: Serializable::unserialize 재진입, `__wakeup/__destruct` 상태 변경, `var_hash` 수명, 세션 디코더 차이 (Calif php-unserialize-audit 방법론, 결과는 가설로만) | 후보 상태 목록(전역명 × 수명 경계 file:line × 예상 소비자 × SAPI) |
+| A3 | **count-before-init 패턴 스캔** | "카운터/길이/인덱스 증가 → 낙할 수 있는 할당(emalloc 계열·`zend_string_init`·realloc)" 순서가 부분 상태를 노출하는 구조 스캔. 시작점: `zend_hash.c` 유사 패턴 외 `smart_str`·`zend_llist`·버킷/슬롯 배열류. 각 지점에 `ZEND_HAS_OOM` 가드 유무 병기 | 후보 지점 목록(file:line × 증가문 × 낙할 수 있는 할당 × 가드 유무) |
+| A4 | **버전 스코프 확정** | 기본: 8.4.27·8.5.12 소스(+ 필요 시 8.3.36·8.2.35 태그 소스만). master(8.6-dev)는 정적 스캔에만 포함. 빌드 추가는 후보 발굴 시 | 스코프 결정 기록 |
+
+**우선순위 산식**: 도달성(원격 입력 경로) × 잔류 가능성(정리 생략 조건) × 소비 가능성(pre-RINIT/재사용 경로) × 미보호(A1 비일치).
+
+### 11.4 Stage B — 동적 검증 (기준 1, 상위 5개)
+
+| ID | 후보 유형 | 하네스 | 판정 |
+|---|---|---|---|
+| B1 | stale-state 후보 | `gdb-pathb.py` 템플릿 복제 — 대상 전역 포인터 브레이크포인트 + 생산자 2종(파싱 중 fatal / 앱 런타임 fatal, `/unserialize` 패턴) × 소비자 2종(pre-RINIT 파싱 / 앱 코드) | ASAN 3종 스택 또는 GDB 잔류·재사용 관측 시 `memory_error_observed_new_path`. ASAN 음성은 "이 조건에서 미재현"(§9.14-5a 이중 판정 유지) |
+| B2 | count-before-init 후보 | `poc-patha.py` 조준 스윕 재사용 — 해당 할당에 fatal 착지(사이트 백트레이스 확인) → teardown 소비 관측 | fatal 사이트 확인 + teardown 소비 시 재현. 카운터 이전 착지 대조군 포함 |
+
+각 후보에 8.4.27(또는 해당 수정 버전) 소멸 확인 병행 — 소멸되면 잔존 아님.
+
+### 11.5 Stage C — 탐색 자동화 (기준 2, 무계)
+
+| ID | 작업 | 내용 | 비고 |
+|---|---|---|---|
+| C1 | **퍼저 파이프라인** | 공식 `php-fuzz-unserialize` + Corpus 통합(공식 seed + 자체 직렬화 코퍼스: 위조 세션·progress 페이로드) + **사전 생성 이슈 해결**(`generate_unserialize_dict.php`를 session/standard 포함 빌드에서 재생성) + 장기 실행(야간 8h) + 축소 스크립트 | 발견물은 A1/A2 부류 분류 → 알려진 부류면 회귀 기록, 미지면 D1 절차. multipart/rfc1867 직접 퍼저 타깃은 공식 SAPI에 부재 시 **신규 개발 = 승인제**(기존 비목표 경위) |
+| C2 | **상태 잔류 diff 자동화** | `linux/gdb-state-diff.py` — 등록된 전역 상태(레벨·포인터)를 요청 경계마다 덤프해 "정상 요청 vs fatal 요청 후" 잔류 diff를 자동 출력 | 가설 없는 잔류 탐지( ZendDiff식 내부 프로빙의 잔류 특화판). A2 후보의 동적 보완 |
+| C3 | 데이터흐름 변형(FlowFusion식) | 우선순위 낙후. C1/C2 결과에 따라 승인제 | 완전성 부인 명시 |
+
+### 11.6 마감 산출 (D2)
+
+1. `docs/php2shell-analysis-findings.md` §9 — 신규 경로 탐색 결과(후보 표, 판정, 발견물 처리 이력).
+2. 탐색 커버리지 보고: 무엇을 스캔했고 무엇을 안 했는지(부인 가능성 명시).
+3. 랩 인계 문서(`php2shell-llm-handoff.md`) 갱신 또는 후속판.
+4. 발견물이 있는 경우: 신고 이력·업스트림 응답·공개 후 소멸 검증까지 별도 추적.
+
+### 11.7 리스크
+
+| 리스크 | 대응 |
+|---|---|
+| 미지 부류 탐색의 완전성은 원리적으로 불가 | 11.1의 충족 정의가 "탐색 수행"임을 문서·보고 모두에 명시 |
+| 업스트림/다른 연구자와 중복 발견 | 발견 시 공개 advisory·GHSA 최신 확인 후 신고 |
+| 8.3/8.2 소스·빌드 비용 | 정적 스캔 우선, 빌드는 후보 확인 시만 |
+| 신규 퍼저 개발 범위 확장 | 승인제 유지(C1 비고) |
+
+### 11.8 실행 결과 (2026-10-23, 상세는 findings §9)
+
+| 단계 | 결과 | 판정 |
+|---|---|---|
+| A1 보호 목록 | 57헝크 4계층 분류(할당기 이중 한도·호출부 가드·구조 축소·상태 조기 리셋). **zend_hash.c 자체 무가드 — 호출부 방어 모델 확인** | 완료 |
+| A2 + S9 | pre-RINIT 도달 전역 열거, INIT/DESTROY 쌍 전수(비세션 확장은 공유 BG 컨텍스트 = 동일 부류), S9 4항목 전부 기존 부류로 수렴 | 완료 — 신규 미보호 상태 없음(정적) |
+| A3 | 99쌍 스캔 — 유효 후보 2건(`rfc1867.c:1123` fallible화 확인, `uploaded_files` 삽입=기존 부류) | 완료 |
+| B (5후보) | url_scanner 3/3·php_serialize 3/3·php_binary 3/3(전부 동일 부류·8.4.27 소멸), uploaded_files 미재현(착지 분산), hard-limit 창(양 버전 fatal 재현·메모리 오류 음성+구조적 사유) | 완료 — `already_patched` 4건 + `이 조건에서 미재현` 1건 |
+| C1 | 코퍼스 28시드 통합(dict 이슈 지속 → 코퍼스 강화), 25분×3 실행 | 완료(결과 findings §9.4) |
+| C2 | `gdb-state-diff.py` — 8.4.4 두 부류 잔류 자동 포착, 8.4.27 전 전이 잔류 0 | 완료 |
+
+**종합: 신규 경로 미발견(`not_found(못 찾음)` — 스코프 한정), 기준 1·2 모두 충족 정의대로 완료.** D1(신고) 미발동.

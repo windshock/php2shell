@@ -33,26 +33,23 @@ BASE = Path('/home/phplab/php-lab')
 PORT = 18088
 
 
-def build_body(parts, nest, boundary, shared_chain=False, leaf_pad=0, seg_pad=0):
+def build_body(parts, nest, boundary, shared_chain=False, leaf_pad=0, seg_pad=0,
+               real_files=False):
     head = []
     suffix = ''.join('[s%d%s]' % (i, 'S' * seg_pad) for i in range(nest))
     pad = 'P' * leaf_pad
+    content = b'Z' * 8
     for i in range(parts):
         if shared_chain:
-            # One deep chain shared by every part; parts differ only at a
-            # long string leaf key, so the allocation stream is dominated by
-            # large key zend_string_init calls (zend_hash.c:958) rather than
-            # the fixed 320B table initialisations.
             name = 'g%s[k%04d%s]' % (suffix, i, pad)
         else:
-            # Long per-level segments make the key allocation comparable to
-            # or larger than new_array+real_init, so a memory_limit crossing
-            # lands on zend_hash.c:958 about as often as on the table paths.
             name = 'f[%d]%s' % (i, suffix)
+        filename = 'a.bin' if real_files else ''
         head.append(
             ('--%s\r\nContent-Disposition: form-data; name="%s"; '
-             'filename=""\r\nContent-Type: application/octet-stream\r\n\r\n\r\n'
-             % (boundary, name)).encode())
+             'filename="%s"\r\nContent-Type: application/octet-stream\r\n\r\n'
+             % (boundary, name, filename)).encode()
+            + (content if real_files else b'') + b'\r\n')
     head.append(('--%s--\r\n' % boundary).encode())
     body = b''.join(head)
     return body
@@ -144,6 +141,9 @@ def main():
     parser.add_argument('--seg-pad', type=int, default=0,
                         help='pad every nested name segment so key string '
                              'allocations dominate the crossing probability')
+    parser.add_argument('--real-files', action='store_true',
+                        help='real file parts (temp file + uploaded_files '
+                             'insert) instead of empty filename="" parts')
     args = parser.parse_args()
 
     label = 'limit%s-parts%d-nest%d%s%s' % (
@@ -162,7 +162,7 @@ def main():
     boundary = 'PathABnd' + secrets.token_hex(8)
     body = build_body(args.parts, args.nest, boundary,
                       shared_chain=args.shared_chain, leaf_pad=args.leaf_pad,
-                      seg_pad=args.seg_pad)
+                      seg_pad=args.seg_pad, real_files=args.real_files)
     result = dict(label=label, version=args.version, parts=args.parts,
                   nest=args.nest,
                   memory_limit=os.environ.get('POC_MEMORY_LIMIT', 'ini-default'),

@@ -118,3 +118,7 @@
 - WAF/PHP 파싱 비교, Fuzzer/FlowFusion, JIT 비교, `cleanup=Off` 대조: 여전히 `not_run`.
 - CVE 근본 원인 확정: 공식 공지·Diff 확인 전에는 `inconclusive`.
 - 이번 갱신도 로컬 WSL 랩 실행 결과이며, 제3자 환경 재현은 별도 검증이 필요하다.
+
+## Phase 5 — 신규 경로 탐색 결과 (2026-10-23)
+
+계획 §11/findings §9 참조. 요약: 패치 보호 목록 역추출(57헝크·4계층) → 후보 열거(pre-RINIT 전역·INIT/DESTROY 쌍·count-before-init 99쌍·S9 체크리스트) → 동적 5후보(url_scanner·핸들러 2종·uploaded_files·hard-limit 창) → 자동화(C2 상태 잔류 diff 도구, C1 코퍼스 통합 퍼징 3회). **신규 경로 미발견(`not_found`)**, 모든 후보가 기존 2부류로 수렴·패치 범위 내. 유일한 구조적 발견: 8.4.27의 hard limit bailout은 여전히 발생하나 현실적 입력 상한에서 부분 초기화 구조에 착지하지 않음(호출부 가드+soft/hard 이중 한도 모델). 안전 경계(관측까지만) 유지, 신고 대상 없음.

@@ -57,6 +57,7 @@ curl -F "file=@README.md" http://127.0.0.1:18084/upload
 - **분석 결과**: [docs/php2shell-analysis-findings.md](docs/php2shell-analysis-findings.md) — 정적(S1~S8), 동적(P1~P13), **Phase 4(8.4.27) 결과**
 - **E2E/계측**: `linux/probe.py`, `linux/gdb-probe.py`, `linux/gdb-unserialize.py`, `linux/poc-bgserialize.py`
 - **3경로 재현(P15~P18)**: `linux/poc-patha.py`·`poc-pathb.py`·`poc-pathc.py`, `linux/gdb-patha.py`·`gdb-pathb.py`, `linux/apache-patha-sweep.sh`·`apache-patha-matrix.sh`·`apache-pathb-matrix.sh`, `linux/oom-delivery-matrix.sh`·`oom-delivery-fpm.py`
+- **신규 경로 탐색(Phase 5)**: `linux/patch-protect-map.sh`, `linux/state-sites.sh`, `linux/ordering-sites.sh`, `linux/phase5-b1.sh`, `linux/phase5-b2b.sh`, `linux/gdb-state-diff.py`, `linux/fuzz-phase5.sh`
 - **SAPI/WAF/Fuzzer**: `linux/apache-lab.sh`, `linux/waf-compare.py`, `linux/fuzz-smoke.sh`
 - **패치 검증**: `linux/phase4.sh`, `linux/patch-diff.sh`, `linux/verify-evidence.py`
 - **증적**: `var/linux-evidence/` + `docs/evidence-manifest-20261021.sha256`

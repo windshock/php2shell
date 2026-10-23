@@ -37,6 +37,10 @@ session.save_path=$run/sessions
 upload_tmp_dir=$run/uploads
 error_log=$run/php-error.log
 INI
+# Phase 5 B1 variants append extra INI lines (handler/trans_sid).
+if [[ -n "${APACHE_LAB_INI_EXTRA:-}" ]]; then
+  printf '%s\n' "$APACHE_LAB_INI_EXTRA" >> "$ini"
+fi
 mkdir -p "$run/sessions" "$run/uploads"
 
 cat > "$conf" <<CONF
