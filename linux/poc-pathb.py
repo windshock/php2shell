@@ -153,11 +153,18 @@ def one_iteration(base_out, index, external_port):
     # FILE_START early-inits the session (PS(id) bound to this request's heap),
     # the progress update re-encodes the 3MB session and OOMs mid-parse, so the
     # END callback and the gated module RSHUTDOWN are both skipped.
+    # Issue #1: only log lines appended AFTER request A starts may vote on
+    # the OOM verdict, so warm-up noise cannot inflate it.
+    log_offset_before_a = error_log.stat().st_size if error_log.exists() else 0
     req_a = multipart(port, '/upload',
                       fields=[(SESSION_FIELD, sid_big), (PROGRESS_FIELD, 'pbA')],
                       file_spec=('file', 'a.bin', b'K' * 32768))
     time.sleep(0.3)
-    log_text = error_log.read_text(errors='replace') if error_log.exists() else ''
+    log_text = ''
+    if error_log.exists():
+        with error_log.open('rb') as handle:
+            handle.seek(log_offset_before_a)
+            log_text = handle.read().decode('utf-8', 'replace')
     oom = 'Allowed memory size of' in log_text
     record.update(request_a_status=req_a['status'], oom_logged=oom,
                   worker_alive_after_a=(process_alive(worker_pid) if worker_pid else None))

@@ -49,6 +49,37 @@ commands
   printf "===OOM_FATAL_BEGIN===\\n"
   bt 16
   printf "===OOM_FATAL_END===\\n"
+  python
+import gdb
+print("===BUCKET_BEGIN===")
+try:
+    frame = gdb.newest_frame()
+    target = None
+    while frame is not None:
+        if '_zend_hash_str_add_or_update_i' in (frame.name() or ''):
+            target = frame
+            break
+        frame = frame.older()
+    if target is None:
+        print("hash_frame=not-found")
+    else:
+        target.select()
+        ht = gdb.parse_and_eval('ht')
+        nused = int(ht['nNumUsed'])
+        print('hash_frame=%s nNumUsed=%d nNumOfElements=%d' %
+              (target.name(), nused, int(ht['nNumOfElements'])))
+        try:
+            bucket = ht['arData'][nused - 1]
+            key = int(bucket['key'])
+            vtype = int(bucket['val']['u1']['v']['type'])
+            print('counted_bucket_idx=%d key_ptr=0x%x val_type=%d' %
+                  (nused - 1, key, vtype))
+        except gdb.Error as exc:
+            print('bucket_read_error=%s' % exc)
+except Exception as exc:
+    print('observer_error=%s' % exc)
+print("===BUCKET_END===")
+  end
   continue
 end
 
@@ -151,11 +182,36 @@ def main():
     bt_text = match.group(1).strip() if match else ''
     report['oom_backtrace'] = bt_text.splitlines()[:16]
     report['oom_site_class'] = classify_backtrace(bt_text)
+    bucket_match = re.search(r'===BUCKET_BEGIN===(.*?)===BUCKET_END===',
+                             log_text, re.S)
+    bucket = {}
+    if bucket_match:
+        for line in bucket_match.group(1).splitlines():
+            for item in line.strip().split():
+                key, _, val = item.partition('=')
+                if key in ('nNumUsed', 'nNumOfElements', 'counted_bucket_idx',
+                           'key_ptr', 'val_type', 'hash_frame'):
+                    bucket[key] = val
+        if 'observer_error' in bucket_match.group(1) or 'bucket_read_error' in bucket_match.group(1):
+            bucket['notes'] = [line.strip() for line in bucket_match.group(1).splitlines()
+                               if 'error' in line][:2]
+    report['bucket_observation'] = bucket
+    # The counted-but-uninitialized claim requires: fatal at the key
+    # allocation (:958) AND a bucket slot at nNumUsed-1 with a garbage key.
+    report['counted_uninitialized_bucket_observed'] = bool(
+        report['oom_site_class'] == 'key_alloc_in_hash_add_or_update'
+        and bucket.get('nNumUsed')
+        and bucket.get('key_ptr') not in (None, '0x0'))
+    report['gdb_errors'] = [line.strip() for line in log_text.splitlines()
+                            if 'Error in sourced' in line or 'No symbol table' in line][:3]
     asan_reports = sorted(str(p) for p in out.glob('asan.*') if p.is_file())
     report['asan_reports'] = asan_reports
     (out / 'result.json').write_text(json.dumps(report, indent=2))
     print(json.dumps({'evidence': report['evidence'],
                       'oom_site_class': report['oom_site_class'],
+                      'bucket': bucket,
+                      'counted_uninitialized_bucket_observed':
+                          report['counted_uninitialized_bucket_observed'],
                       'asan_reports': asan_reports}))
     print(json.dumps(report.get('request', {}), ))
 

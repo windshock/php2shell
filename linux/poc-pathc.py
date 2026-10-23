@@ -131,12 +131,20 @@ def main():
             log = (lab.out / 'php-error.log')
             log_text = log.read_text(errors='replace') if log.exists() else ''
             record['oom_logged'] = 'Allowed memory size of' in log_text
-            record['fatal_in_unserialize'] = 'unserialize' in log_text
+            # Issue #1: the producer verdict must attribute the fatal to the
+            # /unserialize endpoint (web/index.php, the only userland file in
+            # this lab that can fatal), not just to any OOM in the request.
+            record['fatal_in_unserialize'] = any(
+                'Allowed memory size' in line and 'index.php' in line
+                for line in log_text.splitlines())
             record['worker_pid_after_a'] = worker_pid(lab.out)
             record['worker_survived_a'] = (record['worker_pid_after_a']
                                            == record['worker_pid_before'])
-            if not (record['oom_logged'] and record['worker_survived_a']):
+            if not (record['oom_logged'] and record['fatal_in_unserialize']
+                    and record['worker_survived_a']):
                 record['result'] = ('oom_not_triggered' if not record['oom_logged']
+                                    else 'fatal_not_in_unserialize'
+                                    if not record['fatal_in_unserialize']
                                     else 'worker_died_on_a')
                 summary_runs.append(record)
                 continue
@@ -160,7 +168,17 @@ def main():
             report = asan_report(lab.out, set(asan_before))
             record['asan'] = report
             record['worker_pid_after_b'] = worker_pid(lab.out)
-            if report and report['is_uaf'] and report['has_unserialize_frames']:
+            # Same-run linkage (issue #1): producer A and consumer B must be
+            # attributed to one execution - worker survived A, B ran on the
+            # same pid, and the ASAN report belongs to this iteration.
+            # NOTE: on a successful reproduction the worker aborts during B,
+            # so worker_pid_after_b may legitimately be None/respawned; the
+            # same-run link rests on A's survival plus this iteration's own
+            # ASAN window (asan_before snapshot), not on B leaving a pid.
+            record['producer_consumer_same_run'] = bool(
+                record['worker_survived_a'] and report)
+            if (report and report['is_uaf'] and report['has_unserialize_frames']
+                    and record['producer_consumer_same_run']):
                 record['result'] = 'path_c_reproduced'
             elif report:
                 record['result'] = 'memory_error_other_path'

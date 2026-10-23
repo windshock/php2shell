@@ -5,11 +5,13 @@ PHP2Shell 분석 산출물의 읽는 순서와 역할입니다.
 | 문서 | 대상 독자 | 내용 |
 |---|---|---|
 | [php2shell-executive-summary.md](php2shell-executive-summary.md) | 경영·보안 리더십 | 결론, 공식 사실 대조, 대응 우선순위 (2쪽) |
-| [php2shell-analysis-findings.md](php2shell-analysis-findings.md) | 기술 보안·분석가 | 정적 분석(S1~S8), E2E(P1~P13), 주장별 판정표, Phase 4(8.4.27) 결과 |
-| [php2shell-analysis-plan.md](php2shell-analysis-plan.md) | 분석 수행자 | 단계별 계획, 판정 어휘, 외부 연구 방법론 통합표, Phase 4 엄격 판정 규칙 |
+| [php2shell-analysis-findings.md](php2shell-analysis-findings.md) | 기술 보안·분석가 | 정적 분석(S1~S8), E2E(P1~P13), 주장별 판정표, Phase 4(8.4.27), 3경로 재현(§8), 신규 경로 탐색(§9) 결과 |
+| [php2shell-analysis-plan.md](php2shell-analysis-plan.md) | 분석 수행자 | 단계별 계획, 판정 어휘, 외부 연구 방법론 통합표, Phase 4~5(§11 신규 경로 탐색, §12 이슈 반영) 규칙 |
 | [linux-environment.md](linux-environment.md) | 인프라·랩 운영 | WSL2/ASAN/FPM 빌드·검증 환경과 증적 수집 |
 | [php2shell-llm-handoff.md](php2shell-llm-handoff.md) | 후속 담당자 | 인수인계, 검토 지적별 처리 내역, 모니터링 이력 |
-| [evidence-manifest-20261021.sha256](evidence-manifest-20261021.sha256) | 검증 담당자 | 증적 SHA-256 목록(개수는 파일 참조, 원본은 `var/linux-evidence/`) |
+| [evidence-manifest-20261023.sha256](evidence-manifest-20261023.sha256) | 검증 담당자 | 증적 SHA-256 목록(최신, 원본은 `var/linux-evidence/`; 과거 스냅샷 20261021·20261022 보관) |
+
+> 기준 시점: 2026-10-23(HEAD `main`, Phase 5 + 이슈 #1 반영 상태). 증적 감사는 `python3 linux/verify-evidence.py --root var/linux-evidence`, 검증기 자가 테스트는 `--self-test`.
 
 ## 도구 위치
 
@@ -23,6 +25,7 @@ PHP2Shell 분석 산출물의 읽는 순서와 역할입니다.
 | WAF 대조 | `linux/waf-lab.sh`, `linux/waf-compare.py` |
 | 탐지 룰 | `linux/detect-rules/`, `linux/validate-rules.py` |
 | Fuzzer / JIT | `linux/build-fuzzer.sh`, `linux/fuzz-smoke.sh`, `linux/build-jit.sh`, `linux/jit-compare.sh` |
+| 3경로 재현·Phase 5 | `linux/poc-path{a,b,c}.py`, `linux/gdb-path{a,b}.py`, `linux/patch-protect-map.sh`, `linux/state-sites.sh`, `linux/ordering-sites.sh`, `linux/phase5-b1.sh`, `linux/phase5-b2b.sh`, `linux/gdb-state-diff.py`, `linux/fuzz-phase5.sh` |
 | 패치 검증 | `linux/phase4.sh`, `linux/patch-diff.sh`, `linux/verify-evidence.py` |
 
 Windows 진입점은 루트의 `*.cmd`를 사용합니다(`linux-lab.cmd`, `linux-probe.cmd`, `linux-gdb.cmd`, `linux-export.cmd` 등).

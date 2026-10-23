@@ -94,13 +94,24 @@ def process_alive(pid):
         return False
 
 
+# Teardown frames that tie an ASAN report to consumption of a malformed
+# structure during request shutdown (issue #1: a bare ASAN report or a bare
+# fatal must not count as the CVE-2026-109618 teardown-consumption verdict).
+TEARDOWN_FRAMES = ('zend_array_destroy', 'zend_hash_destroy', 'i_zval_ptr_dtor',
+                   'zend_gc_delref', 'rc_dtor_func',
+                   'zend_objects_store_call_destructors', 'php_destroy_uploaded_files')
+
+
 def parse_asan(path):
     text = Path(path).read_text(errors='replace')
     if 'AddressSanitizer' not in text:
         return None
     frames = [line.strip() for line in text.splitlines() if re.match(r'\s*#\d+', line)]
+    teardown = sorted({name for name in TEARDOWN_FRAMES
+                       if any(name in frame for frame in frames)})
     return dict(file=str(path), kind=('heap-use-after-free' if 'heap-use-after-free' in text
-                                      else 'other'), first_frames=frames[:6],
+                                      else 'other'), teardown_frames=teardown,
+                first_frames=frames[:6],
                 summary=next((line for line in text.splitlines() if 'SUMMARY' in line), ''))
 
 
@@ -196,17 +207,27 @@ def main():
         parsed = parse_asan(path)
         if parsed:
             new_asan.append(parsed)
-    result.update(asan_reports=new_asan,
+    teardown_seen = sorted({name for report in new_asan
+                            for name in report.get('teardown_frames', [])})
+    result.update(asan_reports=new_asan, asan_teardown_frames=teardown_seen,
                   worker_alive_after=(process_alive(worker_pid) if worker_pid else None))
+    # A pre-counter crossing (_zend_new_array, 56B on this build) aborts
+    # before nNumUsed++ and cannot leave a malformed bucket: flag it so the
+    # differential control is visible without a separate GDB run.
+    if fatal and result.get('oom_tried_bytes') == 56:
+        result['pre_counter_crossing_hint'] = True
     result['verdict'] = (
-        'fatal_and_teardown_memory_error' if fatal and new_asan else
+        'fatal_and_teardown_memory_error' if fatal and new_asan and teardown_seen else
+        'fatal_and_other_asan' if fatal and new_asan else
         'fatal_only' if fatal else
         'parts_limit' if parts_limit else 'no_fatal')
     (out / ('result-%s.json' % label)).write_text(json.dumps(result, indent=2))
-    print(json.dumps({k: result[k] for k in ('label', 'body_bytes', 'status',
-                                             'connection_reset', 'oom_logged',
-                                             'oom_site_class', 'oom_site',
-                                             'worker_alive_after', 'verdict')}, ))
+    print(json.dumps({k: result.get(k) for k in ('label', 'body_bytes', 'status',
+                                              'connection_reset', 'oom_logged',
+                                              'oom_tried_bytes', 'oom_site_class',
+                                              'worker_alive_after', 'verdict',
+                                              'asan_teardown_frames',
+                                              'pre_counter_crossing_hint')}, ))
 
 
 if __name__ == '__main__':

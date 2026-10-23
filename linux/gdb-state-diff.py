@@ -3,12 +3,16 @@
 residue-specialised).
 
 Runs the CLI server under gdb with a breakpoint at every php_request_startup
-and php_request_shutdown that dumps the request-owned globals the patch
-family cares about (BG serialize/unserialize, PS id/mod_data, url_adapt
+and php_request_shutdown that dumps the REGISTERED request-owned globals the
+patch family cares about (BG serialize/unserialize, PS id/mod_data, url_adapt
 hosts tables, modules_activated). The sequence exercises a normal request,
 a runtime-fatal producer (unserialize OOM) and a follow-up request; the
 parser then diffs "state at next request start" against the pre-fatal
 baseline to report residue without a per-state hypothesis.
+
+Scope caveat (issue #1): this is a fixed registered-state differ over a fixed
+request sequence, NOT an unbounded exploration of every global. New state
+hypotheses require extending the breakpoint dump list in GDB_TEMPLATE.
 
 Observation only.
 """
@@ -119,7 +123,9 @@ def main():
     gdb = subprocess.Popen(['gdb', '-q', '-batch', '-x', str(out / 'gdb.cmd')],
                            stdout=log_handle, stderr=subprocess.STDOUT,
                            start_new_session=True)
-    report = dict(scope='request-boundary state residue diff; observation only',
+    report = dict(scope='request-boundary residue diff over REGISTERED states '
+                  '(BG serialize/unserialize, PS id/mod_data, url_adapt, '
+                  'modules_activated); fixed sequence; observation only',
                   version=args.version, memory_limit=args.memory_limit,
                   evidence=str(out), steps=[])
     jar = http.cookiejar.CookieJar()

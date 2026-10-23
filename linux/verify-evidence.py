@@ -123,6 +123,11 @@ def check_gdb(root, since=None):
     return dict(status='passed' if not problems_all else 'failed', modes=results)
 
 
+# sha256sum emits "digest  path" (text mode) or "digest *path" (binary mode);
+# anything else on a non-empty line is a manifest defect, not a skip.
+_MANIFEST_LINE = re.compile(r'^([0-9a-f]{64})(?:  | \*)(.+)$')
+
+
 def check_manifest(root, skip=False):
     if skip:
         return dict(status='not_run', reason='manifest check skipped (fresh-evidence mode)')
@@ -133,27 +138,72 @@ def check_manifest(root, skip=False):
     problems = []
     if raw.startswith(b'\xef\xbb\xbf'):
         problems.append('manifest has a UTF-8 BOM')
-    checked = missing = 0
-    for line in raw.decode('utf-8-sig').splitlines():
-        match = re.match(r'^([0-9a-f]{64})  (.+)$', line)
-        if not match:
+    entries = checked = missing = mismatched = 0
+    for lineno, line in enumerate(raw.decode('utf-8-sig').splitlines(), 1):
+        if not line.strip():
             continue
+        match = _MANIFEST_LINE.match(line)
+        if not match:
+            problems.append('manifest line %d is not a sha256sum entry: %r' % (lineno, line[:60]))
+            continue
+        entries += 1
         digest, rel = match.groups()
         path = root / rel
         if not path.exists():
             missing += 1
             continue
         if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            mismatched += 1
             problems.append('hash mismatch: ' + rel)
         checked += 1
     if missing:
         problems.append('%d manifest entries are missing on disk' % missing)
+    if entries == 0:
+        problems.append('manifest contains no parseable entries')
+    elif checked == 0:
+        problems.append('manifest verification matched 0 files (entries=%d)' % entries)
     return dict(status='passed' if not problems else 'failed', manifest=str(manifest),
-                checked=checked, missing=missing, problems=problems)
+                entries=entries, checked=checked, missing=missing,
+                mismatched=mismatched, problems=problems)
+
+
+def run_self_test():
+    """Fixture cases for check_manifest: text and binary sha256sum notation,
+    an unparseable line, zero parseable entries, a hash mismatch and a
+    missing entry. A manifest that verifies zero files can never pass."""
+    import tempfile
+    digest_hello = hashlib.sha256(b'hello').hexdigest()
+    cases = []
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        (tmp / 'a.bin').write_bytes(b'hello')
+        (tmp / 'b.bin').write_bytes(b'world')
+        fixtures = {
+            'text-notation-pass': ('%s  a.bin\n' % digest_hello, 'passed'),
+            'binary-notation-pass': ('%s *a.bin\n' % digest_hello, 'passed'),
+            'unparseable-line-fails': ('%s  a.bin\nnot a sha256 line\n' % digest_hello, 'failed'),
+            'zero-entries-fails': ('\n\n', 'failed'),
+            'hash-mismatch-fails': ('%s  b.bin\n' % digest_hello, 'failed'),
+            'missing-entry-fails': ('%s  nope.bin\n' % digest_hello, 'failed'),
+        }
+        for name, (content, expect) in fixtures.items():
+            (tmp / 'evidence-manifest.sha256').write_text(content)
+            result = check_manifest(tmp)
+            got = result['status']
+            ok = got == expect and not (expect == 'passed' and result['checked'] == 0)
+            cases.append(dict(case=name, expect=expect, got=got, ok=ok,
+                              checked=result.get('checked'),
+                              problems=result.get('problems', [])[:2]))
+    passed = sum(1 for case in cases if case['ok'])
+    print(json.dumps(dict(scope='check_manifest self-test', cases=cases,
+                          passed=passed, total=len(cases)), indent=2))
+    return 0 if passed == len(cases) else 1
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--self-test', action='store_true',
+                        help='run the check_manifest fixture tests and exit')
     parser.add_argument('--root', type=Path, default=REPO / 'var/linux-evidence')
     parser.add_argument('--since', type=float, default=None,
                         help='only audit evidence created after this unix timestamp '
@@ -161,6 +211,9 @@ def main():
     parser.add_argument('--skip-manifest', action='store_true',
                         help='skip the SHA-256 manifest check (live evidence directory has no manifest)')
     args = parser.parse_args()
+
+    if args.self_test:
+        return run_self_test()
     summary = dict(scope='evidence audit; fails on inconsistency',
                    since=args.since,
                    poc=check_poc(args.root, args.since), gdb=check_gdb(args.root, args.since),

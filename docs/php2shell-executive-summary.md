@@ -1,7 +1,7 @@
 # PHP 코어 긴급 취약점(PHP2Shell) — Executive Summary
 
-**문서 상태:** 최종 검토본 v2 (기술 검증 반영) · 2026-10-21 23:30 KST
-**기준:** `windshock/php2shell` main 최신 커밋(2026-10-21) · 증적 매니페스트 [docs/evidence-manifest-20261021.sha256](evidence-manifest-20261021.sha256)
+**문서 상태:** v3 (Phase 5·이슈 #1 반영) · 2026-10-23 KST
+**기준:** `windshock/php2shell` main 최신 커밋(2026-10-23) · 증적 매니페스트 [docs/evidence-manifest-20261023.sha256](evidence-manifest-20261023.sha256)
 **분석 범위:** PHP 8.4.4·8.5.4 → 수정 8.4.27 교차 검증, 격리된 로컬 랩, 정적 코드 검증 및 공개 연구 대조. 운영 서비스의 침해 여부는 조사 범위에서 제외.
 
 > **한 줄 결론:** PHP 보안팀이 공식 확인한 **Critical RCE 2건**이며 **패치가 유일한 완전한 해결책**이다. 자체 랩에서는 **CVE-2026-109619 계열(잔류 전역 상태) UAF를 재현**하고 **8.4.27에서 소멸**함을 확인했다. 자체적으로 RCE를 재현한 것은 아니다.

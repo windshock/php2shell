@@ -842,3 +842,46 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 - **기준 1(유계 잔존 확인): 충족** — 후보 열거 완료 + 상위 5종 동적 판정 완료. 모든 후보가 기존 2부류(stale-state·count-before-init)로 수렴하고 패치 범위 내다. 유일한 구조적 발견은 §9.3 B2-2(hard bailout은 존재하나 착지 무해성의 구조적 사유).
 - **기준 2(탐색 자동화): 충족** — C2 잔류 diff 도구 신설(양 부류 자동 포착·소멸 확인), C1 코퍼스 통합 퍼징 3회 가동.
 - 발견물 없음으로 D1(신고 절차)은 미발동. 재현 스크립트·증적은 `patch-protect-map/`, `state-sites/`, `ordering-sites/`, `poc-patha-*realtfiles`, `b2b-hardlimit-*`, `gdb-state-diff-*`, `fuzz-phase5-*`.
+
+## 10. Phase 5 v1.1·v2 — 이슈 #1 신뢰성 보강과 탐색 고도화 (2026-10-23, 계획 §12)
+
+### 10.1 v1.1 — 이슈 #1 반영 (증적 검증·판정·러너 신뢰성)
+
+| 항목 | 구현 | 검증 |
+|---|---|---|
+| P0 매니페스트 검증기 | `check_manifest()`가 `hash  file`/`hash *file` 양 형식 수용, 미해석 행·0건 검사를 **실패**로 판정, 항목/성공/누락/불일치 통계 출력. `--self-test`로 6개 픽스처(정상 2·오류행·0건·불일치·누락) 추가 | self-test **6/6**, 실제 트리 7,990/7,990 검증 통과(현행 매니페스트에 `*` 행 0건 — 실제 무결성 훼손은 없었음을 재확인) |
+| P1 P15 판정 강화 | ① `poc-patha.py`: `fatal_and_teardown_memory_error`가 **teardown 소비 프레임**(zend_array_destroy 등 7종) 결합 시에만 채택, 단순 ASAN은 `fatal_and_other_asan`으로 분리, 56B 착지는 `pre_counter_crossing_hint`로 자동 표시 ② `gdb-patha.py`: OOM 시점에 `_zend_hash_str_add_or_update_i` 프레임의 `nNumUsed`·마지막 bucket을 덤프 | 재검: 크래시 구성 teardown 프레임 4종 결합, 대조(28M)는 `fatal_only`+`pre_counter_crossing_hint=true`. GDB 관측 — **`nNumUsed=1`·`nNumOfElements=1` 상태에서 bucket[0].key=`0xbebebebebebebebe`(ASAN 미초기화 패턴), val_type=190** → "카운트 후 미초기화 bucket"이 한 번의 실행으로 증명 |
+| P1 퍼저 정비 | 시드 3곳 형식 수정(정상 시드 실제 통과), 세션 전용 형식은 별도 분류, 비정상 시드 3종 분리, 정상 시드 `unserialize()` **positive control**, 실행 상태(rc·timeout·crash·units) `runs.json` 분리 기록, 커버리지 한계 주석 | positive control **8/8**(초기 실행 8/9 → `big|s:...`가 단독 unserialize 입력이 아님을 컨트롤이 스스로 포착 → 분류 수정). 2분 스모크 108만 회·크래시 0 |
+| P1/P2 러너 신뢰성 | 매트릭스 `|| true` 제거·`summary.json`(항목 보존)·기대(재현/소멸) 불충족 시 non-zero 종료. `poc-pathb` OOM 판정을 요청 A 이후 로그 구간으로 한정. `poc-pathc` 생산자 fatal을 엔드포인트 귀속(`index.php`)으로 판정 + A/B 동일 실행 귀속. `gdb-state-diff` 스코프 명시(등록 상태 고정 분포) | patha 매트릭스 8.4.4 3/3 ok·대조 ok(종료 0), pathb 8.4.4 ok·8.4.27 ok(extinct). 중간 발견: 초기 `rc != 0` 문자열 비교 오류는 픽스처 재실행으로 적발·수정 |
+| 문서 기준점 | docs/README(§9·§11·§12·최신 매니페스트·`--self-test` 안내), exec summary v3(2026-10-23 기준) | — |
+
+### 10.2 v2 Stage 0 — ground-truth 회귀 세트 (`linux/ground-truth.sh`)
+
+3경로를 **도달(reached) / 오류 발생(error_triggered) / 메모리 오류 관측(memory_error) / 기대 충족(expectation_met)**으로 분리해 버전별 기대(취약=재현, 수정=소멸)와 대조.
+
+| 버전 | P15 | P16 | P17 | 판정 |
+|---|---|---|---|---|
+| 8.4.4 | 도달·fatal·teardown 메모리 오류 ✓ | 도달·fatal·UAF ✓ | 도달·fatal(unserialize 귀속)·UAF ✓ | **ok=true, exit 0** |
+| 8.4.27 | 메모리 오류 없음 ✓ | 메모리 오류 없음 ✓ | 메모리 오류 없음 ✓ | **ok=true, exit 0** |
+
+지표 정의(`reached/error_triggered/memory_error` + v2 탐색 지표 `error_site_coverage/request_transition_coverage/invariant_violations/time_to_first_valid_finding`)를 매 실행 결과에 함께 기록. 이슈 #2 MVP 기준(기존 경로 분별 + 오탐 없음) 충족.
+
+### 10.3 v2 Stage 1 MVP — 요청 수명주기 시퀀스 러너 (`linux/lifecycle-fuzz.py`)
+
+시퀀스 문법: 생산자{파싱 OOM, 런타임 unserialize OOM} × 중간 요청{없음, 정상 요청(음성 대조)} × 소비자{multipart 업로드, 파일 파트 없음} = 8 전이 × 2 반복(8.4.4, CLI 서버).
+
+- **16/16 기대 충족 — 오탐 0, 위음성 0, 전이 커버리지 8/8.**
+- 모델이 세 소비 지점을 자동 구분: 파싱 생산자+업로드 → `php_add_var_hash`(BG(serialize)), 파싱 생산자+파일 없음 → `ps_files_close`(PS 잔류, Path B), 런타임 생산자+업로드 → `tmp_var`(BG(unserialize), Path C).
+- 음성 대조: 생산자-소비자 사이 정상 요청 1개만으로 전 시퀀스 잔류 소거 관측. 런타임 생산자+파일 없음 소비자는 `PS(id)`가 NULL이라 새 빈 세션을 만들어 decode가 생략됨 → 메모리 오류 없음(모델에 반영한 소비 조건).
+- 한계: CLI 프로파일만(MVP) — mod_php/FPM 프로파일, 상태 정규화 ID, 커버리지 피드백은 후속.
+
+### 10.4 v2 Stage 2 MVP — 오류 지점 지도 + 할당 실패 주입 (`linux/fault-site-map.py`)
+
+- 분류 스캔(휴리스틱): `count_before_fallible` 44, `init_fallible_destroy` 5, `global_ptr_request_free` 7, `refcount_then_fallible` 13, `reentrancy` 0(정규식 창 한계 — `.re` 생성기/콜백 흐름은 AST판 필요). 8.4.27 가드 교차표 동반. **후보 가설 목록일 뿐 판정 아님.**
+- **`ZEND_MM_MAX_ALLOCS` 실증**: 8.4.27 + tracked 할당자에서 `ZEND_MM_MAX_ALLOCS=5` → 스크립트 실행 중 5번째 할당이 우아하게 실패(`zend_alloc.c:3297`, "tried to allocate 40 bytes") — 업스트림 오류 주입 훅의 사후-시작업 사용성 확인. **제약 재확인**: 훅은 `php_hash_environment()` 이후(main.c:1914) + tracked 전용 → pre-RINIT 파싱 창은 별도 계측 필요(원본 재검증 전 확정 금지, §12.1).
+
+### 10.5 종합
+
+- 이슈 #1의 완료 기준 4개 충족(0건 통과 불가·오진 집계 차단·시드 구분과 기록 일치·실패 전파).
+- 이슈 #2의 Stage 0·1·2 MVP 충족(ground-truth 분별 + 시퀀스 러너 오탐 0 + 오류 지점 지도·주입 실증). Stage 1 SAPI 확장·상태 정규화, Stage 2 AST판, Stage 3·4는 잔여.
+- 신규 경로 발견: 없음(`not_found`, 스코프 한정 유지).
