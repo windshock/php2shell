@@ -33,7 +33,7 @@ if [ "$flavor" = asan ] || [ "$flavor" = cov ] || [ "$flavor" = asanext ]; then
   # opcache, soap and the XML family (libxml2), filter, exif, mbstring
   # (no oniguruma in the lab, hence --disable-mbregex).
   if [ "$flavor" = asanext ]; then
-    options+=(--enable-opcache --enable-soap --enable-xml --enable-simplexml --enable-dom
+    options+=(--enable-opcache --with-libxml --enable-soap --enable-xml --enable-simplexml --enable-dom
               --enable-xmlreader --enable-xmlwriter --enable-filter --enable-exif
               --enable-mbstring --disable-mbregex)
   fi
