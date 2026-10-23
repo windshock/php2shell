@@ -955,3 +955,24 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 
 **증적:** `docs/evidence-manifest-20261023-g2.sha256`(11,336행). `verify-evidence`(WSL) 11,336/11,336 passed.
 **한계:** code-edge 커버리지는 아직 피드백에 없다. 상태·실패 지점·ASAN·멈춤 키만 쓴다. 측정은 gdb 관측 기준이다.
+
+### 10.8 v2 단계 8 — 오라클 통합·Stage 2 주입 연결 (2026-10-23, 계획 §12.6.5-8)
+
+- **1e 오라클:** 별도 `state-oracle.py`를 두지 않고 탐색기 관측 단계에 통합했다. 판정 사다리는 `state_change_observed` → `invariant_violation_candidate` → `memory_error_confirmed`이며, `patch_difference_confirmed`는 `--diff-version`으로 판정한다. persistent 메모리와 요청 메모리는 "요청 시작 시점에 요청 소유 상태가 살아 있는가"로 구분하고, 주소 대신 null/fresh/carried로 정규화한다.
+- **관측자 효과 대조:** §10.7의 멈춤을 gdb 있이 2회, 없이 2회 돌려 같은 결과를 얻었다.
+- **Stage 2 연결:** `ZEND_MM_MAX_ALLOCS`를 시퀀스 단위 파라미터 `fault ∈ {0,30,120,500,2000}`로 문법에 편입했다(`--faults`).
+  - 요청 단위로는 걸 수 없다. 사용자 코드의 `putenv()`는 RSHUTDOWN에서 원복된다.
+  - 실패 지점 ID에는 `inj:` 접두어(주입 여부)와 debug 빌드의 할당 C 위치를 붙인다.
+  - 위치가 늘 `zend_alloc.c:32xx`(할당기 내부)라 C 위치의 정보량은 낮다. 분별력은 PHP 측 위치(`index.php:N`/`Unknown:0`)에서 나온다.
+- **8.4.27 주입 탐색** `ex-20261023T033844-8.4.27-on-s1`(피드백 ON, gdb, 600s):
+
+| 항목 | 값 |
+|---|---|
+| 실행 | 163건(fault 0:60 / 30:35 / 120:26 / 500:24 / 2000:18) |
+| 고유 실패 지점 | **12**(주입 10 + 자연 2). 예: `inj:oom:2^4@index.php:10`(스크립트 컴파일 중), `inj:oom:2^8@Unknown:0`(시작·종료 단계), `inj:oom:2^8@index.php:34`, `oom:2^22@index.php:31`(자연 unserialize OOM) |
+| 오라클 | 387 단계 전부 `none`: 메모리 오류 0, 불변조건 후보 0, 멈춤 0 |
+| 판정 | **`not_found`**(8.4.27, CLI 서버, 사후 시작 주입 범위 한정) |
+
+- **한계:**
+  - `inj:` 표기는 시퀀스 단위다. 주입이 걸린 시퀀스에서 생긴 자연 OOM도 `inj:`로 표기된다(예: `inj:oom:2^21@Unknown:0`).
+  - pre-RINIT 파싱 창은 주입 범위 밖이다(§12.3 제약 유지).

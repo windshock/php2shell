@@ -77,6 +77,11 @@ ACTIONS = {
     'abort_big': {},
 }
 LIMITS = ('8M', '16M')
+# Stage 2 connection: ZEND_MM_MAX_ALLOCS (8.4.27+, tracked allocator) fails
+# the n-th allocation of every request after startup. putenv() from userland
+# is restored at RSHUTDOWN, so the knob is per sequence (process env), not
+# per request; pre-RINIT parsing stays outside it (main.c:1914, §12.3).
+FAULTS = (0, 30, 120, 500, 2000)
 POST_MAX_MB = 64
 
 
@@ -85,6 +90,11 @@ def validate(seq):
     problems = []
     if seq.get('limit') not in LIMITS:
         problems.append('limit %r not in %s' % (seq.get('limit'), LIMITS))
+    if seq.get('fault', 0) not in FAULTS:
+        problems.append('fault %r not in %s' % (seq.get('fault'), FAULTS))
+    extra_keys = set(seq) - {'limit', 'steps', 'fault'}
+    if extra_keys:
+        problems.append('unexpected sequence keys %s' % sorted(extra_keys))
     steps = seq.get('steps') or []
     if not 1 <= len(steps) <= MAX_LEN:
         problems.append('length %d outside 1..%d' % (len(steps), MAX_LEN))
@@ -112,9 +122,12 @@ def make_step(rng, action=None):
     return step
 
 
-def random_sequence(rng):
-    return dict(limit=rng.choice(LIMITS),
-                steps=[make_step(rng) for _ in range(rng.randint(1, MAX_LEN))])
+def random_sequence(rng, faults=False):
+    seq = dict(limit=rng.choice(LIMITS),
+               steps=[make_step(rng) for _ in range(rng.randint(1, MAX_LEN))])
+    if faults:
+        seq['fault'] = rng.choice(FAULTS)
+    return seq
 
 
 def seq_key(seq):
@@ -130,10 +143,12 @@ def pairs(seq):
     return set(zip(acts, acts[1:]))
 
 
-def mutate(rng, parent, corpus):
+def mutate(rng, parent, corpus, faults=False):
     child = json.loads(json.dumps(parent))
     steps = child['steps']
     ops = ['insert', 'replace', 'param', 'swap', 'delete', 'duplicate', 'splice', 'limit']
+    if faults:
+        ops.append('fault')
     for _ in range(20):
         op = rng.choice(ops)
         if op == 'insert' and len(steps) < MAX_LEN:
@@ -161,6 +176,8 @@ def mutate(rng, parent, corpus):
             child['steps'] = steps = (steps[:cut_a] + json.loads(json.dumps(other[cut_b:])))[:MAX_LEN]
         elif op == 'limit':
             child['limit'] = rng.choice([l for l in LIMITS if l != child['limit']])
+        elif op == 'fault':
+            child['fault'] = rng.choice([f for f in FAULTS if f != child.get('fault', 0)])
         else:
             continue
         if seq_key(child) != seq_key(parent) and not validate(child):
@@ -231,13 +248,17 @@ run
 '''
 
 FATAL_RE = re.compile(r'PHP (Fatal error|Warning|Notice|Parse error):\s+(.*?)(?: in (\S+) on line (\d+))?$')
+AT_RE = re.compile(r'exhausted at (\S+):(\d+)')
 TRIED_RE = re.compile(r'Allowed memory size of \d+ bytes exhausted(?: at \S+)? '
                       r'\(tried to allocate (\d+) bytes\)')
 POINTER_FIELDS = ('ser_data', 'unser_data', 'ps_id', 'ps_mod', 'ps_session_vars')
 
 
-def failure_sites(text):
-    """Normalized failure-site ids from a php-error.log delta."""
+def failure_sites(text, injected=False):
+    """Normalized failure-site ids from a php-error.log delta. The debug
+    build reports the failing allocation's C location ('exhausted at
+    file:line'); 'file:0' (no location) is dropped. With fault injection
+    armed the id is prefixed 'inj:' (injected vs natural failure)."""
     sites = []
     for line in text.splitlines():
         match = FATAL_RE.search(line.strip())
@@ -251,7 +272,10 @@ def failure_sites(text):
         else:
             kind = re.sub(r'\d+', 'N', message)[:60]
         where = '%s:%s' % (Path(file_ or 'Unknown').name, lineno or '0')
-        sites.append('%s@%s' % (kind, where))
+        at = AT_RE.search(line)
+        if at and at.group(1) != 'file':
+            where += '<%s:%s' % (Path(at.group(1)).name, at.group(2))
+        sites.append('%s%s@%s' % ('inj:' if injected else '', kind, where))
     return sites
 
 
@@ -309,7 +333,7 @@ def carried_request_state(norm):
 
 
 class Process:
-    def __init__(self, prefix, out, limit, observer):
+    def __init__(self, prefix, out, limit, observer, fault=0):
         self.out, self.observer = out, observer
         for name in ('sessions', 'uploads'):
             (out / name).mkdir(parents=True, exist_ok=True)
@@ -326,10 +350,17 @@ class Process:
                         'log_path=%s/asan' % out,
                         ASAN_SYMBOLIZER_PATH='/usr/bin/llvm-symbolizer',
                         USE_ZEND_ALLOC='0', USE_TRACKED_ALLOC='1')
+        self.env.pop('ZEND_MM_MAX_ALLOCS', None)
+        fault_line = ''
+        if fault:
+            self.env['ZEND_MM_MAX_ALLOCS'] = str(fault)
+            fault_line = 'set environment ZEND_MM_MAX_ALLOCS=%d\n' % fault
         if observer == 'gdb':
             (out / 'gdb.cmd').write_text(GDB_TEMPLATE.format(
                 asan=out, php=php, ini=out / 'php.ini', port=PORT,
-                docroot=REPO / 'web', router=REPO / 'web/index.php'))
+                docroot=REPO / 'web', router=REPO / 'web/index.php').replace(
+                    'set environment USE_TRACKED_ALLOC=1\n',
+                    'set environment USE_TRACKED_ALLOC=1\n' + fault_line))
             self.cmd = ['gdb', '-q', '-batch', '-x', str(out / 'gdb.cmd')]
         else:
             self.cmd = [str(php), '-c', str(out / 'php.ini'), '-S', '127.0.0.1:%d' % PORT,
@@ -350,6 +381,8 @@ class Process:
                                             timeout=3) as res:
                     if json.load(res).get('ok'):
                         return
+            except urllib.error.HTTPError:
+                return  # answering at all is ready (an armed fault may 500 it)
             except Exception:
                 time.sleep(0.3)
         raise RuntimeError('startup timeout')
@@ -404,14 +437,13 @@ def send(action, step, idx, ctx):
     """One HTTP request; returns a response class."""
     path_q = lambda p: '%s?step=%d' % (p, idx)  # noqa: E731
     try:
-        if action == 'health':
-            with ctx['opener'].open('http://127.0.0.1:%d%s' % (PORT, path_q('/health')),
-                                    timeout=10) as res:
-                return 's%d' % res.status
-        if action == 'session':
-            with ctx['opener'].open('http://127.0.0.1:%d%s' % (PORT, path_q('/session')),
-                                    timeout=10) as res:
-                return 's%d' % res.status
+        if action in ('health', 'session'):
+            try:
+                with ctx['opener'].open('http://127.0.0.1:%d%s' % (PORT, path_q('/' + action)),
+                                        timeout=10) as res:
+                    return 's%d' % res.status
+            except urllib.error.HTTPError as exc:
+                return 's%d' % exc.code
         if action in ('unser_small', 'runtime_oom'):
             if action == 'unser_small':
                 body = b'a:2:{i:0;s:3:"abc";i:1;a:1:{s:1:"k";i:7;}}'
@@ -455,7 +487,7 @@ def execute(seq, prefix, out, observer):
     """Run one sequence in one fresh process; return per-step observations."""
     out.mkdir(parents=True, exist_ok=True)
     ctx = dict(sid_big='exbig' + secrets.token_hex(6), sid_small='exsmall' + secrets.token_hex(6))
-    proc = Process(prefix, out, seq['limit'], observer)
+    proc = Process(prefix, out, seq['limit'], observer, seq.get('fault', 0))
     big = 'A' * (3 * 1024 * 1024)
     (out / 'sessions' / ('sess_' + ctx['sid_big'])).write_text('big|s:%d:"%s";' % (len(big), big))
     (out / 'sessions' / ('sess_' + ctx['sid_small'])).write_text('small|a:1:{i:0;i:7;}')
@@ -510,7 +542,8 @@ def execute(seq, prefix, out, observer):
             else:
                 probed = False
             steps.append(dict(i=idx, a=step['a'], response=response,
-                              failure_sites=failure_sites(log_text), asan=asan,
+                              failure_sites=failure_sites(log_text, bool(seq.get('fault'))),
+                              asan=asan,
                               alive_after=alive, hung=hung, ended_by_probe=probed))
             if not alive or probed:
                 break
@@ -640,7 +673,7 @@ def campaign(args):
             weights = [(1.0 + e['new']) / (1.0 + e['picked']) ** 0.5 for e in corpus]
             parent = rng.choices(corpus, weights=weights, k=1)[0]
             parent['picked'] += 1
-            child, op = mutate(rng, parent['seq'], corpus)
+            child, op = mutate(rng, parent['seq'], corpus, args.faults)
             sched_log.write(json.dumps(dict(
                 exec=n, parent=parent['id'], parent_depth=parent['depth'], op=op,
                 weight=round(weights[corpus.index(parent)], 3),
@@ -657,7 +690,7 @@ def campaign(args):
                                    picked=0, depth=parent['depth'] + 1,
                                    parent=parent['id']))
         else:
-            seq = random_sequence(rng)
+            seq = random_sequence(rng, args.faults)
             if seq_key(seq) in seen_seqs:
                 continue
             seen_seqs.add(seq_key(seq))
@@ -672,8 +705,10 @@ def campaign(args):
                    observer=args.observer, seed=args.seed, budget_s=args.budget,
                    max_execs=args.max_execs, execs=n, wall_s=round(time.time() - started, 1),
                    excluded_pairs=sorted('>'.join(p) for p in exclude),
+                   faults=args.faults,
                    grammar=dict(actions=len(ACTIONS), max_len=MAX_LEN, limits=len(LIMITS),
-                                space_size=grammar_space()),
+                                faults=len(FAULTS) if args.faults else 1,
+                                space_size=grammar_space(args.faults)),
                    unique_keys=kinds, corpus_size=len(corpus),
                    findings=findings, time_to_first_valid_finding=(
                        min((f['first_t'] for f in findings.values()), default=None)))
@@ -686,10 +721,11 @@ def campaign(args):
     return 0
 
 
-def grammar_space():
+def grammar_space(faults=False):
     per_step = sum(math.prod(len(d) for d in params.values()) if params else 1
                    for params in ACTIONS.values())
-    return len(LIMITS) * sum(per_step ** k for k in range(1, MAX_LEN + 1))
+    return (len(LIMITS) * (len(FAULTS) if faults else 1)
+            * sum(per_step ** k for k in range(1, MAX_LEN + 1)))
 
 
 DEFAULT_SEEDS = [dict(limit='8M', steps=[{'a': 'health'}]),
@@ -790,6 +826,12 @@ def self_test():
     sites = failure_sites('[x] PHP Fatal error:  Allowed memory size of 8388608 bytes exhausted '
                           'at file:0 (tried to allocate 3149568 bytes) in Unknown on line 0')
     check('failure site normalized', sites == ['oom:2^21@Unknown:0'])
+    inj = failure_sites('[x] PHP Fatal error:  Allowed memory size of 8388608 bytes exhausted '
+                        'at /src/Zend/zend_hash.c:281 (tried to allocate 56 bytes) in '
+                        '/web/index.php on line 31', injected=True)
+    check('injected site keeps C location', inj == ['inj:oom:2^5@index.php:31<zend_hash.c:281'])
+    check('fault knob validated', validate(dict(limit='8M', fault=7, steps=[{'a': 'health'}]))
+          and not validate(dict(limit='8M', fault=30, steps=[{'a': 'health'}])))
     check('grammar space is not enumerable within a budget', grammar_space() > 10 ** 6)
     print('self_test=%d/%d' % (ok, total))
     return 0 if ok == total else 1
@@ -804,6 +846,8 @@ def main():
     parser.add_argument('--budget', type=float, default=600, help='seconds')
     parser.add_argument('--max-execs', type=int, default=10 ** 6)
     parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--faults', action='store_true',
+                        help='Stage 2: allow ZEND_MM_MAX_ALLOCS per sequence (8.4.27+)')
     parser.add_argument('--seeds', help='JSONL of seed sequences (default: benign seeds)')
     parser.add_argument('--exclude-pairs', nargs='*', default=[],
                         help='hold-out: drop seeds containing these consecutive pairs, '

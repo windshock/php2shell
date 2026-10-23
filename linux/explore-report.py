@@ -10,7 +10,11 @@
         unique state transitions, failure sites, ASAN signatures, cost per
         confirmed finding
 
+  g3    hold-out rediscovery of the known paths, with miss causes split
+        into generation / reach / oracle
+
 Usage: explore-report.py g1|g2 <campaign-dir>
+       explore-report.py g3 DIR...
        explore-report.py g4 --on DIR... --off DIR...
 """
 import argparse
@@ -101,6 +105,61 @@ def campaign_metrics(d):
                 signatures=sorted(s[2:] for s in sigs))
 
 
+# Known ground-truth paths: the consecutive action pair that is their answer
+# and the ASAN function that identifies their consumer.
+KNOWN = {
+    'P16_path_b': dict(pair=('parse_oom', 'upload_nofile'), func='ps_files_close'),
+    'BugS_bg_serialize': dict(pair=('parse_oom', 'upload_small'), func='php_add_var_hash'),
+    'P17_path_c': dict(pair=('runtime_oom', 'upload_small'), func='tmp_var'),
+}
+
+
+def g3(dirs):
+    """Hold-out rediscovery: for each known path, when (if ever) did a run
+    observe its consumer signature, and if not, where did it fail:
+      generation - the answer pair was never generated
+      reach      - generated, but the producer step never fataled there
+      oracle     - producer fataled and the consumer ran, yet no signature
+    """
+    rows = []
+    for d in dirs:
+        summary = json.loads((Path(d) / 'summary.json').read_text())
+        execs = [e for e in load_execs(d) if e.get('grammar_ok')]
+        for name, spec in KNOWN.items():
+            first = None
+            generated = reached = consumed = 0
+            for e in execs:
+                acts = [s['a'] for s in e['seq']['steps']]
+                steps = e.get('steps', [])
+                hit = any(spec['func'] in ((s.get('asan') or {}).get('sig') or '') for s in steps)
+                if hit and first is None:
+                    first = dict(exec=e['exec'], t=e['t'], seq=acts, limit=e['seq']['limit'],
+                                 seed_origin=e['origin'])
+                for i in range(len(acts) - 1):
+                    if (acts[i], acts[i + 1]) != spec['pair']:
+                        continue
+                    generated += 1
+                    if i < len(steps) and steps[i].get('failure_sites'):
+                        reached += 1
+                        if i + 1 < len(steps):
+                            consumed += 1
+            cause = (None if first else 'generation' if not generated else
+                     'reach' if not reached else 'oracle' if consumed else 'reach')
+            rows.append(dict(run=Path(d).name, feedback=summary['feedback'],
+                             seed=summary['seed'], path=name,
+                             excluded_from_seeds='>'.join(spec['pair']) in summary.get(
+                                 'excluded_pairs', []),
+                             rediscovered=first is not None, first=first,
+                             pair_generated=generated, producer_landed=reached,
+                             consumer_ran_after_landing=consumed, miss_cause=cause))
+    space = None
+    if dirs:
+        space = json.loads((Path(dirs[0]) / 'summary.json').read_text())['grammar']
+    return dict(gate='G3', grammar=space, rows=rows,
+                passed=any(r['rediscovered'] and r['excluded_from_seeds']
+                           and r['feedback'] == 'on' for r in rows))
+
+
 def g4(on_dirs, off_dirs):
     on = [campaign_metrics(d) for d in on_dirs]
     off = [campaign_metrics(d) for d in off_dirs]
@@ -120,13 +179,19 @@ def g4(on_dirs, off_dirs):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('gate', choices=('g1', 'g2', 'g4'))
-    parser.add_argument('dir', nargs='?')
+    parser.add_argument('gate', choices=('g1', 'g2', 'g3', 'g4'))
+    parser.add_argument('dir', nargs='*')
     parser.add_argument('--on', nargs='*', default=[])
     parser.add_argument('--off', nargs='*', default=[])
     args = parser.parse_args()
-    result = (g1(args.dir) if args.gate == 'g1' else g2(args.dir) if args.gate == 'g2'
-              else g4(args.on, args.off))
+    if args.gate == 'g1':
+        result = g1(args.dir[0])
+    elif args.gate == 'g2':
+        result = g2(args.dir[0])
+    elif args.gate == 'g3':
+        result = g3(args.dir)
+    else:
+        result = g4(args.on, args.off)
     print(json.dumps(result, indent=2))
     return 0 if result.get('passed', True) else 2
 
