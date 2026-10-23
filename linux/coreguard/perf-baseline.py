@@ -202,6 +202,14 @@ def main():
             results['bench'].append(dict(rc=res.returncode, wall_s=round(time.time() - t0, 3),
                                          total_s=float(total.group(1)) if total else None,
                                          opcache=False))
+    # The session workload leaves one file per request (~15k per run): keep
+    # them as one archive so evidence sync does not copy them one by one.
+    sess = run / 'sessions'
+    results['session_files'] = sum(1 for _ in sess.iterdir())
+    if results['session_files']:
+        subprocess.run(['tar', '-czf', str(sess) + '.tar.gz', '-C', str(run), 'sessions'],
+                       check=True)
+        shutil.rmtree(sess)
     manifest = prefix / 'build-manifest.json'
     summary = dict(scope='CoreGuard Phase 0 performance baseline (relative use only)',
                    build=args.build, coreguard_mode=CG_MODE, status=status, n=args.n, c=args.c, repeats=args.repeats,
