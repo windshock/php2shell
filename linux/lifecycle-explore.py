@@ -738,6 +738,8 @@ def execute(seq, prefix, out, observer, sapi='cli', version=None, cov=False):
                 probed = False
             steps.append(dict(i=idx, a=step['a'], response=response,
                               failure_sites=failure_sites(log_text, bool(seq.get('fault'))),
+                              completed=('LAB-FUSED-END' in log_text
+                                         if step['a'] == 'fused' else None),
                               asan=asan,
                               alive_after=alive, hung=hung, ended_by_probe=probed))
             if not alive or probed:
@@ -812,7 +814,13 @@ def observe(result, seq):
         for s in step['failure_sites']:
             keys.add('F:' + s)
         gc = gc_state(end_of.get(idx))
-        if gc not in ('gc_unobserved', 'gc_normal'):
+        # _zend_bailout() always sets gc_protect(1): protected at shutdown is
+        # expected after a terminating fatal. It is unexpected only when the
+        # request ended normally (fused program returned, or no failure).
+        ended_normally = bool(step.get('completed')) or not step['failure_sites']
+        gc_odd = gc not in ('gc_unobserved', 'gc_normal') and \
+            (ended_normally or gc != 'gc_protected')
+        if gc_odd:
             keys.add('G:%s|%s' % (step['a'], gc))
         if step['failure_sites'] and step['response'].startswith('s2') and step.get('alive_after'):
             # Error recovery: a fatal/exception path that still completed the
@@ -823,7 +831,7 @@ def observe(result, seq):
             findings.append(dict(sig=asan['sig'], step=idx, summary=asan['summary'],
                                  file=asan['file']))
         steps.append(dict(step, state=state_norm, outcome=outcome, oracle=level,
-                          violations=violations, gc_at_shutdown=gc))
+                          violations=violations, gc_at_shutdown=gc, gc_unexpected=gc_odd))
     return keys, steps, findings
 
 
@@ -1171,10 +1179,19 @@ def self_test():
           and gc_state(dict(ser_level=0)) == 'gc_unobserved')
     keys_g, steps_g, _ = observe(dict(steps=[dict(i=0, a='fused', p=1, response='s200',
                                                   failure_sites=['x@f:1'], alive_after=True,
+                                                  completed=True,
                                                   asan=None)],
                                       states=[dict(tag='shutdown', uri='/fused?p=1&step=0',
                                                    gc_enabled=1, gc_active=0, gc_protected=1)],
                                       worker_pid=1), dict(steps=[{'a': 'fused', 'p': 1}]))
+    keys_b, _, _ = observe(dict(steps=[dict(i=0, a='parse_oom', response='s500',
+                                            failure_sites=['oom@x:1'], alive_after=True,
+                                            asan=None)],
+                                states=[dict(tag='shutdown', uri='/x?step=0', gc_enabled=1,
+                                             gc_active=0, gc_protected=1)], worker_pid=1),
+                           dict(steps=[{'a': 'parse_oom'}]))
+    check('protected GC after a terminating fatal is expected (no G key)',
+          not any(k.startswith('G:') for k in keys_b))
     check('protected GC at shutdown -> G and R keys',
           'G:fused|gc_protected' in keys_g and 'R:fused|gc_protected' in keys_g
           and steps_g[0]['gc_at_shutdown'] == 'gc_protected')

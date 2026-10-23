@@ -46,7 +46,9 @@ ROUTER = '''<?php
 if (parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) === '/fused') {{
     $k = (int)($_GET['p'] ?? -1);
     $f = __DIR__ . sprintf('/prog-%04d.php', $k);
-    if ($k >= 0 && is_file($f)) {{ require $f; }} else {{ http_response_code(404); }}
+    // LAB-FUSED-END: the program returned normally (no terminating bailout).
+    if ($k >= 0 && is_file($f)) {{ require $f; error_log('LAB-FUSED-END'); }}
+    else {{ http_response_code(404); }}
     return true;
 }}
 require '{app}';
