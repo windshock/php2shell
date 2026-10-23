@@ -371,6 +371,8 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 | 1. 잔존 위험 확인 | 8.4.27/8.5.12 패치가 보호하지 않는 ① stale-state 부류(생략된 정리로 잔류하는 요청 소유 상태) ② count-before-init 부류(증가 후 낙할 수 있는 할당 → 부분 초기화) 후보의 열거·판정 | 후보 열거 완료 + 우선순위 상위 5개의 동적 판정(재현/이 조건에서 미재현/도달 불가) + 전 후보의 정적 판정 기록 |
 | 2. 미지 부류 탐색 | 가설 없이 오류를 만들어내는 탐색 파이프라인(퍼징·상태 잔류 diff) 구축·가동 | 파이프라인 가동 + 야간 3회 이상 실행 + 발견물 전건의 부류 분류 완료. **"신규 경로 발견" 자체는 충족 조건이 아님** |
 
+> **2026-10-23 정정(이슈 #1 반영):** 당초 기준 문구는 "야간 3회 이상"이었으나 실제 수행은 **25분×3회**(세션 내 실행 가능 규모, findings §9.4)였다. 기준을 실제 수행과 일치하는 표기로 정정하며, 야간 8h급 지속 실행은 `linux/fuzz-phase5.sh`로 남은 과제로 둔다. 또한 `php-fuzz-unserialize`는 HTTP multipart 파싱·요청 간 상태 수명을 직접 커버하지 않는다(커버리지 한계, §12.2).
+
 ### 11.2 공통 규칙
 
 - **안전 경계 유지**: 메모리 오류 관측까지만. 힙 그루밍·주소 조작·RCE 체인·운영/외부 시험은 계속 비목표.
@@ -434,3 +436,43 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 | C2 | `gdb-state-diff.py` — 8.4.4 두 부류 잔류 자동 포착, 8.4.27 전 전이 잔류 0 | 완료 |
 
 **종합: 신규 경로 미발견(`not_found(못 찾음)` — 스코프 한정), 기준 1·2 모두 충족 정의대로 완료.** D1(신고) 미발동.
+
+## 12. GitHub 이슈 검토 반영 (2026-10-23, Issues #1·#2)
+
+> 검토 대상: [Issue #1](https://github.com/windshock/php2shell/issues/1) — Phase 5 증적 검증·판정·러너 신뢰성 보강. [Issue #2](https://github.com/windshock/php2shell/issues/2) — Phase 5 v2 탐색 고도화. 반영 전 지적 사실관계를 코드·증적으로 직접 확인했다(§12.1).
+
+### 12.1 사실 확인 결과
+
+| 이슈 지적 | 확인 결과 | 판정 |
+|---|---|---|
+| #1-P0: 매니페스트 검증기가 `hash *file`(바이너리 표기) 행을 무시하고 `checked==0`도 통과 | **확인** — `check_manifest()` 정규식은 두-공백 형식만 매칭, 미해석 행 `continue`, 0건도 `passed`. 단 현행 10/22·10/23 매니페스트에는 `*` 행 **0건**(Git Bash sha256sum 텍스트 형식) → 실제 무결성 훼손은 없음. 강화는 방어 조치로 정당 | 수용 |
+| #1-P1: 퍼저 "정상 progress 시드" 직렬화 형식 파손 | **확인** — `bytes_processed` 14≠15, `full_path` 8≠9, 외부 `a:5`≠실제 3원소. 정상 시드가 실제로는 비정상 입력이었음 | 수용 |
+| #2: `ZEND_MM_MAX_ALLOCS`가 `php_hash_environment()` 이후에만 설정돼 pre-RINIT 파싱 실패 지점을 못 덮음 | **확인** — 8.4.27 main.c:1906(파싱) → :1914(환경변수 훅). 요청별로도 훅은 해당 요청 파싱 이후 | 수용 — Stage 2 제약으로 반영 |
+| #1: 러너 `|| true` 실패 마스킹, poc-pathb 로그 전체 판독, poc-pathc 판정 미반영, gdb-state-diff 스코프 과대 표기 | **확인** — 모두 코드상 정확 | 수용 |
+
+### 12.2 Issue #1 작업 계획 — "Phase 5 v1.1 신뢰성 보강" (우선 실행)
+
+| 우선순위 | 작업 | 대상 | 완료 기준 |
+|---|---|---|---|
+| P0 | `check_manifest()` 강화 — `hash  file`/`hash *file` 양 형식, 미해석 행 = 실패, `checked==0` = 실패, 항목/성공/누락/불일치 수 출력, 테스트 픽스처(정상·바이너리·오류행·0건·불일치) 추가 | `linux/verify-evidence.py` | 이슈 #1 완료기준 1 — 0건 검사 통과 불가 |
+| P1 | P15 판정 강화 — ① `gdb-patha.py`: 카운터 증가 이후 미초기화 Bucket 상태 관측 명령 추가 ② `poc-patha.py`: `fatal_and_teardown_memory_error`를 "지정 key-alloc 사이트 + 해당 teardown 소비" 증거 결합으로 세분화(단순 fatal·타 지점 ASAN은 별도 판정) ③ 회차 PID·실행 ID·ASAN/SEGV 연결, 카운터 이전 착지 대조군 자동 확인 | `linux/gdb-patha.py`, `linux/poc-patha.py` | 완료기준 2 — 오진이 `reproduced`로 집계되지 않음 |
+| P1 | 퍼저 정비 — 시드 3곳 형식 수정(정상 시드는 통과하는 직렬화로, 비정상은 별도 시드), 정상 시드 `unserialize()` positive control, 사전 생성 실패·exit code·timeout 상태 분리, **§11.1 "야간 3회" ↔ 실제 25분×3 불일치 정정**, `php-fuzz-unserialize`가 multipart·요청 간 수명을 직접 커버하지 않는다는 한계 명시 | `linux/fuzz-phase5.sh`, §11.1·findings §9.4 | 완료기준 3 |
+| P1/P2 | 러너 신뢰성 — 매트릭스 `|| true` 마스킹 제거(기대 재현/필수 증적 누락 시 non-zero), `poc-pathb.py` OOM 판정을 요청 A 이후 로그 구간으로, `poc-pathc.py` `fatal_in_unserialize`를 성공 판정에 반영 + A 생산자/B 소비자 동일 실행 귀속, `gdb-state-diff.py` 스코프를 "등록된 BG/PS/url_scanner 상태의 요청 경계 diff"로 명시(전역 무탐색 아님), `docs/README.md`·exec summary 기준 시점 갱신 | 해당 러너·문서 | 완료기준 4 — 하위 실패가 상위 종료 코드·요약에 전파 |
+
+### 12.3 Issue #2 반영 — Phase 5 v2 계획 (탐색 고도화, #1 완료 후 본격 실행)
+
+총칙: 실행 횟수보다 **상태 전이·실패 지점·소유권 불변조건·실제 미도달 코드**의 탐색 비중 제고. 신규 취약점 발견은 완료 조건이 아님(이슈 명시 존중). 발견 시 기존 §11.2 D1(책임 신고) 절차.
+
+| Stage | 내용 | 우리 스코프 결정 |
+|---|---|---|
+| 0. 기준선 | P15~P17을 ground-truth 회귀 세트로(도달/오류 발생/관측/패치 소멸 분리). 지표 정의: `code_edge_coverage`, `error_site_coverage`, `request_transition_coverage`, `invariant_violations`, `sanitizer_confirmed`, `time_to_first_valid_finding`. unserialize 퍼징 ↔ HTTP·요청 간 커버리지 구별. 미탐지 알려진 경로는 seed/harness/oracle 공백으로 기록 | **수용, 최우선** — #1-P1 판정 강화와 동일 기반 |
+| 1. 수명주기 상태 퍼저 | `linux/lifecycle-fuzz.py` — A→B 시나리오 모델화(생성/오류/소비/대조), SAPI 프로파일(CLI·mod_php·FPM 워커 생존 차이), 상태 ID 정규화(주소 아닌 소유 요청·할당/해제 사이트·수명 단계), 전이 커버리지 피드백, 정상 요청 삽입·워커 교체 음성 대조군. StateAFL/SnapFuzz는 아이디어 차용(즉시 호환 주장 안 함) | 수용 — 기존 `poc-pathb/c`·`gdb-state-diff` 확장 형태로 |
+| 2. 오류 지점 커버리지 | `linux/fault-site-map.py` — `ordering-sites.sh`의 AST/콜그래프 확장, 후보 분류(count-before-init / INIT→fallible→DESTROY / global ptr→request free / refcount→bailout / 재진입), `ZEND_MM_MAX_ALLOCS` 기반 할당 실패 주입. **검증된 제약(§12.1): 훅이 `php_hash_environment()` 이후(main.c:1914)이므로 pre-RINIT 파싱 창은 별도 계측 빌드에서만** — 그 환경의 관측은 원본 재검증 전 확정 금지. 동일 failure site 군집화, json/xml/dom/pcre 확장 조사(비용·영향 명시) | 수용 — AST 도구 도입은 단계적(먼저 기존 스캐너 정밀화) |
+| 3. 상태 불변조건 오라클 | `linux/state-oracle.py` — provenance 로깅(할당 요청 ID·사이트·해제·소비), 후보 상태와 실제 invalid access 구분, persistent/request 메모리 구분·ASLR 정규화·관측자 효과 대조. 판정 사다리: `state_change_observed` → `invariant_violation_candidate` → `memory_error_confirmed` → `patch_difference_confirmed`(기존 §9.5 어휘와 연결) | 수용 |
+| 4. 의미 융합·차등(P2) | FlowFusion PHPT/데이터흐름 재사용(`flowfusion-bridge.py`, state fusion≠요청 간 지속성 검증임을 명시), Fuzz Introspector 커버리지 맵, 차등 트리아지(실패 사이트·소유권·초기화 상태 비교, P15~P17을 양성 대조군으로) | 수용 — 낮은 우선순위 |
+
+**가드레일(수용):** MVP = P15~P17 회귀에서 3경로 도달/관측/소멸 구별 + 대조군 무예보 + 실패 전파. 모든 동적 결과에 `run_id/commit/버전/SAPI/빌드 플래그/주입 vs 자연 실패/입력 시퀀스/할당·해제 스택` 기록. v1과 동일 CPU·시간 예산·3회 이상 독립 반복으로 비교(개선 없으면 전략 폐기 가능). 음성은 스코프(버전·SAPI·확장·입력·실패 지점·시간·커버리지)와 함께 표기. 신규 미공개 오류는 상세 입력을 공개 저장소에 올리지 않고 증적 보호 후 PHP 보안팀 신고. 결과는 plan/findings의 **'Phase 5 v2' 독립 섹션**에 v1과 구분해 반영.
+
+### 12.4 실행 순서
+
+1. #1-P0(매니페스트 검증기) → 2. #1-P1(판정 강화·시드·문구 정정) → 3. #1-P1/P2(실패 전파·귀속·문서 기준점) → 4. v2 Stage 0(기준선·지표) → 5. v2 Stage 1·2 → 6. v2 Stage 3·4. 각 단계 종료 시 §12.2/12.3 체크리스트 갱신.
