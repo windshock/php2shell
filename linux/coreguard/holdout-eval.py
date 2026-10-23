@@ -22,7 +22,7 @@ Verdict (fixed before the first run, v1.1):
 Harm oracles: R23 = GC runs stop increasing after the SOAP failure;
 R46/R51 = memory error (ASAN report, zend_mm_panic, fatal signal).
 
-Usage: holdout-eval.py [--repeats 3]
+Usage: holdout-eval.py --cases R23 [--repeats 3]
 """
 import argparse
 import hashlib
@@ -123,12 +123,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--repeats', type=int, default=3)
+    parser.add_argument('--cases', nargs='+', required=True,
+                        help='hold-out records to evaluate now (one-time per case, v1.1)')
     args = parser.parse_args()
     sha = hashlib.sha256(HOLDOUT.read_bytes()).hexdigest()
     if sha != REGISTERED_SHA:
         print(json.dumps(dict(error='hold-out list changed', sha=sha)))
         return 2
-    holdout = json.loads(HOLDOUT.read_text())['holdout']
+    holdout = [h for h in json.loads(HOLDOUT.read_text())['holdout'] if h['record'] in args.cases]
+    if sorted(h['record'] for h in holdout) != sorted(set(args.cases)):
+        print(json.dumps(dict(error='not a hold-out record', cases=args.cases)))
+        return 2
     cases = json.loads((HERE.parent / 'corpus/h2-cases.json').read_text())['cases']
     b_php = BASE / 'install/8.4.27-asanext/bin/php'
     c_php = BASE / 'install/8.4.27-coreguard-asanext/bin/php'
@@ -157,7 +162,8 @@ def main():
                                  for m, reps in rows[rid]['runs'].items() if m != 'B'}
         print('%s %-26s B_harm=%s %s' % (rid, h['pattern'], b_harm, json.dumps(rows[rid]['verdicts'])))
     summary = dict(scope='CoreGuard Phase 5 one-time hold-out evaluation (pre-registration v1/v1.1)',
-                   holdout_sha256=sha, repeats=args.repeats, c_build=c_manifest.get('patches'),
+                   holdout_sha256=sha, cases_evaluated=sorted(args.cases),
+                   repeats=args.repeats, c_build=c_manifest.get('patches'),
                    c_binary_sha256=c_manifest.get('binary_sha256'), rows=rows,
                    **provenance.provenance())
     (out / 'summary.json').write_text(json.dumps(summary, indent=2))
