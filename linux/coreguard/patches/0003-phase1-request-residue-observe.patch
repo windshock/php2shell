@@ -1,0 +1,45 @@
+diff --git a/ext/standard/basic_functions.c b/ext/standard/basic_functions.c
+index 28aef319..a08974c4 100644
+--- a/ext/standard/basic_functions.c
++++ b/ext/standard/basic_functions.c
+@@ -488,8 +488,40 @@ PHP_RSHUTDOWN_FUNCTION(basic) /* {{{ */
+ /* }}} */
+ 
+ /* Called from php_request_startup(), before any request data is processed. */
++/* CoreGuard Phase 1 (lab experiment, docs/coreguard/phase1-design.md).
++ * Request ownership, observe only: php_basic_early_rinit() runs before any
++ * request data is processed, so non-zero (un)serialize state here is state
++ * owned by an earlier request (the CVE-2026-109619 class). The official
++ * reset below clears it; CoreGuard records that it had something to clear.
++ * COREGUARD_MODE=observe|enforce (both only log; the reset is the
++ * enforcement), COREGUARD_LOG=<file>. */
++static void cg1_residue_check(void)
++{
++	const char *m = getenv("COREGUARD_MODE");
++	if (!m || (strcmp(m, "observe") && strcmp(m, "enforce"))) {
++		return;
++	}
++	if (BG(serialize).level || BG(serialize).data || BG(unserialize).level
++			|| BG(unserialize).data || BG(serialize_lock)) {
++		const char *path = getenv("COREGUARD_LOG");
++		FILE *out = path ? fopen(path, "a") : NULL;
++		fprintf(out ? out : stderr,
++			"COREGUARD event=request_state_residue ser_level=%u ser_data=%d unser_level=%u "
++			"unser_data=%d lock=%u pid=%d\n",
++			(unsigned) BG(serialize).level, BG(serialize).data != NULL,
++			(unsigned) BG(unserialize).level, BG(unserialize).data != NULL,
++			(unsigned) BG(serialize_lock), (int) getpid());
++		if (out) {
++			fclose(out);
++		} else {
++			fflush(stderr);
++		}
++	}
++}
++
+ PHPAPI void php_basic_early_rinit(void)
+ {
++	cg1_residue_check();
+ 	/* The session upload progress handler (un)serializes the session and
+ 	 * registers the session id with the URL rewriter from
+ 	 * php_hash_environment(), before RINIT. */
