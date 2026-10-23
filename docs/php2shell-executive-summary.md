@@ -35,7 +35,7 @@
 | 동일 HTTP 입력 비교 | 기준 | `identical` |
 
 **판정:** `patch_effect_confirmed`(랩 범위) · `root_cause_confirmed`(CVE-2026-109619) · **`root_cause_confirmed`(CVE-2026-109618, 2026-10-22 추가 — 지정 사이트 재현 + 전달 차단 소멸 + 공식 Diff 영역 일치)**
-**증적:** SHA-256 매니페스트([docs/evidence-manifest-20261022.sha256](evidence-manifest-20261022.sha256), 4,370파일), `verify-evidence` 통과.
+**증적:** SHA-256 매니페스트([docs/evidence-manifest-20261022.sha256](evidence-manifest-20261022.sha256), 4,370파일), `verify-evidence` 통과. **[정정 2026-10-23, 계획 §12.6 R7·R7a] 이 "통과"는 해시를 검사하지 않은 결과였다. 이 매니페스트는 모든 행이 `hash *path` 형식인데, 당시 검증기는 이 형식을 파싱하지 못해 0행을 검사하고 통과로 처리했다. 이후 소급 검증 결과는 4,351 일치 / 19 불일치다. 불일치는 전부 이름이 고정된 Apache 런 디렉터리의 로그로, 10/23 재실행이 같은 경로에 덮어쓴 것이다. 회차별 결과와 ASAN 보고는 모두 일치하므로 위 판정의 근거는 유지된다.**
 
 ## 4. 사업 영향과 대응 우선순위
 

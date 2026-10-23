@@ -445,12 +445,12 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 
 | 이슈 지적 | 확인 결과 | 판정 |
 |---|---|---|
-| #1-P0: 매니페스트 검증기가 `hash *file`(바이너리 표기) 행을 무시하고 `checked==0`도 통과 | **확인** — `check_manifest()` 정규식은 두-공백 형식만 매칭, 미해석 행 `continue`, 0건도 `passed`. 단 현행 10/22·10/23 매니페스트에는 `*` 행 **0건**(Git Bash sha256sum 텍스트 형식) → 실제 무결성 훼손은 없음. 강화는 방어 조치로 정당 | 수용 |
+| #1-P0: 매니페스트 검증기가 `hash *file`(바이너리 표기) 행을 무시하고 `checked==0`도 통과 | **확인** — `check_manifest()` 정규식은 두-공백 형식만 매칭, 미해석 행 `continue`, 0건도 `passed`. ~~단 현행 10/22·10/23 매니페스트에는 `*` 행 0건 → 실제 무결성 훼손은 없음~~ **[§12.6 정정] 10/22(4,370행)·10/23(10,458행) 매니페스트는 전 행이 `*` 형식 — 수정 전 검증기는 0행을 검사하고 통과했다.** 강화는 방어 조치가 아니라 실제 결함 수정 | 수용 |
 | #1-P1: 퍼저 "정상 progress 시드" 직렬화 형식 파손 | **확인** — `bytes_processed` 14≠15, `full_path` 8≠9, 외부 `a:5`≠실제 3원소. 정상 시드가 실제로는 비정상 입력이었음 | 수용 |
 | #2: `ZEND_MM_MAX_ALLOCS`가 `php_hash_environment()` 이후에만 설정돼 pre-RINIT 파싱 실패 지점을 못 덮음 | **확인** — 8.4.27 main.c:1906(파싱) → :1914(환경변수 훅). 요청별로도 훅은 해당 요청 파싱 이후 | 수용 — Stage 2 제약으로 반영 |
 | #1: 러너 `|| true` 실패 마스킹, poc-pathb 로그 전체 판독, poc-pathc 판정 미반영, gdb-state-diff 스코프 과대 표기 | **확인** — 모두 코드상 정확 | 수용 |
 
-### 12.2 Issue #1 작업 계획 — "Phase 5 v1.1 신뢰성 보강" (우선 실행; **2026-10-23 실행 완료 — §12.5**)
+### 12.2 Issue #1 작업 계획 — "Phase 5 v1.1 신뢰성 보강" (우선 실행; **2026-10-23 실행 — §12.5, 후속 리뷰로 일부 재개 — §12.6.3**)
 
 | 우선순위 | 작업 | 대상 | 완료 기준 |
 |---|---|---|---|
@@ -459,7 +459,7 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 | P1 | 퍼저 정비 — 시드 3곳 형식 수정(정상 시드는 통과하는 직렬화로, 비정상은 별도 시드), 정상 시드 `unserialize()` positive control, 사전 생성 실패·exit code·timeout 상태 분리, **§11.1 "야간 3회" ↔ 실제 25분×3 불일치 정정**, `php-fuzz-unserialize`가 multipart·요청 간 수명을 직접 커버하지 않는다는 한계 명시 | `linux/fuzz-phase5.sh`, §11.1·findings §9.4 | 완료기준 3 |
 | P1/P2 | 러너 신뢰성 — 매트릭스 `|| true` 마스킹 제거(기대 재현/필수 증적 누락 시 non-zero), `poc-pathb.py` OOM 판정을 요청 A 이후 로그 구간으로, `poc-pathc.py` `fatal_in_unserialize`를 성공 판정에 반영 + A 생산자/B 소비자 동일 실행 귀속, `gdb-state-diff.py` 스코프를 "등록된 BG/PS/url_scanner 상태의 요청 경계 diff"로 명시(전역 무탐색 아님), `docs/README.md`·exec summary 기준 시점 갱신 | 해당 러너·문서 | 완료기준 4 — 하위 실패가 상위 종료 코드·요약에 전파 |
 
-### 12.3 Issue #2 반영 — Phase 5 v2 계획 (탐색 고도화; **Stage 0~2 MVP 2026-10-23 실행 — §12.5**)
+### 12.3 Issue #2 반영 — Phase 5 v2 계획 (탐색 고도화; **Stage 0~2 2026-10-23 실행 — §12.5, 완성 기준 개정 — §12.6.4**)
 
 총칙: 실행 횟수보다 **상태 전이·실패 지점·소유권 불변조건·실제 미도달 코드**의 탐색 비중 제고. 신규 취약점 발견은 완료 조건이 아님(이슈 명시 존중). 발견 시 기존 §11.2 D1(책임 신고) 절차.
 
@@ -479,6 +479,8 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 
 ### 12.5 실행 결과 (2026-10-23, 상세는 findings §10)
 
+> **[§12.6 정정]** 아래 "완료기준 충족"/"MVP 충족" 표기 중 일부는 후속 리뷰(HEAD `86662d5`)로 **부분/재검증 필요**로 하향됐다 — 정정표는 §12.6.2. 재현 실험 결과(P15~P17 재현·8.4.27 소멸) 자체를 부정하는 정정은 아니다.
+
 | 단계 | 결과 |
 |---|---|
 | #1-P0 | `check_manifest` 강화 + `--self-test` 6개 픽스처 — self-test 6/6, 실제 트리 7,990/7,990 통과(현행 매니페스트 `*` 행 0건 재확인). **완료기준 1 충족** |
@@ -491,3 +493,79 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 | v2 Stage 3·4 | 미착수(잔여) |
 
 **신규 경로: 발견 없음(`not_found`, 스코프 한정 유지).**
+
+### 12.6 후속 리뷰 반영 (2026-10-23, Issues #1·#2 코멘트 — 검토 기준 HEAD `86662d5`)
+
+> 출처: [Issue #1 코멘트](https://github.com/windshock/php2shell/issues/1#issuecomment-6355980294) "후속 리뷰 — 남은 신뢰성 이슈", [Issue #2 코멘트](https://github.com/windshock/php2shell/issues/2#issuecomment-6355984077) "Autonomous Stateful Fuzzer 완성 기준 추가". 둘 다 §12.5 실행물에 대한 코드 리뷰(랩 독립 재실행 아님). 반영 전 지적 전건을 코드·증적으로 직접 확인했다(§12.6.1).
+
+#### 12.6.1 사실 확인
+
+| ID | 지적 | 확인 결과 (file:line, HEAD `86662d5`) | 판정 |
+|---|---|---|---|
+| R1 | #1-P0 `ground-truth.sh` 결과 재사용·패치 판정 약함 | **확인** — 하위 러너 3개를 `>/dev/null 2>&1`로 실행하고 rc 미검사(`:30`,`:35`,`:40`). 결과는 `ls -t …/poc-patha-*-matrix/summary.json \| head -1` 등 **버전·run_id 무관 전역 최신 파일**(`:31`,`:36`,`:41`) → 이번 실행이 summary를 못 쓰면 이전 실행·타 버전 결과가 채택된다(특히 P17 summary는 실행 끝에만 생성). 수정 버전 기대(`:103`)는 `not memory_error`뿐 — 입력 유효성·도달·차단 지점 미확인이므로 하네스가 아무것도 못 해도 8.4.27 "소멸"로 통과 가능 | 수용 (P0) |
+| R2 | #1-P1 `fuzz-phase5.sh` 종료 코드·positive control | **확인** — `:116` `[ crashes -gt 0 ] \|\| [ rc -ne 0 ] && [ rc -ne 124 ]`는 bash에서 `(A\|\|B)&&C` → **crash>0 ∧ rc=124이면 `overall_rc=0`**. positive control은 `fail`을 JSON에만 기록하고 퍼징을 계속(`:73-83`, 스크립트 오류만 echo) | 수용 |
+| R3 | #1-P1 `apache-pathb-matrix.sh` `/tmp` 재사용 | **확인** — 회차 결과를 고정 경로 `/tmp/poc-pathb-$version-$i.json`(`:50`)에 쓰고, rc(`:51`)는 판정에 쓰지 않고 파일 존재만 검사(`:56`) → 이번 회차가 실패해도 이전 실행의 동일 이름 파일이 `ok`로 채택될 수 있음. run_id 검증 없음 | 수용 |
+| R4 | #1-P1 `apache-patha-matrix.sh` 원시 결과 덮어쓰기 | **확인** — crash-1..N이 같은 32M 구성이라 `poc-patha.py`의 원시 결과 `result-<label>.json`(label=limit·parts·nest, `poc-patha.py:160`,`:224`)이 회차마다 덮어써진다(회차별로 남는 것은 stdout 요약뿐). 런 디렉터리 `apache-lab-$version-patha`(`:19`)도 고정 이름 | 수용 |
+| R5 | #1-P1 `gdb-patha.py` 판정 조건 | **확인** — `counted_uninitialized_bucket_observed` = fatal@958 ∧ `nNumUsed` ∧ `key_ptr ∉ {None,0x0}`(`:199-204`). §12.5의 `0xbebebebebebebebe` 패턴은 사람이 읽은 값이며 **자동 판정 조건이 아님**; OOM site·메모리 패턴·teardown 소비 스택 결합 없음 | 수용 |
+| R6 | #1-P1 `fault-site-map.py` 누락 파일 무보고 | **확인** — `FILES` 중 없는 파일은 `continue`(`:52-53`), `guard_counts()`도 동일(`:85`). 스캔 범위·누락이 결과에 안 나타나 §12.5 Stage 2 수치(44/5/7/13/0)의 분모가 불명 | 수용 |
+| R7 | #1 문서: 20261022 매니페스트가 `hash *path`인데 findings §10.1은 `*` 0건 | **확인, 범위 확대** — 20261021: 3,924행 전부 두-공백 / **20261022: 4,370행 전부 `*`** / **20261023: 10,458행 전부 `*`**(= `var/linux-evidence/evidence-manifest.sha256`). §12.1·§12.5·findings §10.1의 "`*` 0건"은 오기. **함의:** 수정 전 검증기로 기록된 10/22~10/23 오전의 "verify-evidence passed"(P15~P18, Phase 5 v1)는 매니페스트 해시를 **한 행도 검사하지 않은 통과**였다(10/21 Phase 4는 두-공백 형식이라 해당 없음). 부수: findings §10.1 "7,990/7,990"과 커밋 `86662d5` 메시지 "10,458/10,458" 수치 불일치 | 정정 |
+| R7a | (이번 반영 중 소급 검증) | `var/linux-evidence`에서 `sha256sum -c docs/evidence-manifest-20261022.sha256` → **4,351 OK / 19 FAILED**. 불일치 19건 전부 고정 이름 런 디렉터리 `evidence/apache-lab-{8.4.4,8.4.27}-path{a,b}[-gdb]/`의 `access.log`·`error.log`·`httpd.pid`·`php-error.log` — 10/23 v1.1 재실행이 같은 경로를 덮어쓴 것(R3·R4와 같은 원인). 타임스탬프 디렉터리의 회차 결과·ASAN 보고는 전부 일치 → 10/22 판정 근거는 보존됐으나, **10/22 시점 Apache 원본 로그는 현재 트리에 원형으로 남아 있지 않다** | 기록 |
+| R8 | #2 `lifecycle-fuzz.py`는 회귀 매트릭스 | **확인** — `producers × interposes × consumers` 고정 튜플(`:199-201`) 열거뿐, 생성·변이·코퍼스·스케줄러 없음. `request_transition_coverage`(`:224-228`)는 고정 조합 실행률 → 탐색 능력 지표 아님 | 수용 — Stage 1 상태 하향(§12.6.2) |
+| R9 | #2-P0 실행·판정 신뢰성 | **확인** — ① 생산자 A는 HTTP 상태만 기록, OOM/fatal 착지 위치·동일 프로세스가 기대값 계산에 미반영 ② `interpose_health_ok`(`:131`)는 기록만 — 정상 요청이 실패해도 음성 대조 성립 처리 ③ `expected_memory_error`가 버전 무관 → 8.4.27에서는 정상 소멸이 `false_negative`로 집계됨 ④ 출력 경로 `lifecycle-<index>-<version>`(`:71`) 고정 — 재실행 시 재사용 ⑤ `--memory-limit`(기본 8M)은 summary에만 기록(`:222`), 실제는 `PRODUCER_LIMITS` 8M/16M(`:66`) — 표시값≠실효값 | 수용 |
+
+#### 12.6.2 §12.5 상태 정정
+
+| §12.5 항목 | 기존 표기 | 정정 | 근거 |
+|---|---|---|---|
+| #1-P0 | 완료기준 1 충족 | **유지(검증기 코드)** + 사실 기술 정정 — 현 `check_manifest()`(정규식 `(?:  \| \*)`, 0건·미해석 행 실패)는 코드로 확인. "`*` 0건" 문구 정정, 10/22~10/23 오전 통과 기록의 의미 한정 | R7·R7a |
+| #1-P1 판정 | 완료기준 2 충족 | **부분** — PoC 판정은 teardown 프레임 결합으로 강화됐으나 GDB 자동 판정은 `key_ptr≠0`만 요구, 회차 원시 결과 덮어쓰기 | R4·R5 |
+| #1-P1 퍼저 | 완료기준 3 충족 | **부분** — positive control 실패 시 비중단, 종료 코드 결합 버그 | R2 |
+| #1-P1/P2 | 완료기준 4 충족 | **부분** — pathb `/tmp` 재사용·rc 미검증, 상위(ground-truth) 집계가 하위 실패를 흡수 | R1·R3 |
+| v2 Stage 0 | MVP 충족 | **재검증 필요** — "8.4.4 3/3 · 8.4.27 소멸 3/3"은 R1 해소 후 재실행 전까지 **잠정** | R1 |
+| v2 Stage 1 | MVP 충족 | **고정 회귀 매트릭스(8조합) 완료** — 탐색기 MVP 아님. 16/16은 고정 시나리오의 기대 충족률 | R8·R9 |
+| v2 Stage 2 | MVP 충족 | **유지(잠정)** — 스캔 범위·누락 보고 전까지 분류 수치는 분모 미확정 | R6 |
+
+#### 12.6.3 v1.2 작업 계획 — Issue #1 후속 (우선 실행)
+
+| 우선순위 | 작업 | 대상 | 완료 기준 |
+|---|---|---|---|
+| P0 | ① 실행마다 `run_id` 발급 → 하위 러너에 출력 디렉터리 명시 전달(`POC_OUT_DIR`/`GROUND_TRUTH_OUT`), `ls -t` 탐색 제거 ② 하위 러너 rc 검사(0/2 외 = 하네스 실패) ③ 읽은 summary의 `version`·`run_id`가 이번 실행과 일치하는지 검증 ④ 수정 버전 `extinct` = **입력 유효성**(요청 형상·크기·실효 memory_limit) ∧ **도달**(reached) ∧ **차단 지점 분류**(전달 차단형 / 소비 지점 리셋형 / 생산자 잔존+소비 차단형, §9.14-5d) ∧ `not memory_error` | `linux/ground-truth.sh` | 하위 러너 실패·이전/타 버전 결과·미도달 입력이 각각 non-zero로 끝나는 픽스처 3종 |
+| P1 | positive control에 `fail` 1건이라도 있으면 퍼징 전 중단(별도 종료 코드), `:116`을 `{ [ crashes -gt 0 ]; } \|\| { [ rc -ne 0 ] && [ rc -ne 124 ]; }`로 명시 결합, timeout은 상태로 별도 기록 | `linux/fuzz-phase5.sh` | crash>0 ∧ rc=124, control fail 픽스처에서 non-zero |
+| P1 | pathb: 회차 결과를 `$outdir/iter-$i.json`으로, rc≠0 → `runner_failed`, `result.json`의 run_id·version 대조. patha: 회차별 하위 디렉터리(또는 label에 회차 포함)로 원시 결과 보존. 두 러너 모두 런 디렉터리(`apache-lab-$version-path*`)를 run_id 포함 경로로 — **R7a 재발 방지** | `linux/apache-path{a,b}-matrix.sh`, `linux/apache-lab.sh` | 동일 구성 N회 실행 후 원시 결과 N개 존재, 이전 실행 파일 주입 픽스처가 `ok`로 집계되지 않음 |
+| P1 | 미초기화 bucket 판정 = fatal 사이트 `zend_hash.c:958` ∧ key 미초기화 패턴(ASAN 0xbe 반복 등, 정상 `zend_string*`와 구분) ∧ 같은 실행의 teardown 소비 스택(`zend_array_destroy` 등). 조건별 결과를 개별 필드로 기록하고 단일 조건 충족은 `candidate`로만 | `linux/gdb-patha.py` | 28M 대조·임의 비영 포인터 픽스처가 `observed`로 판정되지 않음 |
+| P1 | 대상 파일별 `present/missing` 표 출력, missing>0이면 `scope_incomplete` + non-zero(`--allow-missing`으로만 완화) | `linux/fault-site-map.py` | 누락 파일 픽스처에서 non-zero + 누락 목록 |
+| 문서 | §12.1·§12.5·findings §10.1의 `*` 기술 정정, 7,990 vs 10,458 수치 정리, 10/22~10/23 오전 "passed" 기록의 의미 한정 주석, R7a 소급 결과를 findings에 기록. **executive summary §증적 행**("20261022 매니페스트 4,370파일, `verify-evidence` 통과" — 수정 전 검증기의 0행 통과였고 소급 시 19건 불일치)도 정정 대상 | docs, `php2shell-executive-summary.md` | 사실 기술이 매니페스트 실물과 일치 |
+| 재실행 | 위 수정 후 `ground-truth.sh` 8.4.4·8.4.27 재실행 → 새 매니페스트 생성·`verify-evidence` 통과 → §12.6.2 "재검증 필요" 해소 여부 기록 | — | 재실행 결과로 Stage 0 상태 확정 |
+
+#### 12.6.4 v2 계획 개정 — Issue #2 후속 (완성 기준 = 닫힌 피드백 루프)
+
+**핵심 완료 조건:** `Generate → Execute → Observe → Select → Mutate → Replay/Validate`가 **실제 관측 피드백으로 닫힌 루프**를 이룬다. 도구 파일 존재·고정 8/8·총 실행 횟수만으로 "완성"을 선언하지 않는다. 신규 CVE 발견은 계속 완료 조건이 아니다.
+
+| 단계 | 내용 | 기존 자산 |
+|---|---|---|
+| 1a 신뢰성(P0, R9) | 생산자 착지 확인(요청 A 이후 로그 구간의 fatal 위치·할당 크기 + 소비자 B와 동일 워커 PID) — **ASAN 보고만으로 시퀀스 성공을 추정하지 않음**(생산자 착지·동일 워커·소비 스택이 모두 확인돼야 `memory_error` 채택), 정상 interpose가 **실제 성공했을 때만** 음성 대조 성립(실패 시 `invalid_control`), 버전별 기대(8.4.27: 소멸=정상, 생산자 잔존 여부 분리 기록), run_id별 고유 증적 디렉터리, 실효 memory_limit을 서버 측에서 측정해 기록 | `lifecycle-fuzz.py`, `poc-pathb/c` 로그 구간 판정 |
+| 1b Generator/Mutator | 고정 8조합 → 시퀀스 문법: 요청 수(1..N)·순서·생산자(파싱 OOM / 런타임 OOM / 연결 중단 / 타임아웃)·복구 요청(health / session / 정상 업로드)·소비자. 문법 유효성 검사를 실행 전에 통과해야 함 | `probe.py` 요청 빌더 |
+| 1c Feedback | ① code-edge(SanitizerCoverage 또는 gcov 빌드) ② failure-site ID(`fault-site-map.py` ID와 연결) ③ 정규화 상태 전이 — `gdb-state-diff.py` 확장, 상태 ID = 소유 요청·할당/해제 사이트·수명 단계·타입·소비 경로(주소 아님). 고정 조합 수와 별개 지표 | `gdb-state-diff.py` |
+| 1d Corpus/Scheduler | 새 edge/state/failure-site를 낸 시퀀스를 보존 → 부모로 재선택 → 변이 자식 생성. **피드백이 다음 입력 선택을 바꾼 기록**(선택 로그)을 산출물로 제출 | — (신규) |
+| 1e Oracle | §12.3 Stage 3(`state-oracle.py`)을 1c와 통합 — persistent/request-owned 메모리의 소유권·해제·초기화 불변조건, 후보 상태와 실제 invalid access 구분 | §12.3 Stage 3 |
+| 1f Replay/Minimize/Differential | 후보 독립 재실행 → 시퀀스 최소화(요청 단위 delta debugging) → 정상 대조 → 8.4.27 대조 → 중복 제거(failure site + 소비 스택 키) | `ground-truth.sh`(v1.2 후) |
+| 실행 계층 | 빠른 탐색(피드백 수집) / 정밀 검증(ASAN+GDB) 분리. 단 **한 시퀀스 안에서는 워커 상태를 보존**(시퀀스 중간 재기동 금지) | — |
+
+**완료 게이트 (순서대로, 앞 게이트 통과가 다음의 전제):**
+
+| 게이트 | 기준 | 증거 |
+|---|---|---|
+| G0 | §12.6.3 v1.2 완료(Issue #1 검증 신뢰성) | 픽스처·재실행 결과 |
+| G1 | 고정 목록에 없는 **신규 유효 시퀀스 자동 생성** | 생성 시퀀스 목록 + 문법 검사 통과 기록 |
+| G2 | `state A 관측 → corpus 저장 → A를 부모로 선택 → 변이 B 생성·실행` 실증 | 스케줄러 선택 로그(부모-자식 계보) |
+| G3 | **hold-out 재발견**: P16 또는 P17 정답 시퀀스를 초기 코퍼스에서 제외하고 재발견 시도. 실패 시 원인을 생성/도달/피드백/판정으로 분리 기록. **주의:** 문법이 예산 내 전수 열거 가능할 만큼 작으면 재발견은 열거의 결과일 뿐이므로, 문법 공간 크기와 실제 실행 수를 함께 보고하고 무작위 탐색(피드백 OFF)과 비교 | hold-out 설정·결과·원인 분리표 |
+| G4 | 피드백 ON/OFF 비교 — 동일 시간·CPU 예산, 3회 이상 독립 반복. 지표: 고유 내부 상태 전이, failure-site 도달률, 검증된 오류당 비용. 유의미한 개선이 없으면 전략 폐기 가능(§12.3 가드레일) | 반복별 원자료 + 요약 |
+| G5 | SAPI 프로파일(mod_php·FPM 워커 생존/교체 차이) 및 FlowFusion 확장(§12.3 Stage 4) | 프로파일별 동일 기준 비교 |
+
+**Stage 2와의 연결:** `ZEND_MM_MAX_ALLOCS` 주입은 시퀀스 이벤트(“요청 k의 n번째 할당 실패”)로 문법에 편입해 failure-site 피드백과 결합한다. §12.3의 제약(훅이 `php_hash_environment()` 이후, main.c:1914)은 유지 — pre-RINIT 창은 별도 계측 빌드, 그 관측은 원본 재검증 전 확정 금지.
+
+**안전 경계 불변:** 격리 로컬 랩, 메모리 오류 관측까지. 힙 그루밍·주소 조작·RCE 체인 비목표. 신규 미공개 오류는 상세 입력 비공개 + PHP 보안팀 책임 신고(§11.2 D1).
+
+#### 12.6.5 실행 순서 (§12.4 대체)
+
+1. v1.2 P0 `ground-truth.sh` → 2. v1.2 P1(퍼저·pathb/patha·gdb-patha·fault-site-map) + 실패 주입 픽스처 → 3. 문서 정정·R7a 소급 기록 → 4. ground-truth 8.4.4/8.4.27 재실행 + 매니페스트 재생성·검증(**G0**) → 5. Stage 1a → 6. 1b(**G1**) → 7. 1c·1d(**G2**) → 8. 1e 오라클 통합 + Stage 2 주입 이벤트 연결 → 9. **G3** hold-out → 10. 1f 최소화·차등 → 11. **G4** ON/OFF 비교 → 12. **G5** SAPI·FlowFusion. 각 단계 종료 시 이 절의 표를 갱신하고, 결과는 findings의 "Phase 5 v2" 독립 섹션에 v1과 구분해 기록한다.
