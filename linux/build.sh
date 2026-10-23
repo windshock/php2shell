@@ -3,7 +3,7 @@ set -euo pipefail
 version=${1:-8.4.4}
 flavor=${2:-asan}
 [[ "$version" =~ ^8\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected stable 8.x.y version'; exit 2; }
-[[ "$flavor" = asan || "$flavor" = normal || "$flavor" = cov ]] || exit 2
+[[ "$flavor" = asan || "$flavor" = normal || "$flavor" = cov || "$flavor" = asanext ]] || exit 2
 base=/home/phplab/php-lab
 source_dir="$base/sources/php-$version"
 build="$base/builds/$version-$flavor"
@@ -22,13 +22,21 @@ mkdir -p "$build"
 cd "$build"
 flags=(-g3 -O2 -fno-omit-frame-pointer)
 options=(--disable-all --enable-cli --enable-fpm --enable-session --without-pear --prefix="$prefix")
-if [ "$flavor" = asan ] || [ "$flavor" = cov ]; then
+if [ "$flavor" = asan ] || [ "$flavor" = cov ] || [ "$flavor" = asanext ]; then
   flags=(-g3 -O1 -fno-omit-frame-pointer)
   options+=(--enable-debug --enable-address-sanitizer)
   # cov: identical to asan plus SanitizerCoverage edge guards; with
   # ASAN_OPTIONS=coverage=1 each process writes <binary>.<pid>.sancov at
   # exit (Phase 5 v2 Stage 1c code-edge feedback).
   if [ "$flavor" = cov ]; then flags+=(-fsanitize-coverage=trace-pc-guard); fi
+  # asanext: asan plus the extensions the historical corpus needs (#4 H2.5):
+  # opcache, soap and the XML family (libxml2), filter, exif, mbstring
+  # (no oniguruma in the lab, hence --disable-mbregex).
+  if [ "$flavor" = asanext ]; then
+    options+=(--enable-opcache --enable-soap --enable-xml --enable-simplexml --enable-dom
+              --enable-xmlreader --enable-xmlwriter --enable-filter --enable-exif
+              --enable-mbstring --disable-mbregex)
+  fi
 else
   options+=(--disable-debug)
 fi
