@@ -1254,6 +1254,8 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 
 ### 11.4 H3 — OFF 기준선: 융합 액션으로 8.4.27 탐색 (`linux/explore-h3.sh`, `02731fb`)
 
+> **[무효 — §11.5에서 대체]** 튜닝 보정 중에 하네스 결함이 확인됐다. `fused` 액션이 상태 줄만 받고 연결을 닫아서, 프로그램이 다음 출력을 쓰려 할 때 `php_handle_aborted_connection`이 bailout하며 **첫 출력 이후의 코드가 실행되지 않았다**. 아래 수치는 "융합 프로그램이 대부분 잘린 상태"의 결과이므로 기준선으로 쓰지 않는다. 증적 디렉터리는 기록으로 남긴다. 수정은 `852770e`, 재측정은 §11.5에 있다.
+
 **방법:**
 - 빌드 8.4.27 `asanext`, CLI 서버. FlowFusion 풀 200개(시드 11, 8.4.27 php-src 테스트에서 생성, generator rc 0)를 `fused` 액션으로 시퀀스 단계에 넣었다(H2.5).
 - 피드백 OFF(무작위), 시드 1·2·3, 각 600초. 샌드박스: exec·네트워크 함수 차단, `allow_url_*` Off, 실행 디렉터리를 cwd로 고정.
@@ -1274,3 +1276,31 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 1. 예측된 결과다. 풀은 8.4.27 php-src 테스트에서 온 프로그램이라 미해결 이슈(hold-out)의 재현 구문을 포함하지 않는다(`fused-pool.py` 설계 조건). 따라서 이 결과는 "무작위 탐색 + 현행 테스트 융합"이 hold-out 부류에 닿지 못한다는 **기준선**이지, 8.4.27이 해당 부류에 안전하다는 근거가 아니다(H2에서 세 건 모두 재현됨).
 2. 처리량이 병목이다. 30분에 융합 단계 82개, 풀의 약 35%만 한 번 이상 실행됐다. gdb 관측기 비용이 실행당 대부분을 차지한다.
 3. ON 재설계(계획 §13.3a)는 이 기준선과 비교한다. 재설계는 튜닝 세트(R49·R55) 부류의 상태 신호(GC 보호 플래그, bailout 회복, 소멸자 재진입)만으로 조정하며, hold-out은 비교 1회에만 쓴다.
+
+### 11.5 H3 — ON 재설계(`--feedback state`)와 튜닝 세트 보정 (계획 §13.3a)
+
+**재설계(`3937243`~`e1d1f45`):** 보상은 code-edge 수가 아니라 상태 신호에 준다. 새 키가 생기면 가중치를 더한다.
+
+| 키 | 신호 | 가중치 |
+|---|---|---|
+| G | (a) 요청이 **정상 종료**(융합 프로그램이 반환, 라우터의 `LAB-FUSED-END`)했는데 shutdown 시점에 GC가 protected/active/disabled 상태. (b) shutdown 밖에서 `zend_mm_delayed_error`(메모리 한도)가 GC protected 상태에서 발생 | 4 |
+| R | 오류 복구: 실패 지점이 기록됐는데 2xx로 끝났고 워커가 살아 있음 | 4 |
+| A | 귀속된 ASAN 보고 | 4 |
+| S(carried) | 요청 간 소유권 전이(이전 요청 포인터 잔류) | 3 |
+| H / 기타(S·T·F) | 정지 / 그 밖의 새 상태·전이 | 2 / 1 |
+
+- 관측기에는 `'zend_gc.c'::gc_globals`(enabled·active·protected·runs)를 추가했다. `_zend_bailout`·`zend_mm_delayed_error`는 이벤트로 기록한다(GC 보호 플래그, `EG_FLAGS_IN_SHUTDOWN`, bailout 호출 프레임 6개).
+- 재진입 신호(소멸자·콜백 중 상태 변경)는 **구현하지 않았다**. 범용 지점(`zend_objects_destroy_object` 등)에 중단점을 걸면 gdb 비용이 너무 크다. hold-out R51과 같은 특정 함수에 거는 것은 지식 누출이다(Phase 0 §3). 미구현 공백으로 남긴다.
+
+**튜닝 세트로만 보정(`linux/explore-tune.sh`, 풀 = R49·R55 재현 코드, `fused-pool.py --cases`는 hold-out 기록을 거부한다):**
+
+| 반복 | 관측 | 조치 |
+|---|---|---|
+| 1 | shutdown 시점 `gc_protected=1`이 `parse_oom`·`runtime_oom`에서도 나왔다 | 8.4.27 `_zend_bailout()`이 항상 `gc_protect(1)`을 호출한다(`Zend/zend.c:1262`). 종료형 fatal 뒤의 보호 상태는 정상이므로, 정상 종료한 요청에만 G를 준다 |
+| 2 | R49가 정상 종료로 집계되지 않았다 | 반복 3·4에서 원인을 찾았다 |
+| 3 | "보호 상태에서 두 번째 bailout" 신호는 lab 앱 `upload`에서도 났다. 프레임을 보니 `soap_error_handler`가 잡아서 다시 던지는 경우와, 연결이 끊긴 뒤 쓰기(`php_handle_aborted_connection`)였다 | 재개와 재던짐을 구분하지 못하므로 이 신호를 폐기했다. 대신 "GC 보호 중 메모리 한도"를 쓴다 |
+| 4 | R49 실행이 1.2초 만에 `php_handle_aborted_connection` bailout으로 끝났다 | **하네스 결함:** `fused` 요청이 본문을 읽지 않고 연결을 닫았다. 본문을 끝까지 읽도록 고쳤다(`852770e`). §11.4 OFF 기준선은 무효다. lab 앱 액션에서는 같은 프레임이 관측되지 않았다(작은 단일 출력) |
+| 5 | R49 → `G:fused|gc_protected`, `R:fused|gc_protected`(정상 종료, `completed=true`). R55 → `A:heap-use-after-free:zend_gc_collect_cycles>zif_gc_collect_cycles>…` | 두 튜닝 신호가 의도대로 발생한다 |
+
+- 증적: `evidence/explore-tune-20261023T143726-8.4.27`(반복 5, `citable: true`). 반복 1~4 디렉터리는 보정 기록으로 남긴다.
+- 보정 중에 hold-out 스크립트는 실행하지 않았다. 신호는 부류 수준(정상 종료 후 GC 보호 잔류, 보호 중 메모리 한도)으로 정의했다. 단, R23(hold-out)도 같은 부류이므로 **G 신호는 R23 부류에 대해 독립적이지 않다**. R46·R51 부류에 대응하는 신호는 A뿐이다. 평가 보고에 이 한계를 적는다.
