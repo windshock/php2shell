@@ -45,13 +45,16 @@ def preserve_inputs(paths, evidence_dir):
     return out
 
 
-def write_note(evidence_dir, effective_commit, reason, check_paths):
+def write_note(evidence_dir, effective_commit, reason, check_paths, until=None):
     """Provenance note for evidence produced without a recorded commit:
     verifies that no commit after `effective_commit` touched the files the
     run loaded (check_paths) and records the reconstruction."""
     import json
-    log = _git('log', '--format=%H %cI %s', '%s..HEAD' % effective_commit, '--', *check_paths)
+    # Only commits made while the run was executing matter (until = run end).
+    log = _git('log', '--format=%H %cI %s', *(['--until=%s' % until] if until else []),
+               '%s..HEAD' % effective_commit, '--', *check_paths)
     note = dict(effective_commit=_git('rev-parse', effective_commit), reason=reason,
+                run_end=until,
                 loaded_paths=list(check_paths),
                 later_commits_touching_loaded_paths=[line for line in (log or '').splitlines()
                                                      if line],
@@ -65,8 +68,8 @@ def write_note(evidence_dir, effective_commit, reason, check_paths):
 if __name__ == '__main__':
     import json
     if len(sys.argv) > 1 and sys.argv[1] == '--note':
-        # --note <evidence_dir> <effective_commit> <reason> <loaded paths...>
-        print(json.dumps(write_note(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5:]),
-                         indent=2))
+        # --note <evidence_dir> <effective_commit> <run_end_iso> <reason> <loaded paths...>
+        print(json.dumps(write_note(sys.argv[2], sys.argv[3], sys.argv[5], sys.argv[6:],
+                                    until=sys.argv[4]), indent=2))
     else:
         print(json.dumps(provenance(), indent=2))
