@@ -1004,7 +1004,9 @@ def campaign(args):
     for k in seen_keys:
         kinds[k[0]] = kinds.get(k[0], 0) + 1
     summary = dict(scope='Phase 5 v2 lifecycle explorer (CLI server); observation only',
-                   run_id=run_id, version=args.version, feedback=args.feedback,
+                   run_id=run_id, version=args.version, flavor=args.flavor,
+                   coreguard_mode=os.environ.get('COREGUARD_MODE'),
+                   coreguard_log=os.environ.get('COREGUARD_LOG'), feedback=args.feedback,
                    observer=args.observer, sapi=args.sapi, seed=args.seed,
                    budget_s=args.budget,
                    max_execs=args.max_execs, execs=n, wall_s=round(time.time() - started, 1),

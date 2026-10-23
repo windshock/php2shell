@@ -30,14 +30,16 @@ TEST_PHP_EXECUTABLE=$prefix/bin/php NO_INTERACTION=1 \
 rc=$?
 end=$(date +%s)
 python3 - "$run" "$build" "$rc" "$((end - start))" "$dirs" <<'PY'
-import json, re, sys
+import json, os, re, sys
 sys.path.insert(0, '/mnt/c/Users/user/Downloads/php/linux')
 import provenance
 run, build, rc, secs, dirs = sys.argv[1:]
 log = open(run + '/run-tests.log', errors='replace').read()
 counts = {k: int(v) for k, v in re.findall(r'^Tests (\w+)\s*:\s*(\d+)', log, re.M)}
 summary = dict(scope='CoreGuard Phase 0 PHPT baseline', build=build, run_tests_rc=int(rc),
-               seconds=int(secs), dirs=dirs.split(), counts=counts, **provenance.provenance())
+               seconds=int(secs), dirs=dirs.split(), counts=counts,
+               coreguard_mode=os.environ.get('COREGUARD_MODE'),
+               coreguard_log=os.environ.get('COREGUARD_LOG'), **provenance.provenance())
 json.dump(summary, open(run + '/summary.json', 'w'), indent=2)
 print(json.dumps(dict(run=run, counts=counts, rc=int(rc), citable=summary['citable']), indent=2))
 PY
