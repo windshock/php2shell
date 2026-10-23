@@ -189,8 +189,10 @@ def render(data, path):
              '> **이 표는 취약점 목록이 아니다.** 수정 완료·미검증 제보·설계 논의가 섞여 있다. '
              '`record_type`은 원천의 현재 상태에서 나온 기록 유형이며, 증거 수준·노출 조건·'
              '현재 탐색기 도달 가능성은 H2/H2.5에서 사례별로 판정한다(`unassessed`).', '',
-             '| ID | 최초 | 기록 | 원천 현재 상태 | record_type | 후보 패턴 | 불일치 |',
-             '|---|---|---|---|---|---|---|']
+             '| ID | 최초 | 기록 | 원천 현재 상태 | record_type | 후보 패턴 | 현재 탐색기 도달성(H2.5) | 불일치 |',
+             '|---|---|---|---|---|---|---|---|']
+    reach_path = Path(__file__).resolve().parent / 'reachability.json'
+    reach = json.loads(reach_path.read_text(encoding='utf-8')) if reach_path.exists() else {}
     for r in data['records']:
         fetched = '; '.join(
             '%s%s' % (s.get('status') or s.get('state') or ('reachable' if s.get('reachable')
@@ -200,14 +202,24 @@ def render(data, path):
             for s in r['verified_sources'])
         pats = [name for name, rx in PATTERNS if re.search(rx, r['pattern'], re.I)]
         label = re.sub(r'\]\([^)]+\)', ']', r['label']).replace('|', '/')
-        lines.append('| %s | %s | %s | %s | %s | %s | %s |' % (
+        rc = reach.get('records', {}).get(r['id'], ['unassessed', ''])
+        lines.append('| %s | %s | %s | %s | %s | %s | %s | %s |' % (
             r['id'], r['first_seen'], label, fetched, r['record_type'],
-            ', '.join(pats) or 'other', '; '.join(r['discrepancies']) or '—'))
+            ', '.join(pats) or 'other', '`%s` %s' % (rc[0], rc[1]),
+            '; '.join(r['discrepancies']) or '—'))
     counts = {}
     for r in data['records']:
         counts[r['record_type']] = counts.get(r['record_type'], 0) + 1
     lines += ['', '**요약:** ' + ', '.join('%s %d' % kv for kv in sorted(counts.items())) +
               ' (총 %d). 원천 조회 실패 0.' % len(data['records'])]
+    if reach:
+        rcount = {}
+        for value in reach['records'].values():
+            rcount[value[0]] = rcount.get(value[0], 0) + 1
+        lines += ['', '**H2.5 도달성(%s):** ' % reach.get('basis') +
+                  ', '.join('%s %d' % kv for kv in sorted(rcount.items())) +
+                  '. 범주 정의: ' + '; '.join('`%s` = %s' % kv for kv in
+                                             reach['categories'].items())]
     Path(path).write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
