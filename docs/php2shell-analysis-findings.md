@@ -939,6 +939,7 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 | 게이트 | 결과 |
 |---|---|
 | **G1** | 실행 85건 중 생성 81건. 81건 모두 서로 다르고 문법 검사를 통과했으며(거부 0), 80건이 고정 8조합 밖이다. 길이 분포 1:8 / 2:28 / 3:25 / 4:15 / 5:4 / 6:1 → **통과** |
+| **G2** | 코퍼스 22개, 최대 깊이 6, 선택 106회, 생성 항목 16개가 부모로 재선택됐다. 계보: `health`(시드) → `runtime_oom` → `+parse_oom`(새 실패 지점) → `+parse_oom`(carried 상태 최초 관측) → swap → replace(`abort_upload`) → param → 자식이 **ASAN `heap-use-after-free:tmp_var>var_tmp_var>ps_srlzr_decode_php` 발견(684.7s)** → **통과** |
 
 - 발견된 시그니처는 알려진 P17(BG(unserialize)) 부류다. 소비자는 `upload_small`이 아니라 `parse_oom`(큰 세션 progress decode)인 변형이다.
 - 고유 키: S 4 / T 26 / F 3 / A 1.
