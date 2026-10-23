@@ -59,9 +59,19 @@ def extract_php(text):
     return code[:cut.start()] if cut else code
 
 
-def modules(php):
-    res = subprocess.run([str(php), '-n', '-m'], capture_output=True, text=True)
-    return {line.strip().lower() for line in res.stdout.splitlines() if line.strip()}
+def opcache_args(php):
+    """opcache is a shared zend_extension: load it explicitly under -n."""
+    found = sorted(Path(php).parents[1].glob('lib/php/extensions/*/opcache.so'))
+    return (['-d', 'zend_extension=%s' % found[0], '-d', 'opcache.enable_cli=1']
+            if found else [])
+
+
+def modules(php, extra=()):
+    res = subprocess.run([str(php), '-n', *extra, '-m'], capture_output=True, text=True)
+    names = {line.strip().lower() for line in res.stdout.splitlines() if line.strip()}
+    if 'zend opcache' in names:
+        names.add('opcache')
+    return names
 
 
 def expect_matches(expected, actual, fmt):
@@ -116,7 +126,8 @@ def run_case(rid, case, version, flavor, root):
         code = extract_php(text) if case.get('extract') else text
         needs = []
     needs = sorted(set(needs) | {n.lower() for n in case.get('needs', [])})
-    have = modules(php)
+    extra = opcache_args(php) if 'opcache' in needs else []
+    have = modules(php, extra)
     missing = [n for n in needs if n not in have]
     rec['needs'] = needs
     if missing:
@@ -124,7 +135,7 @@ def run_case(rid, case, version, flavor, root):
         return rec
     script = out / 'repro.php'
     script.write_text(code, encoding='utf-8')
-    args = [str(php), '-n'] + SANDBOX + ['-d', 'sys_temp_dir=%s' % out,
+    args = [str(php), '-n'] + extra + SANDBOX + ['-d', 'sys_temp_dir=%s' % out,
                                          '-d', 'session.save_path=%s' % out]
     for line in ini:
         args += ['-d', line]
