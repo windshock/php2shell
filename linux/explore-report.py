@@ -16,6 +16,7 @@
 Usage: explore-report.py g1|g2 <campaign-dir>
        explore-report.py g3 DIR...
        explore-report.py g4 --on DIR... --off DIR...
+       explore-report.py g5 DIR... --cutoff SECONDS   (SAPI profiles, same budget)
 """
 import argparse
 import json
@@ -160,6 +161,39 @@ def g3(dirs):
                            and r['feedback'] == 'on' for r in rows))
 
 
+def profile_metrics(d, cutoff=None):
+    """Per-campaign metrics restricted to executions started before cutoff
+    seconds (so 900 s CLI runs compare with 600 s SAPI runs)."""
+    summary = json.loads((Path(d) / 'summary.json').read_text())
+    execs = [e for e in load_execs(d) if e.get('grammar_ok')
+             and (cutoff is None or e['t'] <= cutoff)]
+    keys = set()
+    for e in execs:
+        keys.update(e.get('new_keys', []))
+    sigs = sorted(k[2:] for k in keys if k.startswith('A:'))
+    found = {name: next((e['t'] for e in execs for s in e.get('steps', [])
+                         if spec['func'] in ((s.get('asan') or {}).get('sig') or '')), None)
+             for name, spec in KNOWN.items()}
+    harness = sum(1 for e in execs if any('harness_error' in s for s in e.get('steps', [])))
+    hangs = sum(1 for e in execs if any(s.get('hung') for s in e.get('steps', [])))
+    replaced = sum(1 for e in execs for s in e.get('steps', [])
+                   if s.get('alive_after') is False and not s.get('asan'))
+    return dict(dir=Path(d).name, sapi=summary.get('sapi', 'cli'),
+                feedback=summary['feedback'], cutoff_s=cutoff, execs=len(execs),
+                transitions=len({k for k in keys if k.startswith('T:')}),
+                failure_sites=len({k for k in keys if k.startswith('F:')}),
+                asan_signatures=sigs, known_paths_first_t=found,
+                hangs=hangs, worker_lost_without_asan=replaced,
+                harness_errors=harness, aborted=summary.get('aborted', False))
+
+
+def g5(dirs, cutoff):
+    rows = [profile_metrics(d, cutoff) for d in dirs]
+    return dict(gate='G5', cutoff_s=cutoff, profiles=rows,
+                passed=all(not r['aborted'] and r['harness_errors'] == 0 for r in rows)
+                and len({r['sapi'] for r in rows}) >= 3)
+
+
 def g4(on_dirs, off_dirs):
     on = [campaign_metrics(d) for d in on_dirs]
     off = [campaign_metrics(d) for d in off_dirs]
@@ -179,7 +213,8 @@ def g4(on_dirs, off_dirs):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('gate', choices=('g1', 'g2', 'g3', 'g4'))
+    parser.add_argument('gate', choices=('g1', 'g2', 'g3', 'g4', 'g5'))
+    parser.add_argument('--cutoff', type=float, default=None)
     parser.add_argument('dir', nargs='*')
     parser.add_argument('--on', nargs='*', default=[])
     parser.add_argument('--off', nargs='*', default=[])
@@ -190,6 +225,8 @@ def main():
         result = g2(args.dir[0])
     elif args.gate == 'g3':
         result = g3(args.dir)
+    elif args.gate == 'g5':
+        result = g5(args.dir, args.cutoff)
     else:
         result = g4(args.on, args.off)
     print(json.dumps(result, indent=2))

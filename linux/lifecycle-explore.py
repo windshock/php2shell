@@ -28,7 +28,9 @@ same executor and budget (G4 baseline). --exclude-pairs (G3 hold-out) drops
 seeds containing the given consecutive action pairs from the initial corpus
 only; generation may still rediscover them.
 
-SAPI scope: CLI built-in server only (G5 extends to mod_php/FPM).
+SAPI scope: --sapi cli (default; gdb state observer available), apache
+(prefork mod_php, httpd -X) or fpm (nginx + single-worker FPM; a replaced
+worker ends the sequence). See explore_sapi.py.
 Observation only: no heap grooming, no pointer control, no RCE attempt.
 New memory-error signatures stay in the local evidence tree; they are not
 published (plan §11.2 D1).
@@ -54,10 +56,12 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from probe import multipart  # noqa: E402
+import explore_sapi  # noqa: E402
 
 REPO = HERE.parent
 BASE = Path('/home/phplab/php-lab')
-PORT = 18090
+CLI_PORT = 18090
+PORT = CLI_PORT  # rebound per execution to the active SAPI's port
 SESSION_FIELD = 'PHPSESSID'
 PROGRESS_FIELD = 'PHP_SESSION_UPLOAD_PROGRESS'
 FIXED_VERSIONS = ('8.4.27', '8.5.12')
@@ -333,7 +337,11 @@ def carried_request_state(norm):
 
 
 class Process:
-    def __init__(self, prefix, out, limit, observer, fault=0):
+    def __init__(self, prefix, out, limit, observer, fault=0, docroot=None, router=None):
+        # docroot/router default to the lab app; flowfusion-bridge.py
+        # serves a fused program next to it.
+        docroot = docroot or REPO / 'web'
+        router = router or REPO / 'web/index.php'
         self.out, self.observer = out, observer
         for name in ('sessions', 'uploads'):
             (out / name).mkdir(parents=True, exist_ok=True)
@@ -358,14 +366,21 @@ class Process:
         if observer == 'gdb':
             (out / 'gdb.cmd').write_text(GDB_TEMPLATE.format(
                 asan=out, php=php, ini=out / 'php.ini', port=PORT,
-                docroot=REPO / 'web', router=REPO / 'web/index.php').replace(
+                docroot=docroot, router=router).replace(
                     'set environment USE_TRACKED_ALLOC=1\n',
                     'set environment USE_TRACKED_ALLOC=1\n' + fault_line))
             self.cmd = ['gdb', '-q', '-batch', '-x', str(out / 'gdb.cmd')]
         else:
             self.cmd = [str(php), '-c', str(out / 'php.ini'), '-S', '127.0.0.1:%d' % PORT,
-                        '-t', str(REPO / 'web'), str(REPO / 'web/index.php')]
+                        '-t', str(docroot), str(router)]
         self.proc = None
+        self.port = PORT
+        self.sessions = out / 'sessions'
+        self.error_log = out / 'php-error.log'
+        self.asan_dir = out
+
+    def worker_pid(self):
+        return None  # CLI: attribution uses the gdb-observed inferior pid
 
     def start(self):
         free_port()
@@ -409,6 +424,7 @@ class Process:
 
 
 HANG_GRACE = 12.0
+MAX_HARNESS_STREAK = 3
 
 
 def responsive():
@@ -483,25 +499,35 @@ def send(action, step, idx, ctx):
         return 'error:%s' % type(exc).__name__
 
 
-def execute(seq, prefix, out, observer):
+def execute(seq, prefix, out, observer, sapi='cli', version=None):
     """Run one sequence in one fresh process; return per-step observations."""
+    global PORT
     out.mkdir(parents=True, exist_ok=True)
     ctx = dict(sid_big='exbig' + secrets.token_hex(6), sid_small='exsmall' + secrets.token_hex(6))
-    proc = Process(prefix, out, seq['limit'], observer, seq.get('fault', 0))
+    if sapi == 'cli':
+        PORT = CLI_PORT
+        proc = Process(prefix, out, seq['limit'], observer, seq.get('fault', 0))
+    else:
+        proc = explore_sapi.make_process(sapi, version, out, seq['limit'],
+                                         seq.get('fault', 0), POST_MAX_MB)
+        PORT = proc.port
     big = 'A' * (3 * 1024 * 1024)
-    (out / 'sessions' / ('sess_' + ctx['sid_big'])).write_text('big|s:%d:"%s";' % (len(big), big))
-    (out / 'sessions' / ('sess_' + ctx['sid_small'])).write_text('small|a:1:{i:0;i:7;}')
+    proc.sessions.mkdir(parents=True, exist_ok=True)
+    (proc.sessions / ('sess_' + ctx['sid_big'])).write_text('big|s:%d:"%s";' % (len(big), big))
+    (proc.sessions / ('sess_' + ctx['sid_small'])).write_text('small|a:1:{i:0;i:7;}')
     ctx['jar'] = http.cookiejar.CookieJar()
     ctx['opener'] = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(ctx['jar']))
-    error_log = out / 'php-error.log'
+    error_log = proc.error_log
+    asan_dir = proc.asan_dir
     steps = []
     started = time.time()
+    worker = None
     try:
         proc.start()
-        server_pid = None
+        worker = proc.worker_pid()
         for idx, step in enumerate(seq['steps']):
             before_log = error_log.stat().st_size if error_log.exists() else 0
-            before_asan = {p.name for p in out.glob('asan.*')}
+            before_asan = {p.name for p in asan_dir.glob('asan.*')}
             response = send(step['a'], step, idx, ctx)
             time.sleep(0.25)
             log_text = ''
@@ -513,7 +539,7 @@ def execute(seq, prefix, out, observer):
             deadline = time.time() + (3.0 if response in ('reset', 'no_status', 'aborted')
                                       or response.startswith('error') else 0.6)
             while time.time() < deadline and asan is None:
-                for path in sorted(out.glob('asan.*')):
+                for path in sorted(asan_dir.glob('asan.*')):
                     if path.name not in before_asan and path.is_file():
                         asan = asan_signature(path)
                         if asan:
@@ -528,7 +554,7 @@ def execute(seq, prefix, out, observer):
                 # (symbolization) or a hang. Wait longer, then classify.
                 deadline = time.time() + HANG_GRACE
                 while time.time() < deadline and asan is None and proc.alive():
-                    for path in sorted(out.glob('asan.*')):
+                    for path in sorted(asan_dir.glob('asan.*')):
                         if path.name not in before_asan and path.is_file():
                             asan = asan_signature(path)
                             if asan:
@@ -559,7 +585,8 @@ def execute(seq, prefix, out, observer):
                     states.append(json.loads(line[6:]))
                 except ValueError:
                     pass
-    return dict(steps=steps, states=states, elapsed=round(time.time() - started, 2))
+    return dict(steps=steps, states=states, elapsed=round(time.time() - started, 2),
+                sapi=sapi, worker_pid=worker)
 
 
 # ------------------------------------------------------------ observation
@@ -572,6 +599,8 @@ def observe(result, seq):
         if match and st.get('tag') == 'startup':
             by_step.setdefault(int(match.group(1)), (i, st))
     pids = {st.get('pid') for st in states if st.get('pid')}
+    if result.get('worker_pid'):
+        pids = {int(result['worker_pid'])}
     keys, steps = set(), []
     findings = []
     for step in result['steps']:
@@ -618,7 +647,8 @@ def campaign(args):
     rng = random.Random(args.seed)
     prefix = BASE / 'install' / (args.version + '-asan')
     stamp = time.strftime('%Y%m%dT%H%M%S', time.gmtime())
-    run_id = 'ex-%s-%s-%s-s%d-%d' % (stamp, args.version, args.feedback, args.seed, os.getpid())
+    run_id = 'ex-%s-%s-%s-%s-s%d-%d' % (stamp, args.version, args.sapi, args.feedback,
+                                        args.seed, os.getpid())
     out_base = Path(args.out) if args.out else BASE / 'evidence' / ('explore-' + run_id)
     out_base.mkdir(parents=True, exist_ok=True)
     execs_log = (out_base / 'execs.jsonl').open('a')
@@ -628,6 +658,10 @@ def campaign(args):
              if line.strip()] if args.seeds else DEFAULT_SEEDS
     seeds = [s for s in seeds if not (pairs(s) & exclude)]
     corpus, seen_keys, seen_seqs = [], {}, set()
+    # Harness failures (the target never ran) are counted and stop the
+    # campaign after MAX_HARNESS_STREAK in a row - a wedged lab must not be
+    # reported as an exploration result.
+    harness = dict(total=0, streak=0, aborted=False)
     findings = {}
     started = time.time()
     n = 0
@@ -643,8 +677,16 @@ def campaign(args):
         if problems:
             execs_log.write(json.dumps(record) + '\n')
             return record
-        res = execute(seq, prefix, out_base / ('exec-%04d' % n), args.observer)
+        res = execute(seq, prefix, out_base / ('exec-%04d' % n), args.observer,
+                      args.sapi, args.version)
         keys, steps, found = observe(res, seq)
+        if any('harness_error' in st for st in steps):
+            harness['total'] += 1
+            harness['streak'] += 1
+            if harness['streak'] >= MAX_HARNESS_STREAK:
+                harness['aborted'] = True
+        else:
+            harness['streak'] = 0
         new = sorted(k for k in keys if k not in seen_keys)
         for k in new:
             seen_keys[k] = n
@@ -668,7 +710,8 @@ def campaign(args):
             corpus.append(dict(id=rec['id'], seq=seed, new=len(rec.get('new_keys', [])),
                                picked=0, depth=0))
         seen_seqs.add(seq_key(seed))
-    while n < args.max_execs and time.time() - started < args.budget:
+    while (n < args.max_execs and time.time() - started < args.budget
+           and not harness['aborted']):
         if args.feedback == 'on' and corpus:
             weights = [(1.0 + e['new']) / (1.0 + e['picked']) ** 0.5 for e in corpus]
             parent = rng.choices(corpus, weights=weights, k=1)[0]
@@ -702,7 +745,8 @@ def campaign(args):
         kinds[k[0]] = kinds.get(k[0], 0) + 1
     summary = dict(scope='Phase 5 v2 lifecycle explorer (CLI server); observation only',
                    run_id=run_id, version=args.version, feedback=args.feedback,
-                   observer=args.observer, seed=args.seed, budget_s=args.budget,
+                   observer=args.observer, sapi=args.sapi, seed=args.seed,
+                   budget_s=args.budget,
                    max_execs=args.max_execs, execs=n, wall_s=round(time.time() - started, 1),
                    excluded_pairs=sorted('>'.join(p) for p in exclude),
                    faults=args.faults,
@@ -710,15 +754,17 @@ def campaign(args):
                                 faults=len(FAULTS) if args.faults else 1,
                                 space_size=grammar_space(args.faults)),
                    unique_keys=kinds, corpus_size=len(corpus),
+                   harness_errors=harness['total'], aborted=harness['aborted'],
                    findings=findings, time_to_first_valid_finding=(
                        min((f['first_t'] for f in findings.values()), default=None)))
     (out_base / 'corpus.json').write_text(json.dumps(corpus, indent=2))
     (out_base / 'summary.json').write_text(json.dumps(summary, indent=2))
     print(json.dumps({k: summary[k] for k in ('run_id', 'feedback', 'execs', 'wall_s',
                                               'unique_keys', 'corpus_size',
-                                              'time_to_first_valid_finding')}
+                                              'time_to_first_valid_finding',
+                                              'harness_errors', 'aborted')}
                      | {'findings': sorted(findings), 'out': str(out_base)}, indent=2))
-    return 0
+    return 3 if harness['aborted'] else 0
 
 
 def grammar_space(faults=False):
@@ -748,7 +794,8 @@ def replay(args):
 
     def sig_of(s, version_prefix=prefix):
         counter[0] += 1
-        res = execute(s, version_prefix, out / ('run-%03d' % counter[0]), args.observer)
+        res = execute(s, version_prefix, out / ('run-%03d' % counter[0]), args.observer,
+                      args.sapi, version_prefix.name.rsplit('-', 1)[0])
         _, steps, found = observe(res, s)
         return sorted({f['sig'] for f in found}), steps
 
@@ -843,6 +890,8 @@ def main():
     parser.add_argument('--version', default='8.4.4')
     parser.add_argument('--feedback', choices=('on', 'off'), default='on')
     parser.add_argument('--observer', choices=('gdb', 'none'), default='gdb')
+    parser.add_argument('--sapi', choices=('cli', 'apache', 'fpm'), default='cli',
+                        help='G5: worker model; apache/fpm use the fast observer only')
     parser.add_argument('--budget', type=float, default=600, help='seconds')
     parser.add_argument('--max-execs', type=int, default=10 ** 6)
     parser.add_argument('--seed', type=int, default=1)
@@ -861,6 +910,8 @@ def main():
     args = parser.parse_args()
     if args.self_test:
         return self_test()
+    if args.sapi != 'cli':
+        args.observer = 'none'
     if args.replay:
         return replay(args)
     return campaign(args)

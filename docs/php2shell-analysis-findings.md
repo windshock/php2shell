@@ -1025,3 +1025,57 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 3. 정답 밀도가 높아 무작위 샘플이 유리하다.
 
 §12.3 가드레일에 따라 **전략 폐기 여부는 사람의 판단 사항**이다. 보완 후보는 code-edge 피드백, 포화 키 감쇠, 길이 페널티다.
+
+### 10.10 v2 G5 — SAPI 프로파일 비교 + FlowFusion 브리지 (2026-10-23)
+
+**SAPI 프로파일** (`linux/explore_sapi.py`, `lifecycle-explore.py --sapi cli|apache|fpm`)
+
+프로파일 구성:
+- **apache:** prefork mod_php, `httpd -X`. 단일 프로세스라 fatal 뒤에도 같은 프로세스가 다음 요청을 처리한다.
+- **fpm:** nginx + FPM `pm.max_children=1`. 워커가 교체되면 잔류가 사라지므로 시퀀스를 끝내고 `worker_lost`로 기록한다(§12.3 워커 교체 대조군).
+- apache·fpm은 빠른 관측기(실패 지점·ASAN·멈춤)만 쓴다.
+
+검증 순서:
+1. 사전 확인: mod_php에서 P16(`ps_files_close`)과 FPM에서 P17(`tmp_var`)을 탐색기 실행기로 재현했다. 둘 다 8.4.27에서 소멸했다.
+2. 첫 배치는 **무효 처리**했다. mod_php에서 Path B 자기 교착 요청이 SIGTERM으로 종료되지 않아 포트를 쥔 httpd가 남았고, 이후 실행이 모두 시작에 실패했다(실행 18건 중 9건이 하네스 오류).
+   - 수정: SIGKILL로 승격하고 포트 해제를 확인하도록 바꿨다. 하네스 오류가 3회 연속이면 캠페인을 중단하고 exit 3으로 끝내며, 오류 수를 summary에 기록한다.
+3. 수정 후 재실행: `explore-g5-20261023T054912-8.4.4`(seed 1, 600s, 동일 hold-out, 4회 모두 하네스 오류 0).
+
+**비교** (`explore-report.py g5 --cutoff 600`. CLI는 G3/G4 seed 1 실행을 600s로 절단):
+
+| 프로파일 | 실행 | 전이 T | 실패 지점 F | Bug S | P16 | P17 | 멈춤 | ASAN 없는 워커 소실 |
+|---|---|---|---|---|---|---|---|---|
+| CLI OFF | 93 | 25 | 4 | 216s | – | 88s | 1 | 0 |
+| CLI ON | 89 | 20 | 3 | 466s | – | – | 7 | 0 |
+| mod_php OFF | 80 | 19 | 4 | 258s | – | 124s | 3 | 0 |
+| mod_php ON | 72 | 20 | 4 | 422s | – | 517s | 10 | 0 |
+| FPM OFF | 109 | 15 | 4 | **–** | **–** | 75s | 0 | **17** |
+| FPM ON | 140 | 15 | 4 | **–** | **–** | 238s | 0 | **16** |
+
+해석:
+- **FPM**에서는 파싱 중 fatal(parse_oom 계열)이 워커를 종료시킨다(§2.7 exit 70과 일치). 마스터가 워커를 교체하면서 잔류가 소멸하므로, 이 시퀀스 모델에서 Bug S·P16은 **구조적으로 도달 불가**다. 런타임 fatal(P17)만 워커가 살아남아 재현된다. 같은 이유로 FPM에서는 멈춤도 0건이다.
+- **mod_php**는 CLI와 같은 생존 모델이다. Path B 자기 교착 멈춤이 가장 많이 관측됐다.
+- P16은 600s 안에 어느 프로파일에서도 재발견되지 않았다. 900s 기준으로는 CLI에서 재발견됐다(§10.9).
+- 피드백 ON 열세는 SAPI와 무관하게 유지됐다(§10.9 결론과 일치).
+
+**FlowFusion 브리지** (`linux/flowfusion-bridge.py`, php/flowfusion `87cde41`을 수정 없이 재사용)
+
+준비:
+- `prepare.py --no-build`로 시드 23,143개(lint 거부 809개), API 지식 DB를 만들었다.
+- php-src 테스트 트리는 원본을 수정하지 않고 사본(`ext/php-src-8.4.4`)을 쓰며, out-of-tree ASAN CLI를 심볼릭 링크로 연결했다.
+
+실행 방식:
+- FlowFusion `--generate`로 생성한 융합 프로그램을 **요청 0**으로 실행한다. 같은 프로세스에서 소비자 요청(progress 업로드 / 파일 없는 업로드 / 세션)을 이어 보내고, gdb로 상태를 관측한다.
+- 판정은 intra_request(요청 0의 메모리 오류 = FlowFusion 고유 영역) / cross_request / carried_state / clean으로 나눈다.
+- exec·네트워크 함수는 차단했다(`disable_functions`, `allow_url_fopen=Off`).
+
+결과 `flowfusion-bridge-20261023T063514-8.4.4-s11`:
+- 100개 프로그램, 전략 9종(dataflow / state / declaration 및 연쇄).
+- 요청 0 정상 응답 92/100. **판정 100/100 clean**: 요청 간 잔류, 불변조건 후보, 메모리 오류 모두 0.
+
+한계:
+- `--INI--` 미적용, FlowFusion의 JIT·opcache 실행 모드 미적용, CLI 서버만.
+- 규모가 100개로 작아, FlowFusion 본래의 대규모 단일 요청 퍼징을 대체하지 않는다.
+- 요청 간 잔류 관점의 **음성 결과는 스코프 한정**(`not_found`)이다.
+
+**G5 판정:** 프로파일 3종을 같은 기준으로 비교했다(하네스 오류 0, `g5 passed=true`). FlowFusion 생성물을 Stage 1 다중 요청 실행에 연결하고 측정까지 마쳤으므로 **통과**다.
