@@ -283,13 +283,18 @@ class EventBP(gdb.Breakpoint):
             out['uri'] = uri.string() if _ptr(uri) else ''
         except Exception as exc:
             out['error'] = str(exc)[:120]
+        try:
+            out['gc_protected'] = int(gdb.parse_and_eval("'zend_gc.c'::gc_globals")['gc_protected'])
+        except Exception:
+            pass
         print('EVENT ' + json.dumps(out))
         sys.stdout.flush()
         return False
 
 StateBP('php_request_startup', 'startup')
 StateBP('php_request_shutdown', 'shutdown')
-for _loc in ('php_var_unserialize_destroy', 'php_var_serialize_destroy', 'php_basic_early_rinit'):
+for _loc in ('php_var_unserialize_destroy', 'php_var_serialize_destroy', 'php_basic_early_rinit',
+             '_zend_bailout'):
     try:
         EventBP(_loc)
     except Exception:
@@ -775,6 +780,11 @@ def observe(result, seq):
             by_step.setdefault(int(match.group(1)), (i, st))
         elif match and st.get('tag') == 'shutdown':
             end_of.setdefault(int(match.group(1)), st)
+    bailouts = {}
+    for ev in result.get('events') or ():
+        match = re.search(r'[?&]step=(\d+)', ev.get('uri') or '')
+        if match and ev.get('name') == '_zend_bailout':
+            bailouts.setdefault(int(match.group(1)), []).append(ev)
     pids = {st.get('pid') for st in states if st.get('pid')}
     if result.get('worker_pid'):
         pids = {int(result['worker_pid'])}
@@ -822,6 +832,15 @@ def observe(result, seq):
             (ended_normally or gc != 'gc_protected')
         if gc_odd:
             keys.add('G:%s|%s' % (step['a'], gc))
+        bails = bailouts.get(idx, [])
+        # A bailout entered while GC is already protected: execution resumed
+        # after an earlier (caught) bailout without restoring the protection
+        # (invariant class of tuning case R49, plan 13.3a).
+        bail_protected = any(ev.get('gc_protected') for ev in bails)
+        if bail_protected:
+            keys.add('G:%s|bailout_while_protected' % step['a'])
+        if len(bails) > 1:
+            keys.add('R:%s|resumed_after_bailout' % step['a'])
         if step['failure_sites'] and step['response'].startswith('s2') and step.get('alive_after'):
             # Error recovery: a fatal/exception path that still completed the
             # request (caught bailout, handler, delayed OOM).
@@ -831,7 +850,8 @@ def observe(result, seq):
             findings.append(dict(sig=asan['sig'], step=idx, summary=asan['summary'],
                                  file=asan['file']))
         steps.append(dict(step, state=state_norm, outcome=outcome, oracle=level,
-                          violations=violations, gc_at_shutdown=gc, gc_unexpected=gc_odd))
+                          violations=violations, gc_at_shutdown=gc, gc_unexpected=gc_odd,
+                          bailouts=len(bails), bailout_while_protected=bail_protected))
     return keys, steps, findings
 
 
@@ -1192,6 +1212,18 @@ def self_test():
                            dict(steps=[{'a': 'parse_oom'}]))
     check('protected GC after a terminating fatal is expected (no G key)',
           not any(k.startswith('G:') for k in keys_b))
+    keys_r, steps_r, _ = observe(dict(steps=[dict(i=0, a='fused', response='s200',
+                                                  failure_sites=['a@f:1', 'oom@f:2'],
+                                                  alive_after=True, asan=None, completed=False)],
+                                      states=[], worker_pid=1,
+                                      events=[dict(name='_zend_bailout', uri='/fused?p=0&step=0',
+                                                   gc_protected=0),
+                                              dict(name='_zend_bailout', uri='/fused?p=0&step=0',
+                                                   gc_protected=1)]),
+                                 dict(steps=[{'a': 'fused', 'p': 0}]))
+    check('second bailout under GC protection -> G bailout_while_protected + R resumed',
+          'G:fused|bailout_while_protected' in keys_r and 'R:fused|resumed_after_bailout' in keys_r
+          and steps_r[0]['bailouts'] == 2)
     check('protected GC at shutdown -> G and R keys',
           'G:fused|gc_protected' in keys_g and 'R:fused|gc_protected' in keys_g
           and steps_g[0]['gc_at_shutdown'] == 'gc_protected')
