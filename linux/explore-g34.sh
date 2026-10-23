@@ -6,6 +6,8 @@
 # Hold-out: the answer pairs of P16 (parse_oom>upload_nofile), Bug S
 # (parse_oom>upload_small) and P17 (runtime_oom>upload_small) are excluded
 # from the initial corpus; the default seeds are benign single requests.
+# EXPLORE_EXTRA (env) is appended to every run, e.g. "--cov" for the
+# code-edge feedback build (Stage 1c).
 # Usage: explore-g34.sh [version] [budget_s] [seeds...]
 set -u
 cd /mnt/c/Users/user/Downloads/php
@@ -23,7 +25,7 @@ for s in $seeds; do
     echo "=== $fb seed=$s -> $out"
     # shellcheck disable=SC2086
     python3 linux/lifecycle-explore.py --version "$version" --feedback "$fb" --seed "$s" \
-      --budget "$budget" --exclude-pairs $holdout --out "$out" > "$out.log" 2>&1
+      --budget "$budget" --exclude-pairs $holdout ${EXPLORE_EXTRA:-} --out "$out" > "$out.log" 2>&1
     echo "exit=$? $(tail -c 400 "$out.log" | tr -d '\n' | cut -c1-300)"
   done
 done

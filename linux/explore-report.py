@@ -99,6 +99,7 @@ def campaign_metrics(d):
                                  for s in e.get('steps', [])))
     return dict(dir=str(d), feedback=summary['feedback'], seed=summary['seed'],
                 execs=summary['execs'], wall_s=summary['wall_s'],
+                code_edges=summary.get('code_edge_coverage'),
                 transitions=len(trans), states=len(states), failure_sites=len(sites),
                 asan_signatures=len(sigs), confirmed_execs=confirmed_execs,
                 execs_per_signature=(round(summary['execs'] / len(sigs), 1) if sigs else None),
@@ -204,7 +205,7 @@ def g4(on_dirs, off_dirs):
             return None
         return dict(mean=round(statistics.mean(vals), 2),
                     min=min(vals), max=max(vals), n=len(vals))
-    keys = ('execs', 'transitions', 'states', 'failure_sites', 'asan_signatures',
+    keys = ('execs', 'code_edges', 'transitions', 'states', 'failure_sites', 'asan_signatures',
             'execs_per_signature', 'time_to_first_valid_finding')
     return dict(gate='G4', on=on, off=off,
                 aggregate={k: dict(on=agg(on, k), off=agg(off, k)) for k in keys})

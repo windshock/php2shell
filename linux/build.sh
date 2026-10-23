@@ -3,7 +3,7 @@ set -euo pipefail
 version=${1:-8.4.4}
 flavor=${2:-asan}
 [[ "$version" =~ ^8\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected stable 8.x.y version'; exit 2; }
-[[ "$flavor" = asan || "$flavor" = normal ]] || exit 2
+[[ "$flavor" = asan || "$flavor" = normal || "$flavor" = cov ]] || exit 2
 base=/home/phplab/php-lab
 source_dir="$base/sources/php-$version"
 build="$base/builds/$version-$flavor"
@@ -22,9 +22,13 @@ mkdir -p "$build"
 cd "$build"
 flags=(-g3 -O2 -fno-omit-frame-pointer)
 options=(--disable-all --enable-cli --enable-fpm --enable-session --without-pear --prefix="$prefix")
-if [ "$flavor" = asan ]; then
+if [ "$flavor" = asan ] || [ "$flavor" = cov ]; then
   flags=(-g3 -O1 -fno-omit-frame-pointer)
   options+=(--enable-debug --enable-address-sanitizer)
+  # cov: identical to asan plus SanitizerCoverage edge guards; with
+  # ASAN_OPTIONS=coverage=1 each process writes <binary>.<pid>.sancov at
+  # exit (Phase 5 v2 Stage 1c code-edge feedback).
+  if [ "$flavor" = cov ]; then flags+=(-fsanitize-coverage=trace-pc-guard); fi
 else
   options+=(--disable-debug)
 fi

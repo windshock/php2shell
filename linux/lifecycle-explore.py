@@ -200,6 +200,7 @@ handle SIGPIPE nostop noprint pass
 handle SIGSEGV nostop noprint pass
 handle SIGBUS nostop noprint pass
 handle SIGABRT nostop noprint pass
+handle SIGINT nostop noprint pass
 set environment ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:symbolize=1:log_path={asan}/asan
 set environment ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer
 set environment USE_ZEND_ALLOC=0
@@ -301,6 +302,22 @@ def asan_signature(path):
                 summary=next((l for l in text.splitlines() if 'SUMMARY' in l), ''))
 
 
+SANCOV_MAGIC64 = 0xC0BFFFFFFFFFFF64
+
+
+def read_sancov(cov_dir):
+    """Covered edge-guard PCs (module offsets) of the php binary."""
+    pcs = set()
+    files = sorted(Path(cov_dir).glob('php.*.sancov')) if Path(cov_dir).exists() else []
+    for path in files:
+        data = path.read_bytes()
+        if len(data) < 8 or int.from_bytes(data[:8], 'little') != SANCOV_MAGIC64:
+            continue
+        for i in range(8, len(data) - 7, 8):
+            pcs.add(int.from_bytes(data[i:i + 8], 'little'))
+    return pcs, len(files)
+
+
 def normalize_state(state, previous):
     """Abstract state id: levels bucketed, pointers null/fresh/carried."""
     if state is None:
@@ -337,7 +354,8 @@ def carried_request_state(norm):
 
 
 class Process:
-    def __init__(self, prefix, out, limit, observer, fault=0, docroot=None, router=None):
+    def __init__(self, prefix, out, limit, observer, fault=0, docroot=None, router=None,
+                 cov=False):
         # docroot/router default to the lab app; flowfusion-bridge.py
         # serves a fused program next to it.
         docroot = docroot or REPO / 'web'
@@ -359,6 +377,13 @@ class Process:
                         ASAN_SYMBOLIZER_PATH='/usr/bin/llvm-symbolizer',
                         USE_ZEND_ALLOC='0', USE_TRACKED_ALLOC='1')
         self.env.pop('ZEND_MM_MAX_ALLOCS', None)
+        self.cov = cov
+        self.cov_dir = out / 'cov'
+        if cov:
+            # Stage 1c: SanitizerCoverage edge guards (cov build); each php
+            # process writes php.<pid>.sancov when it exits normally.
+            self.cov_dir.mkdir(parents=True, exist_ok=True)
+            self.env['ASAN_OPTIONS'] += ':coverage=1:coverage_dir=%s' % self.cov_dir
         fault_line = ''
         if fault:
             self.env['ZEND_MM_MAX_ALLOCS'] = str(fault)
@@ -367,6 +392,9 @@ class Process:
             (out / 'gdb.cmd').write_text(GDB_TEMPLATE.format(
                 asan=out, php=php, ini=out / 'php.ini', port=PORT,
                 docroot=docroot, router=router).replace(
+                    'log_path={0}/asan\n'.format(out),
+                    'log_path={0}/asan{1}\n'.format(
+                        out, ':coverage=1:coverage_dir=%s' % self.cov_dir if cov else '')).replace(
                     'set environment USE_TRACKED_ALLOC=1\n',
                     'set environment USE_TRACKED_ALLOC=1\n' + fault_line))
             self.cmd = ['gdb', '-q', '-batch', '-x', str(out / 'gdb.cmd')]
@@ -402,7 +430,28 @@ class Process:
                 time.sleep(0.3)
         raise RuntimeError('startup timeout')
 
+    def inferior_pid(self):
+        if self.observer != 'gdb':
+            return self.proc.pid if self.proc else None
+        pid = None
+        if (self.out / 'observer.log').exists():
+            for line in (self.out / 'observer.log').read_text(errors='replace').splitlines():
+                match = re.search(r'"pid": (\d+)', line)
+                if line.startswith('STATE ') and match:
+                    pid = int(match.group(1))
+        return pid
+
     def stop(self):
+        if self.cov and self.proc and self.proc.poll() is None:
+            # Graceful CLI-server shutdown (SIGINT handler) so the coverage
+            # dump runs at exit; SIGTERM would skip it.
+            pid = self.inferior_pid()
+            if pid:
+                try:
+                    os.kill(pid, signal.SIGINT)
+                    self.proc.wait(timeout=15)
+                except Exception:
+                    pass
         if self.proc and self.proc.poll() is None:
             try:
                 os.killpg(self.proc.pid, signal.SIGTERM)
@@ -499,14 +548,14 @@ def send(action, step, idx, ctx):
         return 'error:%s' % type(exc).__name__
 
 
-def execute(seq, prefix, out, observer, sapi='cli', version=None):
+def execute(seq, prefix, out, observer, sapi='cli', version=None, cov=False):
     """Run one sequence in one fresh process; return per-step observations."""
     global PORT
     out.mkdir(parents=True, exist_ok=True)
     ctx = dict(sid_big='exbig' + secrets.token_hex(6), sid_small='exsmall' + secrets.token_hex(6))
     if sapi == 'cli':
         PORT = CLI_PORT
-        proc = Process(prefix, out, seq['limit'], observer, seq.get('fault', 0))
+        proc = Process(prefix, out, seq['limit'], observer, seq.get('fault', 0), cov=cov)
     else:
         proc = explore_sapi.make_process(sapi, version, out, seq['limit'],
                                          seq.get('fault', 0), POST_MAX_MB)
@@ -585,8 +634,9 @@ def execute(seq, prefix, out, observer, sapi='cli', version=None):
                     states.append(json.loads(line[6:]))
                 except ValueError:
                     pass
+    edges, cov_files = read_sancov(out / 'cov') if cov else (set(), 0)
     return dict(steps=steps, states=states, elapsed=round(time.time() - started, 2),
-                sapi=sapi, worker_pid=worker)
+                sapi=sapi, worker_pid=worker, edges=edges, cov_files=cov_files)
 
 
 # ------------------------------------------------------------ observation
@@ -645,7 +695,7 @@ def observe(result, seq):
 # ------------------------------------------------------------- campaign
 def campaign(args):
     rng = random.Random(args.seed)
-    prefix = BASE / 'install' / (args.version + '-asan')
+    prefix = BASE / 'install' / (args.version + ('-cov' if args.cov else '-asan'))
     stamp = time.strftime('%Y%m%dT%H%M%S', time.gmtime())
     run_id = 'ex-%s-%s-%s-%s-s%d-%d' % (stamp, args.version, args.sapi, args.feedback,
                                         args.seed, os.getpid())
@@ -658,6 +708,7 @@ def campaign(args):
              if line.strip()] if args.seeds else DEFAULT_SEEDS
     seeds = [s for s in seeds if not (pairs(s) & exclude)]
     corpus, seen_keys, seen_seqs = [], {}, set()
+    seen_edges = set()
     # Harness failures (the target never ran) are counted and stop the
     # campaign after MAX_HARNESS_STREAK in a row - a wedged lab must not be
     # reported as an exploration result.
@@ -678,8 +729,10 @@ def campaign(args):
             execs_log.write(json.dumps(record) + '\n')
             return record
         res = execute(seq, prefix, out_base / ('exec-%04d' % n), args.observer,
-                      args.sapi, args.version)
+                      args.sapi, args.version, args.cov)
         keys, steps, found = observe(res, seq)
+        new_edges = [e for e in res.get('edges', ()) if e not in seen_edges]
+        seen_edges.update(new_edges)
         if any('harness_error' in st for st in steps):
             harness['total'] += 1
             harness['streak'] += 1
@@ -696,6 +749,8 @@ def campaign(args):
                                           step=f['step'], summary=f['summary'],
                                           evidence=f['file'])
         record.update(steps=steps, new_keys=new, elapsed=res['elapsed'],
+                      new_edges=len(new_edges), edges=len(res.get('edges', ())),
+                      cov_files=res.get('cov_files', 0),
                       novel_vs_fixed_matrix=not (len(seq['steps']) == 2 and
                                                  tuple(s['a'] for s in seq['steps']) in fixed_set))
         execs_log.write(json.dumps(record) + '\n')
@@ -707,7 +762,8 @@ def campaign(args):
     for seed in seeds:
         rec = run_one(seed, origin='seed')
         if args.feedback == 'on' and rec.get('grammar_ok'):
-            corpus.append(dict(id=rec['id'], seq=seed, new=len(rec.get('new_keys', [])),
+            corpus.append(dict(id=rec['id'], seq=seed, new=len(rec.get('new_keys', []))
+                               + (1 if rec.get('new_edges') else 0),
                                picked=0, depth=0))
         seen_seqs.add(seq_key(seed))
     while (n < args.max_execs and time.time() - started < args.budget
@@ -728,8 +784,10 @@ def campaign(args):
                 continue
             seen_seqs.add(seq_key(child))
             rec = run_one(child, parent=parent['id'], op=op)
-            if rec.get('new_keys'):
-                corpus.append(dict(id=rec['id'], seq=child, new=len(rec['new_keys']),
+            gain = len(rec.get('new_keys', [])) + (rec.get('new_edges', 0) and
+                                                   1 + int(math.log2(rec['new_edges'])))
+            if gain:
+                corpus.append(dict(id=rec['id'], seq=child, new=gain,
                                    picked=0, depth=parent['depth'] + 1,
                                    parent=parent['id']))
         else:
@@ -753,7 +811,8 @@ def campaign(args):
                    grammar=dict(actions=len(ACTIONS), max_len=MAX_LEN, limits=len(LIMITS),
                                 faults=len(FAULTS) if args.faults else 1,
                                 space_size=grammar_space(args.faults)),
-                   unique_keys=kinds, corpus_size=len(corpus),
+                   unique_keys=kinds, corpus_size=len(corpus), cov=args.cov,
+                   code_edge_coverage=len(seen_edges),
                    harness_errors=harness['total'], aborted=harness['aborted'],
                    findings=findings, time_to_first_valid_finding=(
                        min((f['first_t'] for f in findings.values()), default=None)))
@@ -880,6 +939,14 @@ def self_test():
     check('fault knob validated', validate(dict(limit='8M', fault=7, steps=[{'a': 'health'}]))
           and not validate(dict(limit='8M', fault=30, steps=[{'a': 'health'}])))
     check('grammar space is not enumerable within a budget', grammar_space() > 10 ** 6)
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        blob = SANCOV_MAGIC64.to_bytes(8, 'little') + b''.join(
+            x.to_bytes(8, 'little') for x in (0x1000, 0x2040, 0x1000))
+        (Path(tmp) / 'php.123.sancov').write_bytes(blob)
+        (Path(tmp) / 'php.9.sancov').write_bytes(b'garbage!')
+        pcs, nfiles = read_sancov(tmp)
+    check('sancov parsed, bad magic ignored', pcs == {0x1000, 0x2040} and nfiles == 2)
     print('self_test=%d/%d' % (ok, total))
     return 0 if ok == total else 1
 
@@ -895,6 +962,8 @@ def main():
     parser.add_argument('--budget', type=float, default=600, help='seconds')
     parser.add_argument('--max-execs', type=int, default=10 ** 6)
     parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--cov', action='store_true',
+                        help='Stage 1c: <version>-cov build, SanitizerCoverage edge feedback (CLI)')
     parser.add_argument('--faults', action='store_true',
                         help='Stage 2: allow ZEND_MM_MAX_ALLOCS per sequence (8.4.27+)')
     parser.add_argument('--seeds', help='JSONL of seed sequences (default: benign seeds)')
@@ -912,6 +981,7 @@ def main():
         return self_test()
     if args.sapi != 'cli':
         args.observer = 'none'
+        args.cov = False
     if args.replay:
         return replay(args)
     return campaign(args)
