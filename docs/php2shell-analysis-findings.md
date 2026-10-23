@@ -885,3 +885,28 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 - 이슈 #1의 완료 기준 4개 충족(0건 통과 불가·오진 집계 차단·시드 구분과 기록 일치·실패 전파).
 - 이슈 #2의 Stage 0·1·2 MVP 충족(ground-truth 분별 + 시퀀스 러너 오탐 0 + 오류 지점 지도·주입 실증). Stage 1 SAPI 확장·상태 정규화, Stage 2 AST판, Stage 3·4는 잔여.
 - 신규 경로 발견: 없음(`not_found`, 스코프 한정 유지).
+
+### 10.6 v1.2 — 이슈 #1 후속 리뷰 반영 (2026-10-23, 계획 §12.6.3, **G0**)
+
+| 항목 | 구현 | 검증(픽스처·실측) |
+|---|---|---|
+| P0 ground-truth | 실행마다 `run_id`를 발급하고 하위 러너 3개에 출력 경로(`MATRIX_OUT`, `--summary-out`)와 run_id를 명시 전달(`ls -t` 제거). 종료 코드 수집, 판정은 `linux/ground-truth-eval.py`로 분리. 수정 버전 소멸 = **입력 유효성 ∧ 도달 ∧ 차단 지점 분류 ∧ 메모리 오류 없음** | `ground-truth-eval.py --self-test` **12/12**(하위 러너 rc=139·이전 실행 결과·타 버전 결과·결과 파일 부재 → exit 1, 미도달 입력·생산자 미발생·실효 memory_limit 불일치·소비자 미실행·`no_fatal` 부분문자열·대조군 착지 이상 → exit 2) |
+| 구 판정 결함(추가 발견) | 기존 `ground-truth.sh`는 `'fatal' in str(verdict)`로 판정 → `no_fatal`도 매칭. 8.4.27 P15를 `reached=true, error_triggered=true`로 잘못 기록했다(실제는 fatal 없음 400) | 새 판정에서 8.4.27 P15 `error_triggered=false`, `block_point=delivery_blocked` |
+| P1 퍼저 | `run_failed()`로 결합을 명시(`{crash>0} \|\| {rc∉{0,124}}`), positive control 실패 시 퍼징 전 exit 3 | `fuzz-phase5.sh --self-test` **9/9**. 구식 `A \|\| B && C`에 crash=1·rc=124를 넣으면 실패로 잡히지 않음을 재현 |
+| P1 pathb/patha 러너 | pathb: `/tmp` 고정 경로 → `$outdir/iter-$i.json`, rc∉{0,1}이면 `runner_failed`, run_id·version 불일치는 `foreign_result`. patha: 회차별 `raw-<label>/`로 원시 결과 보존. 두 러너 모두 Apache 런 디렉터리를 `apache-lab-<ver>-path{a,b}-<run_id>`로(R7a 재발 방지). `poc-patha`가 `run_id`·응답 본문·`script_reached` 기록 | `linux/tests/matrix-fixtures.sh` **3/3**(이전 실행 결과 주입 → `foreign_result` exit 1, rc=139 → `runner_failed` exit 1, 동일 구성 2회 → 원시 결과 2개·run_id 일치) |
+| P1 gdb-patha | 판정 = ① fatal 사이트(nNumUsed++ 이후 key 할당) ∧ ② 카운트된 슬롯 key가 할당자 채움 패턴(반복 바이트) ∧ ③ **같은 실행**의 정지 스택이 teardown 프레임을 포함하고 같은 패턴 포인터에서 fault. 일부만 충족하면 `candidate`. GDB 스크립트가 정지 시 `bt`를 자동 기록. 런 디렉터리도 회차별 | `--self-test` **5/5**(임의 비영 포인터·teardown 부재·다른 포인터 fault → `candidate`, 28M 대조 → `not_observed`). 실측 8.4.4: 32M → `counted_uninitialized_bucket_consumed`(key=`0xbe…`, fault `zend_gc_delref(p=0xbebebebebebebebe)` ← `zend_array_destroy`), 28M → `hash_resize`/`not_observed` |
+| P1 fault-site-map | 대상 파일별 present/missing·행 수, 누락 시 `scope_incomplete` exit 2(`--allow-missing`으로만 완화). 출력 디렉터리 타임스탬프화 | `--self-test` **2/2**. 실측: **11/11 파일, 20,255행** — §10.4 수치(44/5/7/13/0)의 분모 확정 |
+
+**G0 재실행 (최종 코드, 순차 실행):**
+
+| 버전 | run_id | P15 | P16 | P17 | 종료 |
+|---|---|---|---|---|---|
+| 8.4.4 | `gt-20261023T025503-8.4.4-385` | 유효·도달·fatal·teardown 메모리 오류 ✓, 대조 pre-counter ✓ | 유효·도달·fatal·UAF ✓ | 유효(실효 16M)·도달·unserialize fatal·UAF ✓ | **0** |
+| 8.4.27 | `gt-20261023T025519-8.4.27-546` | 유효·도달(앱 응답 `{"ok":false}`)·**fatal 없음**·`delivery_blocked` | 유효·도달·fatal 잔존·`consumer_reset` | 유효·도달·fatal 잔존·`consumer_reset` | **0** |
+
+→ 계획 §9.14-5d의 예상 소멸 형태(P15 전달 차단형, P16 소비 지점 리셋형, P17 생산자 잔존+소비 차단형)가 이제 **자동 판정으로** 기록된다. §12.6.2의 Stage 0 "재검증 필요"는 해소됐다.
+
+**증적:** export 후 매니페스트를 재생성했다(`docs/evidence-manifest-20261023-v12.sha256`, 10,699행). WSL에서 `verify-evidence`를 실행한 결과 poc·gdb·manifest 모두 passed, **10,699/10,699 검사**.
+- **경로 주의:** Windows Python으로 실행하면 PoC 증적의 절대 Linux 경로(`/home/phplab/...`)를 찾지 못해 실패한다. 반드시 WSL의 `python3`로 실행해야 한다.
+- **소급 확인:** 20261023 매니페스트는 현 트리 대비 10,457 OK / **1 불일치**다. 불일치 파일 `evidence/fault-site-map/fault-site-map.json`은 이번 작업의 첫 `fault-site-map.py` 실행(출력 경로를 회차별로 바꾸기 전)이 덮어쓴 것으로, R7a와 같은 부류다. 이후 출력 경로를 타임스탬프화했다.
+- **수치 정리:** §10.1의 "7,990"은 v1.1 작업 중간 시점의 수치로 보이며 근거 기록이 남아 있지 않다. 확정 수치는 20261023 매니페스트 10,458행과 이번 v1.2 매니페스트 10,699행이다.

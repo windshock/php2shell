@@ -86,6 +86,9 @@ end
 file /usr/sbin/apache2
 set args -X -f {conf}
 run
+printf "===STOP_BEGIN===\\n"
+bt 12
+printf "===STOP_END===\\n"
 '''
 
 
@@ -107,7 +110,79 @@ def classify_backtrace(bt_text):
     return 'other'
 
 
+def fill_pattern(value):
+    """Repeated-byte value such as ASAN's malloc fill 0xbebebebebebebebe."""
+    try:
+        v = int(value, 16) if isinstance(value, str) else int(value)
+    except (TypeError, ValueError):
+        return None
+    raw = v.to_bytes(8, 'little')
+    return '0x%02x' % raw[0] if v and len(set(raw)) == 1 else None
+
+
+def judge(site_class, bucket, stop_text):
+    """Issue #1 follow-up (plan §12.6 R5): a non-zero key pointer alone is not
+    an uninitialized bucket. The verdict needs, in the same execution:
+      1. the fatal at the key allocation after nNumUsed++ (site),
+      2. the counted slot holding an allocator fill pattern, not a pointer
+         that could be a valid zend_string (pattern),
+      3. teardown consuming that same pattern - the stop stack has a
+         teardown frame and faults on a pointer with the same fill (teardown).
+    Any subset is only a candidate."""
+    site = site_class == 'key_alloc_in_hash_add_or_update' and bool(bucket.get('nNumUsed'))
+    pattern = fill_pattern(bucket.get('key_ptr'))
+    teardown_frames = sorted({name for name in TEARDOWN_FRAMES if name in stop_text})
+    fault_ptrs = re.findall(r'\(p=(0x[0-9a-f]+)\)', stop_text)
+    fault_pattern = next((fill_pattern(ptr) for ptr in fault_ptrs if fill_pattern(ptr)), None)
+    consumed = (bool('SIGSEGV' in stop_text or fault_ptrs) and bool(teardown_frames)
+                and pattern is not None and fault_pattern == pattern)
+    checks = dict(site_after_counter=site, key_fill_pattern=pattern,
+                  teardown_frames=teardown_frames, teardown_fault_pattern=fault_pattern,
+                  teardown_consumes_same_pattern=consumed)
+    if site and pattern and consumed:
+        verdict = 'counted_uninitialized_bucket_consumed'
+    elif site or pattern or consumed:
+        verdict = 'candidate'
+    else:
+        verdict = 'not_observed'
+    return dict(bucket_checks=checks, bucket_verdict=verdict,
+                counted_uninitialized_bucket_observed=verdict ==
+                'counted_uninitialized_bucket_consumed')
+
+
+TEARDOWN_FRAMES = ('zend_array_destroy', 'zend_hash_destroy', 'i_zval_ptr_dtor',
+                   'zend_gc_delref', 'rc_dtor_func')
+
+
+def run_self_test():
+    good_bucket = dict(nNumUsed='1', key_ptr='0xbebebebebebebebe', val_type='190')
+    segv = ('Program received signal SIGSEGV\n#0 zend_gc_delref (p=0xbebebebebebebebe) '
+            'at zend_types.h:1346\n#2 zend_array_destroy (ht=0x6) at zend_hash.c:1839')
+    cases = [
+        ('site + fill pattern + same-pattern teardown fault', 'key_alloc_in_hash_add_or_update',
+         good_bucket, segv, 'counted_uninitialized_bucket_consumed'),
+        ('28M control: resize-site crossing', 'hash_resize', {}, '', 'not_observed'),
+        ('arbitrary non-zero key pointer (old rule passed this)',
+         'key_alloc_in_hash_add_or_update', dict(nNumUsed='1', key_ptr='0x6020000001b0'),
+         segv, 'candidate'),
+        ('no teardown stop in this run', 'key_alloc_in_hash_add_or_update', good_bucket, '',
+         'candidate'),
+        ('teardown fault on a different pointer', 'key_alloc_in_hash_add_or_update',
+         good_bucket, segv.replace('p=0xbebebebebebebebe', 'p=0x0000602000001234'),
+         'candidate'),
+    ]
+    passed = 0
+    for name, site, bucket, stop, want in cases:
+        got = judge(site, bucket, stop)['bucket_verdict']
+        passed += got == want
+        print('%s %s (got %s)' % ('PASS' if got == want else 'FAIL', name, got))
+    print('self_test=%d/%d' % (passed, len(cases)))
+    return 0 if passed == len(cases) else 1
+
+
 def main():
+    if '--self-test' in sys.argv:
+        return run_self_test()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--version', default='8.4.4')
     parser.add_argument('--parts', type=int, default=1000)
@@ -116,9 +191,11 @@ def main():
     parser.add_argument('--seg-pad', type=int, default=0)
     args = parser.parse_args()
 
-    run = BASE / 'evidence' / ('apache-lab-%s-patha-gdb' % args.version)
-    prefix = BASE / 'install' / (args.version + '-apache')
     stamp = time.strftime('%Y%m%dT%H%M%S', time.gmtime())
+    # Per-run Apache directory: a fixed name let reruns overwrite earlier
+    # logs (plan §12.6 R7a).
+    run = BASE / 'evidence' / ('apache-lab-%s-patha-gdb-%s' % (args.version, stamp))
+    prefix = BASE / 'install' / (args.version + '-apache')
     out = BASE / 'evidence' / ('probe-gdb-patha-%s-%s' % (stamp, args.version))
     out.mkdir(parents=True)
 
@@ -196,12 +273,10 @@ def main():
             bucket['notes'] = [line.strip() for line in bucket_match.group(1).splitlines()
                                if 'error' in line][:2]
     report['bucket_observation'] = bucket
-    # The counted-but-uninitialized claim requires: fatal at the key
-    # allocation (:958) AND a bucket slot at nNumUsed-1 with a garbage key.
-    report['counted_uninitialized_bucket_observed'] = bool(
-        report['oom_site_class'] == 'key_alloc_in_hash_add_or_update'
-        and bucket.get('nNumUsed')
-        and bucket.get('key_ptr') not in (None, '0x0'))
+    stop = re.search(r'===STOP_BEGIN===(.*?)===STOP_END===', log_text, re.S)
+    report['stop_backtrace'] = (stop.group(1).strip().splitlines()[:12] if stop else [])
+    report.update(judge(report['oom_site_class'], bucket,
+                        stop.group(1) if stop else ''))
     report['gdb_errors'] = [line.strip() for line in log_text.splitlines()
                             if 'Error in sourced' in line or 'No symbol table' in line][:3]
     asan_reports = sorted(str(p) for p in out.glob('asan.*') if p.is_file())
@@ -210,8 +285,8 @@ def main():
     print(json.dumps({'evidence': report['evidence'],
                       'oom_site_class': report['oom_site_class'],
                       'bucket': bucket,
-                      'counted_uninitialized_bucket_observed':
-                          report['counted_uninitialized_bucket_observed'],
+                      'bucket_verdict': report['bucket_verdict'],
+                      'bucket_checks': report['bucket_checks'],
                       'asan_reports': asan_reports}))
     print(json.dumps(report.get('request', {}), ))
 

@@ -101,6 +101,11 @@ def main():
                              'decoded-string allocation of unserialize()')
     parser.add_argument('--body-mb', type=float, default=14.0)
     parser.add_argument('--iterations', type=int, default=3)
+    parser.add_argument('--run-id', default=None,
+                        help='caller run id recorded in the summary (ground-truth)')
+    parser.add_argument('--summary-out', type=Path, default=None,
+                        help='explicit summary path; callers must not discover '
+                             'it by mtime (issue #1 follow-up)')
     args = parser.parse_args()
 
     summary_runs = []
@@ -131,6 +136,9 @@ def main():
             log = (lab.out / 'php-error.log')
             log_text = log.read_text(errors='replace') if log.exists() else ''
             record['oom_logged'] = 'Allowed memory size of' in log_text
+            # Effective limit as the server enforced it (not the CLI value).
+            limit = re.search(r'Allowed memory size of (\d+) bytes', log_text)
+            record['oom_limit_bytes'] = int(limit.group(1)) if limit else None
             # Issue #1: the producer verdict must attribute the fatal to the
             # /unserialize endpoint (web/index.php, the only userland file in
             # this lab that can fatal), not just to any OOM in the request.
@@ -190,6 +198,7 @@ def main():
 
     reproduced = sum(1 for r in summary_runs if r.get('result') == 'path_c_reproduced')
     summary = dict(scope='local lab trigger PoC; no exploitation attempt',
+                   run_id=args.run_id,
                    version=args.version, target='php-fpm-single-worker',
                    memory_limit=args.memory_limit, body_mb=args.body_mb,
                    iterations=args.iterations, reproduced=reproduced,
@@ -201,13 +210,11 @@ def main():
                                            result=r.get('result'),
                                            summary=(r.get('asan') or {}).get('summary'))
                                       for r in summary_runs])
-    out_dir = lab.out.parent / ('poc-pathc-%s-%s' % (time.strftime(
-        '%Y%m%dT%H%M%S', time.gmtime()), args.version))
     # Evidence already lives in each iteration's probe dir; keep the summary
-    # next to them.
-    (lab.out.parent / ('poc-pathc-summary-%s-%s.json' % (
-        time.strftime('%Y%m%dT%H%M%S', time.gmtime()), args.version))).write_text(
-            json.dumps(summary, indent=2))
+    # next to them unless the caller names the path.
+    summary_path = args.summary_out or (lab.out.parent / ('poc-pathc-summary-%s-%s.json' % (
+        time.strftime('%Y%m%dT%H%M%S', time.gmtime()), args.version)))
+    summary_path.write_text(json.dumps(summary, indent=2))
     print(json.dumps({k: summary[k] for k in ('version', 'iterations',
                                               'reproduced', 'iterations_detail')}, indent=2))
     return 0 if reproduced == args.iterations else 1

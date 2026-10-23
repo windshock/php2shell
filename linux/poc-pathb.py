@@ -223,6 +223,7 @@ def main():
                for index in range(1, args.iterations + 1)]
     reproduced = sum(1 for item in results if item['result'] == 'path_b_reproduced')
     summary = dict(scope='local lab trigger PoC; no exploitation attempt',
+                   run_id=os.environ.get('POC_RUN_ID'),
                    version=args.version, target='apache-mod_php',
                    iterations=args.iterations, reproduced=reproduced,
                    reproduction_rate=round(reproduced / args.iterations, 3),

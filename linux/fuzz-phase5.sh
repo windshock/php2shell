@@ -9,8 +9,60 @@
 #
 # Normal seeds must actually pass unserialize() (verified by the positive
 # control below); malformed variants are deliberately separate seeds.
-# Usage: fuzz-phase5.sh [minutes_per_run] [runs]
+# Usage: fuzz-phase5.sh [minutes_per_run] [runs] | --self-test
+# Exit: 0 = ok, 1 = crash or fuzzer failure, 3 = positive control failed.
 set -u
+
+# Run verdict (issue #1 follow-up, plan §12.6 R2): a crash artifact always
+# fails the run; otherwise any exit other than 0 or 124 (timeout guard) fails.
+# Explicit grouping - `A || B && C` parses as `(A || B) && C` in sh and let
+# crashes with rc=124 pass.
+run_failed() {  # crashes rc
+  { [ "$1" -gt 0 ]; } || { [ "$2" -ne 0 ] && [ "$2" -ne 124 ]; }
+}
+
+# Positive-control gate: every "normal" seed must have passed unserialize().
+control_ok() {  # seed-control.json
+  python3 - "$1" <<'PY'
+import json, sys
+try:
+    out = json.load(open(sys.argv[1]))['positive_control']
+except Exception as exc:
+    print('positive_control=unreadable (%s)' % exc)
+    sys.exit(1)
+failed = sorted(k for k, v in out.items() if v != 'pass')
+print('positive_control_failed=%s' % (','.join(failed) or 'none'))
+sys.exit(1 if failed or not out else 0)
+PY
+}
+
+if [ "${1:-}" = "--self-test" ]; then
+  fails=0
+  check() {  # description expected-failure(0|1) command...
+    local desc=$1 want=$2; shift 2
+    if "$@" >/dev/null 2>&1; then got=0; else got=1; fi
+    if [ "$got" -eq "$want" ]; then echo "PASS $desc"; else echo "FAIL $desc"; fails=$((fails + 1)); fi
+  }
+  # run_failed: success (0) means "the run failed" - expected-failure=0 here
+  # therefore means "flagged as failed".
+  check 'crash with rc=124 is flagged' 0 run_failed 1 124
+  check 'crash with rc=0 is flagged' 0 run_failed 2 0
+  check 'clean rc=0 is not flagged' 1 run_failed 0 0
+  check 'timeout guard rc=124 alone is not flagged' 1 run_failed 0 124
+  check 'rc=1 is flagged' 0 run_failed 0 1
+  tmp=$(mktemp -d)
+  echo '{"positive_control":{"a":"pass","b":"fail"}}' > "$tmp/fail.json"
+  echo '{"positive_control":{"a":"pass","b":"pass"}}' > "$tmp/ok.json"
+  echo '{"positive_control":{}}' > "$tmp/empty.json"
+  check 'one failing seed blocks fuzzing' 1 control_ok "$tmp/fail.json"
+  check 'all seeds passing allows fuzzing' 0 control_ok "$tmp/ok.json"
+  check 'empty control blocks fuzzing' 1 control_ok "$tmp/empty.json"
+  check 'missing control file blocks fuzzing' 1 control_ok "$tmp/none.json"
+  rm -rf "$tmp"
+  echo "self_test_failures=$fails"
+  exit $((fails > 0))
+fi
+
 base=/home/phplab/php-lab
 src="$base/sources/php-8.4.4"
 build="$base/builds/8.4.4-fuzzer"
@@ -81,6 +133,11 @@ foreach ($names as $n) {
 file_put_contents($argv[2], json_encode(["positive_control" => $out]));
 echo "positive_control=" . count(array_keys($out, "pass")) . "/" . count($out) . "\n";
 ' "$outdir/corpus" "$outdir/seed-control.json" || echo 'positive_control=script-error'
+if ! control_ok "$outdir/seed-control.json"; then
+  echo "positive control failed - not fuzzing with an invalid corpus"
+  echo "OUT=$outdir"
+  exit 3
+fi
 
 "$build/sapi/cli/php" "$src/sapi/fuzzer/generate_unserialize_dict.php" \
   > "$outdir/dict/unserialize" 2> "$outdir/dict/gen.log" || true
@@ -113,7 +170,7 @@ open(path, 'w').write(json.dumps(data, indent=2))
 PY
   echo "run=$run rc=$rc timed_out=$timed_out crash_artifacts=$crashes corpus_units=$units executed=$execs"
   tail -4 "$outdir/fuzz-run$run.log"
-  if [ "$crashes" -gt 0 ] || [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then overall_rc=1; fi
+  if run_failed "$crashes" "$rc"; then overall_rc=1; fi
   if [ "$crashes" -gt 0 ]; then
     echo "CRASH ARTIFACTS in $outdir — stopping further runs"
     break

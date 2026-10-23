@@ -63,6 +63,7 @@ def send_request(port, body, boundary, timeout=90):
     started = time.time()
     status = None
     reset = False
+    raw = b''
     try:
         sock = socket.create_connection(('127.0.0.1', port), timeout=timeout)
         sock.settimeout(timeout)
@@ -82,8 +83,10 @@ def send_request(port, body, boundary, timeout=90):
             status = int(match.group(1))
     except (ConnectionResetError, BrokenPipeError, OSError):
         reset = True
+    resp_body = raw.split(b'\r\n\r\n', 1)[1] if b'\r\n\r\n' in raw else b''
     return dict(status=status, connection_reset=reset,
-                elapsed=round(time.time() - started, 2), response_head=raw[:160].decode('latin1', 'replace'))
+                elapsed=round(time.time() - started, 2), response_head=raw[:160].decode('latin1', 'replace'),
+                response_body=resp_body[:200].decode('latin1', 'replace'))
 
 
 def process_alive(pid):
@@ -180,7 +183,8 @@ def main():
                   body_bytes=len(body),
                   amplification=(os.environ.get('POC_MEMORY_LIMIT_BYTES') and
                                  int(os.environ.get('POC_MEMORY_LIMIT_BYTES')) // max(len(body), 1)),
-                  worker_pid=worker_pid)
+                  worker_pid=worker_pid, seg_pad=args.seg_pad,
+                  run_id=os.environ.get('POC_RUN_ID'))
     response = send_request(args.port, body, boundary)
     time.sleep(1.0)
     result.update(response)
@@ -193,7 +197,12 @@ def main():
     fatal = re.search(r'Allowed memory size of (\d+) bytes exhausted at ([^\s]+) '
                       r'\(tried to allocate (\d+) bytes\)', log_text)
     parts_limit = 'Multipart body parts limit' in log_text
-    result.update(oom_logged=bool(fatal), multipart_parts_limit=parts_limit)
+    result.update(oom_logged=bool(fatal), multipart_parts_limit=parts_limit,
+                  log_excerpt=log_text[:400])
+    # The lab /upload handler answers {"ok":false} itself when $_FILES has no
+    # usable part: that body proves userland ran (the request was not
+    # rejected by Apache before PHP) - the extinct verdict needs it.
+    result['script_reached'] = '"ok":' in (result.get('response_body') or '')
     if fatal:
         result.update(oom_limit_bytes=int(fatal.group(1)),
                       oom_site=fatal.group(2),
