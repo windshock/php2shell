@@ -1,0 +1,21 @@
+{
+  "scope": "#4 H2 independent reproduction cases (plan 13.4). Scripts are the verbatim reproducer blocks fetched into linux/corpus/repro/ by fetch-repro.py; they were read before use. Oracle kinds: memory_error = ASAN report or fatal signal; expect = PHPT --EXPECT(F)-- comparison; custom = a named check over the output.",
+  "cases": {
+    "R18": {"source": "bugs #79760", "status": "no_reproducer",
+            "note": "the report has no script (observed while running the Laravel test suite with the default memory limit); a reproducer must be constructed before H2 can judge it"},
+    "R23": {"source": "PR #10283 test gh10026.phpt (local 127.0.0.1 variant; the issue version contacts an external host and is not used)",
+            "script": "R23/github_com_php_php_src_pull_10283.block00.txt", "format": "phpt",
+            "oracle": "expect", "needs": ["soap"]},
+    "R26": {"source": "GH-12073", "script": "R26/github_com_php_php_src_issues_12073.block00.txt",
+            "format": "php", "oracle": "memory_error",
+            "note": "the script sets memory_limit=4875K itself; reported as a shutdown segfault on FPM"},
+    "R35": {"source": "GH-16726", "script": "R35/github_com_php_php_src_issues_16726.block00.txt",
+            "format": "php", "oracle": "memory_error"},
+    "R46": {"source": "PR #22710 test hash_clean_bailout.phpt",
+            "script": "R46/github_com_php_php_src_pull_22710.block00.txt", "format": "phpt",
+            "oracle": "memory_error"},
+    "R49": {"source": "GH-24361", "script": "R49/github_com_php_php_src_issues_24361.block00.txt",
+            "format": "php", "oracle": "custom", "custom": "gc_protected_after_compile_error",
+            "needs": ["opcache"]}
+  }
+}

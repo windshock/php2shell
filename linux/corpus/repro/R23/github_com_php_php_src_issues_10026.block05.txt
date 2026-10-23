@@ -1,0 +1,5 @@
+<?php
+var_dump(gc_status()['protected']);   // bool(false)
+$c = new SoapClient(null, ['location' => 'http://127.0.0.1:9/nope', 'uri' => 'urn:x']);
+try { $c->anyMethod(); } catch (Throwable $e) { /* SoapFault: Could not connect to host */ }
+var_dump(gc_status()['protected']);   // bool(false)

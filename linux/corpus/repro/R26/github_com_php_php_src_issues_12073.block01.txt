@@ -1,0 +1,10 @@
+#0  zend_mm_free_heap (ptr=0x7631, heap=0x7ff6cb600040) at /usr/src/php/Zend/zend_alloc.c:1366
+#1  _efree (ptr=0x7631) at /usr/src/php/Zend/zend_alloc.c:2551
+#2  0x0000559226f12314 in destroy_op_array (op_array=0x7ff6639fc778) at /usr/src/php/Zend/zend_opcode.c:475
+#3  0x0000559226f94ec9 in zend_closure_free_storage (object=0x7ff6639fc740) at /usr/src/php/Zend/zend_closures.c:490
+#4  0x0000559226fa45aa in zend_objects_store_free_object_storage (objects=objects@entry=0x559227c220c8 <executor_globals+840>, 
+    fast_shutdown=fast_shutdown@entry=true) at /usr/src/php/Zend/zend_objects_API.c:104
+#5  0x0000559226f0df3f in shutdown_executor () at /usr/src/php/Zend/zend_execute_API.c:339
+#6  0x0000559226f1d4a9 in zend_deactivate () at /usr/src/php/Zend/zend.c:1239
+#7  0x0000559226eb8559 in php_request_shutdown (dummy=dummy@entry=0x0) at /usr/src/php/main/main.c:1854
+#8  0x0000559226c42b8a in main (argc=<optimized out>, argv=<optimized out>) at /usr/src/php/sapi/fpm/fpm/fpm_main.c:1942

@@ -1,0 +1,53 @@
+<?php
+
+class A
+{
+	public $b;
+}
+
+class B
+{
+	public $a;
+}
+
+function buildCycle()
+{
+	$a = new A();
+	$b = new B();
+	$a->b = $b;
+	$b->a = $a;
+}
+
+function failySoapCall()
+{
+
+	try {
+		new SoapClient('https://nowhere.inexistent.space/?WSDL');
+	}
+	catch (Exception) {
+		echo "Soap call failed\n";
+	}
+}
+
+function gc()
+{
+	gc_collect_cycles();
+	echo "GC Runs: " . gc_status()['runs'] . "\n";
+}
+
+
+buildCycle();
+gc();
+buildCycle();
+gc();
+buildCycle();
+gc();
+
+failySoapCall();
+
+buildCycle();
+gc();
+buildCycle();
+gc();
+buildCycle();
+gc();

@@ -1,0 +1,10 @@
+<?php
+$f = tempnam(sys_get_temp_dir(), 'wsdl');
+file_put_contents($f, 'not a wsdl at all');
+
+var_dump(gc_status()['protected']);   // bool(false)
+try { new SoapClient($f); } catch (Throwable $e) { echo get_class($e), ": ", $e->getMessage(), "\n"; }
+var_dump(gc_status()['protected']);   // bool(true)
+
+gc_disable(); gc_enable();
+var_dump(gc_status()['protected']);   // bool(true) — still protected

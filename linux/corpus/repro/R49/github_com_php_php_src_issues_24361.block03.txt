@@ -1,0 +1,3 @@
+PHP 8.7.0-dev (cli) (NTS DEBUG), master 0b4a5a84492
+PHP 8.4.28-dev (cli) (NTS), PHP-8.4 81fd6105bc6
+PHP 8.3.36-dev (cli) (NTS), PHP-8.3 9c6ad6caeeb

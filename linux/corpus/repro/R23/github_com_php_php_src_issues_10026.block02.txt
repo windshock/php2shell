@@ -1,0 +1,7 @@
+GC Runs: 1
+GC Runs: 2
+GC Runs: 3
+Soap call failed
+GC Runs: 4
+GC Runs: 5
+GC Runs: 6

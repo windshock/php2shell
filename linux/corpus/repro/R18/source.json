@@ -1,0 +1,13 @@
+{
+  "record": "R18",
+  "label": "[bugs #79760](https://bugs.php.net/bug.php?id=79760)",
+  "fetched_at": "2026-10-23T13:14:58Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=79760",
+      "blocks": 1,
+      "kind": "bug",
+      "title": "PHP :: Bug #79760 :: Potential use after free if memory limit hit during GC"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "record": "R23",
+  "label": "[Issue #10026](https://github.com/php/php-src/issues/10026), [PR #10283](https://github.com/php/php-src/pull/10283), [PR #24338](https://github.com/php/php-src/pull/24338)",
+  "fetched_at": "2026-10-23T13:15:05Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/10026",
+      "blocks": 6,
+      "kind": "issue",
+      "title": "Garbage collection stops after exception in SoapClient"
+    },
+    {
+      "url": "https://github.com/php/php-src/pull/10283",
+      "blocks": 1,
+      "kind": "pr",
+      "title": "Fix GH-10026: Garbage collection stops after exception in SoapClient",
+      "head": "dc4f6e797a6922fdd7f89d9fb0cc708166e2a34e"
+    },
+    {
+      "url": "https://github.com/php/php-src/pull/24338",
+      "blocks": 3,
+      "kind": "pr",
+      "title": "Fix GH-10026: Garbage collection stops after exception in SoapClient",
+      "head": "9d761842590cb46b66a7fb95edbe1d4e1633749b"
+    }
+  ]
+}

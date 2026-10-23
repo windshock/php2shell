@@ -1,0 +1,54 @@
+<?php
+
+class Wrapper {
+
+	private $cb;
+
+	public function __construct( callable $cb ) {
+		$this->cb = $cb;
+	}
+}
+
+class Dep {
+	public function test() {
+		echo "test";
+	}
+}
+
+class ClosureTest {
+
+	public function __construct(
+		private Dep $dep,
+		private Dep $dep2,
+		private Dep $dep3,
+		private Dep $dep4,
+		private Dep $dep5,
+		private Dep $dep6
+	) {
+	}
+
+	private function output( $i, $k ) {
+		echo $i . $k;
+	}
+
+	function create( int $i, int $k = 213 ) {
+		return new Wrapper( function ( $j ) use ( $k ) {
+			$this->output( $j, $k );
+
+			$this->dep->test();
+			$this->dep2->test();
+			$this->dep3->test();
+			$this->dep4->test();
+			$this->dep5->test();
+			$this->dep6->test();
+		} );
+	}
+}
+
+ini_set( 'memory_limit', '4875K' );
+
+$test = new ClosureTest( new Dep(), new Dep(), new Dep(), new Dep(), new Dep(), new Dep() );
+for ( $i = 0; $i < 10_000; $i++ ) {
+	$$i = $test->create( $i );
+}
+

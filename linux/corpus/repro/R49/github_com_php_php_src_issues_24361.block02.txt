@@ -1,0 +1,10 @@
+bool(false)
+
+Fatal error: 'break' not in the 'loop' or 'switch' context in /tmp/bad.php on line 2
+Stack trace:
+#0 /path/to/test.php(8): opcache_compile_file('/tmp/bad.php')
+#1 {main}
+bool(false)
+bool(false)
+int(9999)
+int(99999)

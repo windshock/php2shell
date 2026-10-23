@@ -1,0 +1,13 @@
+<?php
+$bad = sys_get_temp_dir() . "/bad.php";
+file_put_contents($bad, "<?php\nbreak 2;\n");
+
+class Node { public $self; }
+
+var_dump(gc_status()["protected"]);
+var_dump(@opcache_compile_file($bad));
+var_dump(gc_status()["protected"]);
+
+for ($i = 0; $i < 100000; $i++) { $o = new Node; $o->self = $o; }
+var_dump(gc_collect_cycles());
+var_dump(gc_status()["collected"]);

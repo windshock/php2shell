@@ -1,0 +1,13 @@
+{
+  "record": "R26",
+  "label": "[Issue #12073](https://github.com/php/php-src/issues/12073)",
+  "fetched_at": "2026-10-23T13:15:06Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/12073",
+      "blocks": 2,
+      "kind": "issue",
+      "title": "Segmentation fault during request shutdown when memory limit is exceeded during closure initialization"
+    }
+  ]
+}

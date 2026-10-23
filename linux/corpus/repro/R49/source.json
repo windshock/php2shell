@@ -1,0 +1,13 @@
+{
+  "record": "R49",
+  "label": "[Issue #24361](https://github.com/php/php-src/issues/24361), [php.bugs 보존본](https://news-web.php.net/php.bugs/253005)",
+  "fetched_at": "2026-10-23T13:15:09Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/24361",
+      "blocks": 4,
+      "kind": "issue",
+      "title": "opcache_compile_file() on a file with a fatal compile error disables the cycle collector for the rest of the request"
+    }
+  ]
+}

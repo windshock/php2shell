@@ -1,0 +1,25 @@
+Description:
+------------
+If a get_gc handler triggers the memory limit after the GC has decremented refcounts, we may end up freeing objects early.
+
+For example, running Laravel tests on master with default memory limit results in:
+
+php: /home/nikic/php/php-src-asan/Zend/zend_types.h:1162: zend_gc_delref: Assertion `p->refcount > 0' failed.
+
+with the following backtrace fragment from the _zend_bailout:
+
+#15 0x0000555556c5b818 in zend_std_get_properties (zobj=0x7fffe7992c08)
+    at /home/nikic/php/php-src-asan/Zend/zend_object_handlers.c:110
+#16 0x0000555556358910 in reflection_get_gc (obj=0x7fffe7992c08, gc_data=0x7fffffff8bd0, 
+    gc_data_count=0x7fffffff8b80)
+    at /home/nikic/php/php-src-asan/ext/reflection/php_reflection.c:275
+#17 0x0000555556c1f296 in gc_mark_grey (ref=0x7fffe7992c08, stack=0x7fffffff8d10)
+    at /home/nikic/php/php-src-asan/Zend/zend_gc.c:827
+#18 0x0000555556c20335 in gc_mark_roots (stack=0x7fffffff8d10)
+    at /home/nikic/php/php-src-asan/Zend/zend_gc.c:979
+#19 0x0000555556c23c23 in zend_gc_collect_cycles ()
+    at /home/nikic/php/php-src-asan/Zend/zend_gc.c:1464
+
+Not sure how to fix this.
+
+

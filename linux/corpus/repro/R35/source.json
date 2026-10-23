@@ -1,0 +1,13 @@
+{
+  "record": "R35",
+  "label": "[Issue #16726](https://github.com/php/php-src/issues/16726)",
+  "fetched_at": "2026-10-23T13:15:06Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/16726",
+      "blocks": 2,
+      "kind": "issue",
+      "title": "Heap Use-After-Free (UAF) Bug in PHP"
+    }
+  ]
+}

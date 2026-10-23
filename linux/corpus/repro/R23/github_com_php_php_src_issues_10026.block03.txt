@@ -1,0 +1,17 @@
+ ext/soap/soap.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/ext/soap/soap.c b/ext/soap/soap.c
+index de29917cd8..5b02f74ba9 100644
+--- a/ext/soap/soap.c
++++ b/ext/soap/soap.c
+@@ -124,7 +124,8 @@ static void soap_error_handler(int error_num, zend_string *error_filename, const
+ 	SOAP_GLOBAL(soap_version) = _old_soap_version;\
+ 	if (_bailout) {\
+ 		zend_bailout();\
+-	}
++	}\
++	gc_protect(0);
+ 
+ #define FETCH_THIS_SDL(ss) \
+ 	{ \

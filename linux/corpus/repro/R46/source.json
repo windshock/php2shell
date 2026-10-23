@@ -1,0 +1,14 @@
+{
+  "record": "R46",
+  "label": "[PR #22710](https://github.com/php/php-src/pull/22710)",
+  "fetched_at": "2026-10-23T13:15:08Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/pull/22710",
+      "blocks": 1,
+      "kind": "pr",
+      "title": "Fix use-after-free when a destructor bails out during zend_hash_clean()",
+      "head": "07eca44b4efb35685e4c0653fc5369281f65259e"
+    }
+  ]
+}
