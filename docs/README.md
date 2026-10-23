@@ -9,9 +9,9 @@ PHP2Shell 분석 산출물의 읽는 순서와 역할입니다.
 | [php2shell-analysis-plan.md](php2shell-analysis-plan.md) | 분석 수행자 | 단계별 계획, 판정 어휘, 외부 연구 방법론 통합표, Phase 4~5(§11 신규 경로 탐색, §12 이슈 반영) 규칙 |
 | [linux-environment.md](linux-environment.md) | 인프라·랩 운영 | WSL2/ASAN/FPM 빌드·검증 환경과 증적 수집 |
 | [php2shell-llm-handoff.md](php2shell-llm-handoff.md) | 후속 담당자 | 인수인계, 검토 지적별 처리 내역, 모니터링 이력 |
-| [evidence-manifest-20261023-final.sha256](evidence-manifest-20261023-final.sha256) | 검증 담당자 | 증적 SHA-256 목록(최신 31,821행, 원본은 `var/linux-evidence/`; 과거 스냅샷 20261021·20261022·20261023·-v12·-g2·-g4·-g5 보관). 검증은 WSL `python3`로(PoC 증적이 Linux 절대 경로 참조) |
+| [evidence-manifest-20261023-v21.sha256](evidence-manifest-20261023-v21.sha256) | 검증 담당자 | 증적 SHA-256 목록(최신 46,172행, 원본은 `var/linux-evidence/`; 과거 스냅샷 20261021·20261022·20261023·-v12·-g2·-g4·-g5·-final 보관). 검증은 WSL `python3`로(PoC 증적이 Linux 절대 경로 참조) |
 
-> 기준 시점: 2026-10-23(Phase 5 v2 G0~G5 + 1c·Stage 4 보완, 계획 §12.6.6·findings §10.6~10.11). 증적 감사는 `python3 linux/verify-evidence.py --root var/linux-evidence`, 검증기 자가 테스트는 `--self-test`.
+> 기준 시점: 2026-10-23(Phase 5 v2.1 재도출 완료, 계획 §13.8·findings §10.12; #4 코퍼스는 `docs/historical-corpus.md`). 증적 감사는 `python3 linux/verify-evidence.py --root var/linux-evidence`, 검증기 자가 테스트는 `--self-test`.
 
 ## 도구 위치
 
