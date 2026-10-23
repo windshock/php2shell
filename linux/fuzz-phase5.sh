@@ -139,8 +139,12 @@ if ! control_ok "$outdir/seed-control.json"; then
   exit 3
 fi
 
-"$build/sapi/cli/php" "$src/sapi/fuzzer/generate_unserialize_dict.php" \
-  > "$outdir/dict/unserialize" 2> "$outdir/dict/gen.log" || true
+# generate_unserialize_dict.php writes to __DIR__/dict/unserialize, not to
+# stdout: run a copy inside the evidence dir so the pristine source tree is
+# never written (it previously left sapi/fuzzer/dict/unserialize there and
+# the empty stdout capture looked like a failed dictionary - plan §12.6.6).
+cp "$src/sapi/fuzzer/generate_unserialize_dict.php" "$outdir/generate_unserialize_dict.php"
+"$build/sapi/cli/php" "$outdir/generate_unserialize_dict.php" > "$outdir/dict/gen.log" 2>&1 || true
 dict_arg=""
 dict_ok=false
 if [ -s "$outdir/dict/unserialize" ]; then dict_arg="-dict=$outdir/dict/unserialize"; dict_ok=true; fi
