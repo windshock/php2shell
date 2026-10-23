@@ -1,0 +1,88 @@
+diff --git a/Zend/zend_gc.c b/Zend/zend_gc.c
+index fbe46a43..699225f3 100644
+--- a/Zend/zend_gc.c
++++ b/Zend/zend_gc.c
+@@ -276,6 +276,9 @@ typedef struct _zend_gc_globals {
+ 	zend_fiber *dtor_fiber;
+ 	bool dtor_fiber_running;
+ 
++	bool cg_reported;			/* CoreGuard: event already raised in this request */
++	bool cg_pending;			/* CoreGuard enforce: terminate at next interrupt */
++
+ #if GC_BENCH
+ 	uint32_t root_buf_length;
+ 	uint32_t root_buf_peak;
+@@ -533,6 +536,8 @@ void gc_globals_dtor(void)
+ 
+ void gc_reset(void)
+ {
++	GC_G(cg_reported) = 0;
++	GC_G(cg_pending) = 0;
+ 	if (GC_G(buf)) {
+ 		GC_G(gc_active) = 0;
+ 		GC_G(gc_protected) = 0;
+@@ -696,12 +701,64 @@ static zend_never_inline void ZEND_FASTCALL gc_possible_root_when_full(zend_refc
+ 	GC_BENCH_PEAK(root_buf_peak, root_buf_length);
+ }
+ 
++/* CoreGuard Phase 2b (lab experiment, docs/coreguard/phase2b-design.md).
++ * Invariant: after a bailout, execution does not continue with the cycle
++ * collector protected. _zend_bailout() sets gc_protect(1) because the heap
++ * may be inconsistent; if a zend_try site catches the bailout and execution
++ * resumes, roots are silently refused and cycles are never collected.
++ * Detection point: a root refused while protected, outside shutdown, after
++ * a bailout in this request, not caused by root-buffer overflow.
++ * COREGUARD_MODE=disabled (default) | observe (log) | enforce (log, then end
++ * the request at the next opcode boundary via the VM interrupt - the same
++ * safe point max_execution_time uses). Protection is never lifted. */
++static int cg_mode = -1;
++static void (*cg_prev_interrupt)(zend_execute_data *execute_data);
++
++
++static void cg_interrupt(zend_execute_data *execute_data)
++{
++	if (GC_G(cg_pending)) {
++		GC_G(cg_pending) = 0;
++		zend_error_noreturn(E_ERROR, "CoreGuard: execution resumed after a caught bailout "
++			"with the cycle collector protected; request terminated");
++	}
++	if (cg_prev_interrupt) {
++		cg_prev_interrupt(execute_data);
++	}
++}
++
++static ZEND_COLD void cg_gc_refused(void)
++{
++	if (cg_mode < 0) {
++		const char *m = getenv("COREGUARD_MODE");
++		cg_mode = (m && !strcmp(m, "enforce")) ? 2 : (m && !strcmp(m, "observe")) ? 1 : 0;
++	}
++	if (!cg_mode || GC_G(cg_reported) || GC_G(gc_full)
++			|| (EG(flags) & EG_FLAGS_IN_SHUTDOWN) || !CG(unclean_shutdown)
++			|| !EG(current_execute_data)) {
++		return;
++	}
++	GC_G(cg_reported) = 1;
++	fprintf(stderr, "COREGUARD event=gc_protected_after_caught_bailout mode=%s pid=%d\n",
++		cg_mode == 2 ? "enforce" : "observe", (int) getpid());
++	fflush(stderr);
++	if (cg_mode == 2) {
++		if (zend_interrupt_function != cg_interrupt) {
++			cg_prev_interrupt = zend_interrupt_function;
++			zend_interrupt_function = cg_interrupt;
++		}
++		GC_G(cg_pending) = 1;
++		zend_atomic_bool_store_ex(&EG(vm_interrupt), true);
++	}
++}
++
+ ZEND_API void ZEND_FASTCALL gc_possible_root(zend_refcounted *ref)
+ {
+ 	uint32_t idx;
+ 	gc_root_buffer *newRoot;
+ 
+ 	if (UNEXPECTED(GC_G(gc_protected))) {
++		cg_gc_refused();
+ 		return;
+ 	}
+ 
