@@ -82,6 +82,7 @@ ACTIONS = {
     'abort_big': {},
 }
 FUSED_POOL = None  # set by --fused-pool: directory made by linux/fused-pool.py
+OPCACHE = False  # set by --opcache: load the shared opcache zend_extension
 FUSED_SANDBOX = ('disable_functions=exec,shell_exec,system,passthru,proc_open,popen,'
                  'pcntl_exec,mail,fsockopen,pfsockopen,stream_socket_client,'
                  'stream_socket_server,socket_create,socket_connect,curl_exec,'
@@ -259,6 +260,12 @@ class StateBP(gdb.Breakpoint):
                        modules_activated=int(pg['modules_activated']))
         except Exception as exc:
             out['error'] = str(exc)[:200]
+        try:
+            gc = gdb.parse_and_eval("'zend_gc.c'::gc_globals")
+            out.update(gc_enabled=int(gc['gc_enabled']), gc_active=int(gc['gc_active']),
+                       gc_protected=int(gc['gc_protected']), gc_runs=int(gc['gc_runs']))
+        except Exception as exc:
+            out['gc_error'] = str(exc)[:120]
         print('STATE ' + json.dumps(out))
         sys.stdout.flush()
         return False
@@ -387,6 +394,30 @@ def normalize_state(state, previous):
     return ','.join(parts)
 
 
+def gc_state(state):
+    """GC state at request shutdown: normal = enabled, not running, not
+    protected. Anything else is unexpected at the end of a request."""
+    if not state or 'gc_protected' not in state:
+        return 'gc_unobserved'
+    odd = [name for name, bad in (('protected', state['gc_protected']),
+                                  ('active', state['gc_active']),
+                                  ('disabled', not state['gc_enabled'])) if bad]
+    return 'gc_' + '+'.join(odd) if odd else 'gc_normal'
+
+
+# Feedback 'state' (plan §13.3a): weight per new key kind. Code edges and
+# step-outcome text are not rewarded beyond 1.
+STATE_WEIGHTS = dict(G=4, R=4, A=4, H=2)
+
+
+def feedback_gain(mode, rec):
+    new = rec.get('new_keys', [])
+    if mode == 'state':
+        return sum(STATE_WEIGHTS.get(k[0], 3 if k[0] == 'S' and 'carried' in k else 1)
+                   for k in new)
+    return len(new) + (rec.get('new_edges', 0) and 1 + int(math.log2(rec['new_edges'])))
+
+
 def carried_request_state(norm):
     """Invariant: request-owned state must not be live at the next startup."""
     if norm in ('unobserved', 'observer_error'):
@@ -419,6 +450,11 @@ class Process:
                 'session.save_path=%s\nupload_tmp_dir=%s\nerror_log=%s\n'
                 % (limit, POST_MAX_MB, out / 'sessions', out / 'uploads',
                    out / 'php-error.log'))
+        if OPCACHE:
+            so = sorted(prefix.glob('lib/php/extensions/*/opcache.so'))
+            if not so:
+                raise SystemExit('--opcache: no opcache.so under %s' % prefix)
+            ini += 'zend_extension=%s\nopcache.enable=1\nopcache.enable_cli=1\n' % so[0]
         (out / 'php.ini').write_text(ini)
         php = prefix / 'bin/php'
         self.env = os.environ.copy()
@@ -730,11 +766,13 @@ def execute(seq, prefix, out, observer, sapi='cli', version=None, cov=False):
 def observe(result, seq):
     """Derive per-step normalized state, outcome and feedback keys."""
     states = result['states']
-    by_step = {}
+    by_step, end_of = {}, {}
     for i, st in enumerate(states):
         match = re.search(r'[?&]step=(\d+)', st.get('uri') or '')
         if match and st.get('tag') == 'startup':
             by_step.setdefault(int(match.group(1)), (i, st))
+        elif match and st.get('tag') == 'shutdown':
+            end_of.setdefault(int(match.group(1)), st)
     pids = {st.get('pid') for st in states if st.get('pid')}
     if result.get('worker_pid'):
         pids = {int(result['worker_pid'])}
@@ -773,12 +811,19 @@ def observe(result, seq):
         keys.add('T:%s|%s|%s' % (state_norm, step['a'], outcome))
         for s in step['failure_sites']:
             keys.add('F:' + s)
+        gc = gc_state(end_of.get(idx))
+        if gc not in ('gc_unobserved', 'gc_normal'):
+            keys.add('G:%s|%s' % (step['a'], gc))
+        if step['failure_sites'] and step['response'].startswith('s2') and step.get('alive_after'):
+            # Error recovery: a fatal/exception path that still completed the
+            # request (caught bailout, handler, delayed OOM).
+            keys.add('R:%s|%s' % (step['a'], gc))
         if attributed:
             keys.add('A:' + asan['sig'])
             findings.append(dict(sig=asan['sig'], step=idx, summary=asan['summary'],
                                  file=asan['file']))
         steps.append(dict(step, state=state_norm, outcome=outcome, oracle=level,
-                          violations=violations))
+                          violations=violations, gc_at_shutdown=gc))
     return keys, steps, findings
 
 
@@ -870,14 +915,16 @@ def campaign(args):
     # Seeds always run first (both modes) so the budgets compare like for like.
     for seed in seeds:
         rec = run_one(seed, origin='seed')
-        if args.feedback == 'on' and rec.get('grammar_ok'):
-            corpus.append(dict(id=rec['id'], seq=seed, new=len(rec.get('new_keys', []))
-                               + (1 if rec.get('new_edges') else 0),
+        if args.feedback in ('on', 'state') and rec.get('grammar_ok'):
+            corpus.append(dict(id=rec['id'], seq=seed,
+                               new=(feedback_gain('state', rec) if args.feedback == 'state'
+                                    else len(rec.get('new_keys', []))
+                                    + (1 if rec.get('new_edges') else 0)),
                                picked=0, depth=0))
         seen_seqs.add(seq_key(seed))
     while (n < args.max_execs and time.time() - started < args.budget
            and not harness['aborted']):
-        if args.feedback == 'on' and corpus:
+        if args.feedback in ('on', 'state') and corpus:
             weights = [(1.0 + e['new']) / (1.0 + e['picked']) ** 0.5 for e in corpus]
             parent = rng.choices(corpus, weights=weights, k=1)[0]
             parent['picked'] += 1
@@ -893,8 +940,7 @@ def campaign(args):
                 continue
             seen_seqs.add(seq_key(child))
             rec = run_one(child, parent=parent['id'], op=op)
-            gain = len(rec.get('new_keys', [])) + (rec.get('new_edges', 0) and
-                                                   1 + int(math.log2(rec['new_edges'])))
+            gain = feedback_gain(args.feedback, rec)
             if gain:
                 corpus.append(dict(id=rec['id'], seq=child, new=gain,
                                    picked=0, depth=parent['depth'] + 1,
@@ -916,7 +962,7 @@ def campaign(args):
                    budget_s=args.budget,
                    max_execs=args.max_execs, execs=n, wall_s=round(time.time() - started, 1),
                    excluded_pairs=sorted('>'.join(p) for p in exclude),
-                   faults=args.faults,
+                   faults=args.faults, opcache=OPCACHE,
                    fused_pool=(dict(dir=str(FUSED_POOL), programs=len(ACTIONS['fused']['p']),
                                     pool_json_sha256=hashlib.sha256(
                                         (FUSED_POOL / 'pool.json').read_bytes()).hexdigest())
@@ -1119,6 +1165,22 @@ def self_test():
                                                    asan=dict(sig='x:y', pid=1, summary='', file='f'))],
                                        states=[], worker_pid=4242), dict(steps=[{'a': 'health'}]))
     check('ASAN of another pid -> not confirmed', not found_o)
+    check('gc state: normal / protected / unobserved',
+          gc_state(dict(gc_enabled=1, gc_active=0, gc_protected=0)) == 'gc_normal'
+          and gc_state(dict(gc_enabled=1, gc_active=0, gc_protected=1)) == 'gc_protected'
+          and gc_state(dict(ser_level=0)) == 'gc_unobserved')
+    keys_g, steps_g, _ = observe(dict(steps=[dict(i=0, a='fused', p=1, response='s200',
+                                                  failure_sites=['x@f:1'], alive_after=True,
+                                                  asan=None)],
+                                      states=[dict(tag='shutdown', uri='/fused?p=1&step=0',
+                                                   gc_enabled=1, gc_active=0, gc_protected=1)],
+                                      worker_pid=1), dict(steps=[{'a': 'fused', 'p': 1}]))
+    check('protected GC at shutdown -> G and R keys',
+          'G:fused|gc_protected' in keys_g and 'R:fused|gc_protected' in keys_g
+          and steps_g[0]['gc_at_shutdown'] == 'gc_protected')
+    check('state gain weights G/R over T',
+          feedback_gain('state', dict(new_keys=['G:x', 'T:y'])) == 5
+          and feedback_gain('state', dict(new_keys=['S:ps_id=carried'])) == 3)
     print('self_test=%d/%d' % (ok, total))
     return 0 if ok == total else 1
 
@@ -1127,7 +1189,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--version', default='8.4.4')
-    parser.add_argument('--feedback', choices=('on', 'off'), default='on')
+    parser.add_argument('--feedback', choices=('on', 'off', 'state'), default='on',
+                        help="on = v2 key+edge gain; state = plan 13.3a redesign "
+                             "(GC state, error recovery, carried ownership weighted)")
     parser.add_argument('--observer', choices=('gdb', 'none'), default='gdb')
     parser.add_argument('--sapi', choices=('cli', 'apache', 'fpm'), default='cli',
                         help='G5: worker model; apache/fpm use the fast observer only')
@@ -1135,6 +1199,8 @@ def main():
     parser.add_argument('--max-execs', type=int, default=10 ** 6)
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--fused-pool', help='#4 H2.5: FlowFusion pool dir (fused action, CLI)')
+    parser.add_argument('--opcache', action='store_true',
+                        help='load the shared opcache zend_extension (asanext flavor)')
     parser.add_argument('--flavor', default='asan', help='build flavor (asan, asanext)')
     parser.add_argument('--cov', action='store_true',
                         help='Stage 1c: <version>-cov build, SanitizerCoverage edge feedback (CLI)')
@@ -1160,6 +1226,8 @@ def main():
         if args.sapi != 'cli':
             parser.error('--fused-pool needs --sapi cli')
         enable_fused(args.fused_pool)
+    global OPCACHE
+    OPCACHE = bool(getattr(args, 'opcache', False))
     if args.replay:
         return replay(args)
     return campaign(args)

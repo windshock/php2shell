@@ -97,19 +97,8 @@ CUSTOM = {
 }
 
 
-def run_case(rid, case, version, flavor, root):
-    out = root / rid / version
-    out.mkdir(parents=True, exist_ok=True)
-    rec = dict(record=rid, version=version, flavor=flavor, source=case.get('source'))
-    if case.get('status') in ('no_reproducer', 'excluded_weaponized'):
-        # Never run: no script, or the only code is a weaponized exploit
-        # (outside the safety boundary).
-        rec.update(verdict=case['status'], note=case.get('note'))
-        return rec
-    php = BASE / 'install' / ('%s-%s' % (version, flavor)) / 'bin/php'
-    if not php.exists():
-        rec.update(verdict='harness_failed', reason='binary missing: %s' % php)
-        return rec
+def case_source(case):
+    """Script text of a case as run: (code, ini lines, needs, expect)."""
     text = (HERE / 'repro' / case['script']).read_text(encoding='utf-8')
     if text.lstrip().startswith('diff --git'):
         # A test file quoted as a patch: keep the added lines without '+'.
@@ -128,6 +117,23 @@ def run_case(rid, case, version, flavor, root):
         code = extract_php(text) if case.get('extract') else text
         needs = []
     needs = sorted(set(needs) | {n.lower() for n in case.get('needs', [])})
+    return code, ini, needs, expect
+
+
+def run_case(rid, case, version, flavor, root):
+    out = root / rid / version
+    out.mkdir(parents=True, exist_ok=True)
+    rec = dict(record=rid, version=version, flavor=flavor, source=case.get('source'))
+    if case.get('status') in ('no_reproducer', 'excluded_weaponized'):
+        # Never run: no script, or the only code is a weaponized exploit
+        # (outside the safety boundary).
+        rec.update(verdict=case['status'], note=case.get('note'))
+        return rec
+    php = BASE / 'install' / ('%s-%s' % (version, flavor)) / 'bin/php'
+    if not php.exists():
+        rec.update(verdict='harness_failed', reason='binary missing: %s' % php)
+        return rec
+    code, ini, needs, expect = case_source(case)
     extra = opcache_args(php) if 'opcache' in needs else []
     have = modules(php, extra)
     missing = [n for n in needs if n not in have]
