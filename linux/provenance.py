@@ -17,7 +17,9 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def _git(*args):
-    res = subprocess.run(['git', '-C', str(REPO), *args], capture_output=True, text=True)
+    # safe.directory: WSL git refuses the /mnt/c checkout (other owner) otherwise.
+    res = subprocess.run(['git', '-c', 'safe.directory=*', '-C', str(REPO), *args],
+                         capture_output=True, text=True)
     return res.stdout.strip() if res.returncode == 0 else None
 
 
@@ -43,6 +45,28 @@ def preserve_inputs(paths, evidence_dir):
     return out
 
 
+def write_note(evidence_dir, effective_commit, reason, check_paths):
+    """Provenance note for evidence produced without a recorded commit:
+    verifies that no commit after `effective_commit` touched the files the
+    run loaded (check_paths) and records the reconstruction."""
+    import json
+    log = _git('log', '--format=%H %cI %s', '%s..HEAD' % effective_commit, '--', *check_paths)
+    note = dict(effective_commit=_git('rev-parse', effective_commit), reason=reason,
+                loaded_paths=list(check_paths),
+                later_commits_touching_loaded_paths=[line for line in (log or '').splitlines()
+                                                     if line],
+                written_by=provenance())
+    note['reconstruction_valid'] = log is not None and not note[
+        'later_commits_touching_loaded_paths']
+    Path(evidence_dir, 'provenance-note.json').write_text(json.dumps(note, indent=2))
+    return note
+
+
 if __name__ == '__main__':
     import json
-    print(json.dumps(provenance(), indent=2))
+    if len(sys.argv) > 1 and sys.argv[1] == '--note':
+        # --note <evidence_dir> <effective_commit> <reason> <loaded paths...>
+        print(json.dumps(write_note(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5:]),
+                         indent=2))
+    else:
+        print(json.dumps(provenance(), indent=2))

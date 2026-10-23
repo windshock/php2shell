@@ -45,7 +45,10 @@ def integrity(seq, steps, states=None, observer='gdb'):
         match = re.search(r'[?&]step=(\d+)', st.get('uri') or '')
         if match and st.get('tag') == 'startup':
             startups.add(int(match.group(1)))
-    observed_ok = (observer != 'gdb') or all(s['i'] in startups for s in executed)
+    # A request aborted mid-upload never reaches php_request_startup, so it
+    # legitimately has no startup record (it is not an observer failure).
+    observed_ok = (observer != 'gdb') or all(
+        s['i'] in startups or s.get('response') in ('aborted', 'reset') for s in executed)
     complete = len(executed) == planned
     if harness:
         status = 'harness_failed'
@@ -268,6 +271,14 @@ def self_test():
     v_int = integrity(seq2, vuln, st(0) + st(1))
     check('vulnerable run integrity executed (ended by memory error)',
           v_int['status'] == 'executed' and v_int['ended_by'] == 'memory_error')
+    seq3 = dict(steps=[{'a': 'abort_upload'}, {'a': 'runtime_oom'}, {'a': 'upload_small'}])
+    aborted = [dict(i=0, a='abort_upload', response='aborted', alive_after=True),
+               dict(vuln[0], i=1), dict(vuln[1], i=2)]
+    check('aborted upload without a startup record is not an observer failure',
+          integrity(seq3, aborted, st(1) + st(2))['status'] == 'executed')
+    check('completed request without a startup record is an observer failure',
+          integrity(seq3, [dict(aborted[0], response='s200')] + aborted[1:],
+                    st(1) + st(2))['status'] == 'inconclusive')
     good_fixed = [dict(i=0, a='runtime_oom', failure_sites=['oom@index.php:31'],
                        state='ser=0,unser=0', response='s500', alive_after=True),
                   dict(i=1, a='upload_small', failure_sites=[], state='ser=0,unser=0',

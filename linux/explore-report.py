@@ -212,6 +212,19 @@ def g3(dirs):
                            and r['path'] in ('P16_path_b', 'P17_path_c') for r in rows))
 
 
+def exec_integrity(e, observer):
+    """Integrity re-derived from the recorded steps with the current rule
+    (verdicts.integrity): a step whose normalized state is not 'unobserved'
+    had a startup record. Recorded values from older rules are ignored."""
+    if 'integrity' not in e:
+        return None
+    import verdicts
+    steps = e.get('steps', [])
+    states = [dict(tag='startup', uri='/x?step=%d' % s['i']) for s in steps
+              if 'i' in s and s.get('state') not in (None, 'unobserved')]
+    return verdicts.integrity(e['seq'], steps, states, observer or 'gdb')['status']
+
+
 def profile_metrics(d, cutoff=None):
     """Per-campaign metrics restricted to executions started before cutoff
     seconds (so 900 s CLI runs compare with 600 s SAPI runs)."""
@@ -228,7 +241,7 @@ def profile_metrics(d, cutoff=None):
     reached = {name: any(re.search(spec['producer'], site) for e in execs
                          for s in e.get('steps', []) for site in s.get('failure_sites', []))
                for name, spec in KNOWN.items()}
-    valid = [e for e in execs if e.get('integrity') == 'executed']
+    valid = [e for e in execs if exec_integrity(e, summary.get('observer')) == 'executed']
     with_pid = [e for e in execs if e.get('worker_pid')]
     observed = [e for e in execs if e.get('steps')]
     harness = sum(1 for e in execs if any('harness_error' in s for s in e.get('steps', [])))

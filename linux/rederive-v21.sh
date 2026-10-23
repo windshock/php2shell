@@ -16,8 +16,8 @@ base=/home/phplab/php-lab
 stamp=$(date -u +%Y%m%dT%H%M%S)
 root="$base/evidence/rederive-v21-$stamp"
 mkdir -p "$root"
-sha=$(git rev-parse HEAD 2>/dev/null || echo unknown)
-dirty=$(git status --porcelain linux | wc -l)
+sha=$(git -c safe.directory="*" rev-parse HEAD 2>/dev/null || echo unknown)
+dirty=$(git -c safe.directory="*" status --porcelain linux | wc -l)
 steps=()
 step() {  # name command...
   local name=$1; shift
