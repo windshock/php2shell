@@ -88,10 +88,12 @@ def expect_matches(expected, actual, fmt):
 
 CUSTOM = {
     # GH-24361: after a compile error caught by opcache_compile_file() the
-    # cycle collector must not stay protected: the 2nd gc_status()
-    # ["protected"] var_dump is bool(true) when the bug is present.
+    # cycle collector must not stay protected. The script dumps three bools:
+    # protected-before, the compile result, protected-after (checked against
+    # a real run's output, R5) - the bug is present when protected-after is
+    # true.
     'gc_protected_after_compile_error':
-        lambda out: re.findall(r'bool\((true|false)\)', out)[1:2] == ['true'],
+        lambda out: re.findall(r'bool\((true|false)\)', out)[2:3] == ['true'],
 }
 
 
