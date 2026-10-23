@@ -81,6 +81,24 @@ ACTIONS = {
     'abort_upload': {},
     'abort_big': {},
 }
+FUSED_POOL = None  # set by --fused-pool: directory made by linux/fused-pool.py
+FUSED_SANDBOX = ('disable_functions=exec,shell_exec,system,passthru,proc_open,popen,'
+                 'pcntl_exec,mail,fsockopen,pfsockopen,stream_socket_client,'
+                 'stream_socket_server,socket_create,socket_connect,curl_exec,'
+                 'curl_multi_exec,putenv,dl\nallow_url_fopen=Off\nallow_url_include=Off\n'
+                 'max_execution_time=10\n')
+
+
+def enable_fused(pool_dir):
+    """#4 H2.5: the `fused` action runs program p of a FlowFusion pool as one
+    request of the sequence (CLI server only)."""
+    global FUSED_POOL
+    pool = json.loads((Path(pool_dir) / 'pool.json').read_text())
+    FUSED_POOL = Path(pool_dir)
+    ACTIONS['fused'] = {'p': tuple(range(len(pool['programs'])))}
+    return pool
+
+
 LIMITS = ('8M', '16M')
 # Stage 2 connection: ZEND_MM_MAX_ALLOCS (8.4.27+, tracked allocator) fails
 # the n-th allocation of every request after startup. putenv() from userland
@@ -447,7 +465,9 @@ class Process:
     def start(self):
         free_port()
         self.log = (self.out / 'observer.log').open('w')
-        self.proc = subprocess.Popen(self.cmd, env=self.env, stdout=self.log,
+        # cwd = the exec dir: programs that write relative files (fused
+        # php-src tests) must never write into the repository.
+        self.proc = subprocess.Popen(self.cmd, env=self.env, stdout=self.log, cwd=self.out,
                                      stderr=subprocess.STDOUT, start_new_session=True)
         deadline = time.time() + 60
         while time.time() < deadline:
@@ -548,6 +568,13 @@ def send(action, step, idx, ctx):
     """One HTTP request; returns a response class."""
     path_q = lambda p: '%s?step=%d' % (p, idx)  # noqa: E731
     try:
+        if action == 'fused':
+            url = 'http://127.0.0.1:%d/fused?p=%d&step=%d' % (PORT, step['p'], idx)
+            try:
+                with ctx['opener'].open(url, timeout=20) as res:
+                    return 's%d' % res.status
+            except urllib.error.HTTPError as exc:
+                return 's%d' % exc.code
         if action in ('health', 'session'):
             try:
                 with ctx['opener'].open('http://127.0.0.1:%d%s' % (PORT, path_q('/' + action)),
@@ -599,9 +626,20 @@ def execute(seq, prefix, out, observer, sapi='cli', version=None, cov=False):
     global PORT
     out.mkdir(parents=True, exist_ok=True)
     ctx = dict(sid_big='exbig' + secrets.token_hex(6), sid_small='exsmall' + secrets.token_hex(6))
+    uses_fused = any(s['a'] == 'fused' for s in seq['steps'])
+    if uses_fused and (FUSED_POOL is None or sapi != 'cli'):
+        return dict(steps=[dict(harness_error='fused action needs --fused-pool and the CLI '
+                                              'server')], states=[], events=[], elapsed=0,
+                    sapi=sapi, worker_pid=None, edges=set(), cov_files=0, cov_status=None,
+                    ready_state=None)
     if sapi == 'cli':
         PORT = CLI_PORT
-        proc = Process(prefix, out, seq['limit'], observer, seq.get('fault', 0), cov=cov)
+        proc = Process(prefix, out, seq['limit'], observer, seq.get('fault', 0), cov=cov,
+                       docroot=FUSED_POOL if FUSED_POOL else None,
+                       router=(FUSED_POOL / 'router.php') if FUSED_POOL else None)
+        if FUSED_POOL:
+            with (out / 'php.ini').open('a') as ini:
+                ini.write(FUSED_SANDBOX)
     else:
         proc = explore_sapi.make_process(sapi, version, out, seq['limit'],
                                          seq.get('fault', 0), POST_MAX_MB)
@@ -747,7 +785,7 @@ def observe(result, seq):
 # ------------------------------------------------------------- campaign
 def campaign(args):
     rng = random.Random(args.seed)
-    prefix = BASE / 'install' / (args.version + ('-cov' if args.cov else '-asan'))
+    prefix = BASE / 'install' / (args.version + ('-cov' if args.cov else '-' + args.flavor))
     stamp = time.strftime('%Y%m%dT%H%M%S', time.gmtime())
     run_id = 'ex-%s-%s-%s-%s-s%d-%d' % (stamp, args.version, args.sapi, args.feedback,
                                         args.seed, os.getpid())
@@ -879,6 +917,10 @@ def campaign(args):
                    max_execs=args.max_execs, execs=n, wall_s=round(time.time() - started, 1),
                    excluded_pairs=sorted('>'.join(p) for p in exclude),
                    faults=args.faults,
+                   fused_pool=(dict(dir=str(FUSED_POOL), programs=len(ACTIONS['fused']['p']),
+                                    pool_json_sha256=hashlib.sha256(
+                                        (FUSED_POOL / 'pool.json').read_bytes()).hexdigest())
+                               if FUSED_POOL else None),
                    grammar=dict(actions=len(ACTIONS), max_len=MAX_LEN, limits=len(LIMITS),
                                 faults=len(FAULTS) if args.faults else 1,
                                 space_size=grammar_space(args.faults)),
@@ -1037,6 +1079,8 @@ def self_test():
     check('fault knob validated', validate(dict(limit='8M', fault=7, steps=[{'a': 'health'}]))
           and not validate(dict(limit='8M', fault=30, steps=[{'a': 'health'}])))
     check('grammar space is not enumerable within a budget', grammar_space() > 10 ** 6)
+    check('fused action rejected without a pool',
+          bool(validate(dict(limit='8M', steps=[{'a': 'fused', 'p': 0}]))))
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         blob = SANCOV_MAGIC64.to_bytes(8, 'little') + b''.join(
@@ -1090,6 +1134,8 @@ def main():
     parser.add_argument('--budget', type=float, default=600, help='seconds')
     parser.add_argument('--max-execs', type=int, default=10 ** 6)
     parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--fused-pool', help='#4 H2.5: FlowFusion pool dir (fused action, CLI)')
+    parser.add_argument('--flavor', default='asan', help='build flavor (asan, asanext)')
     parser.add_argument('--cov', action='store_true',
                         help='Stage 1c: <version>-cov build, SanitizerCoverage edge feedback (CLI)')
     parser.add_argument('--faults', action='store_true',
@@ -1110,6 +1156,10 @@ def main():
     if args.sapi != 'cli':
         args.observer = 'none'
         args.cov = False
+    if getattr(args, 'fused_pool', None):
+        if args.sapi != 'cli':
+            parser.error('--fused-pool needs --sapi cli')
+        enable_fused(args.fused_pool)
     if args.replay:
         return replay(args)
     return campaign(args)
