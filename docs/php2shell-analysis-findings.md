@@ -1395,3 +1395,29 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 3. **enforce: No-Go(기본 활성화 불가).** PHPT 19건 회귀다. 상류(PR #24338 테스트)가 GC를 켠 채 계속하길 기대하는 SOAP WSDL 오류 같은 정상 흐름도 끝내 버린다. 가용성 비용이 크다.
 4. **독립성 한계:** R23은 튜닝 R49와 같은 계열이다. 이 결과는 "같은 부류의 다른 진입점(opcache → soap)으로 일반화된다"는 약한 증거다. 새 부류의 보호를 입증한 것은 아니다.
 5. R46·R51은 아직 C에서 실행하지 않았다(v1.1: 해당 Phase가 끝날 때 1회).
+
+### 11.10 CoreGuard Phase 2 — 할당 실패 원자성 분석 (8.4.27)
+
+**정적:** `linux/fault-site-map.py --src sources/php-8.4.27`(11/11 파일, 21,377행, `scope_complete`). 증적 `evidence/fault-site-map-20261024T073514`. 후보 수(8.4.4 → 8.4.27): count_before_fallible 44 → 35, init_fallible_destroy 5 → 1, global_ptr_request_free 7 → 7, refcount_then_fallible 13 → 13, reentrancy 0 → 0. 정규식 휴리스틱이므로 가설이며 판정이 아니다.
+
+**동적:** `linux/coreguard/phase2-fault-sweep.py`(`80dd83d`, `9c0f471`). B = 8.4.27-asanext, 추적 할당기, `ZEND_MM_MAX_ALLOCS=N`으로 N번째 할당을 실패시켰다. 워크로드는 자료구조 부류별 합성 코드 10종이다(hold-out·튜닝 재현 코드는 쓰지 않음). N은 1~300을 모두, 그 뒤는 7 간격으로, 정상 완료가 25회 이어질 때까지 올렸다. 주입 없는 대조 10/10 정상. 증적 `evidence/coreguard-p2-sweep-20261023T223614-8.4.27-asanext`(`citable: true`):
+
+| 워크로드 | 실행 | 마지막 OOM N | 메모리 오류 | 중간 정상 완료 | 기타 |
+|---|---|---|---|---|---|
+| unserialize_nested | 300 | 264 | 0 | 0 | 0 |
+| unserialize_refs | 300 | 205 | 0 | 0 | 0 |
+| session_codec | 305 | 280 | 0 | 0 | 0 |
+| array_ops | 374 | 643 | 0 | 0 | 0 |
+| string_ops | 351 | 482 | 0 | 0 | 0 |
+| json_codec | 300 | 230 | 0 | 0 | 0 |
+| objects_dtor | 338 | 391 | 0 | 0 | 0 |
+| simplexml_dom | 339 | 398 | 0 | 0 | 0 |
+| mbstring | 300 | 168 | 0 | 0 | 0 |
+| var_export_closure | 336 | 377 | 0 | 0 | 0 |
+
+- 첫 실행(`…T223509`)은 종료 규칙이 "정상 완료 3연속"이라 일부 워크로드가 300에서 멈췄다. 25연속으로 바꿔 다시 측정했고, 위 표는 두 번째 실행이다. 두 실행 모두 메모리 오류는 0이다.
+
+**해석:**
+1. 이 10개 표면에서는 **모든 주입 지점의 실패가 지연 OOM fatal로 끝났다.** fallible NULL을 받고 조용히 계속한 경우(중간 정상 완료)도 0이다. 8.4.27의 fallible 할당 + `ZEND_HAS_OOM` 지연 오류가 할당 실패를 요청 종료로 바꾼다.
+2. 따라서 계획 §13.5 Phase 2(prepare → validate → commit)는 **이 범위에서 공식 수정과 중복된다.** 측정할 추가 효과가 없으므로 구현하지 않는다(No-Go, 근거: 위 표). 300 이후는 표본 추출(1/7)이라 그 구간의 단일 지점은 시험되지 않았을 수 있다.
+3. R46(정리 루프 중 bailout → 이중 정리)은 할당 실패가 아니라 **소멸자 bailout의 원자성** 문제라 이 분석의 대상이 아니다. 이 부류의 보호는 Phase 3(격리)에서 다룬다. R46은 원인과 수정 PR 접근을 이미 알고 있는 사례라, 어떤 설계로도 독립적인 성공 근거가 되기 어렵다(Phase 0 §3). 이 한계를 설계 문서에 먼저 적는다.
