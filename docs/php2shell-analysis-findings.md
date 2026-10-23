@@ -1364,3 +1364,34 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 - ASAN 보고는 모든 모드에서 0이다. disabled의 stdout은 4건 모두 B와 같다.
 - T4는 탐지 한계를 확인한다. 보호가 남아 있어도 루트 거부가 없으면 이벤트도 없다(피해도 아직 없다).
 - 다음: C(`coreguard-normalext`) 성능과 B/C PHPT 비교, 그다음 사전 등록 §6-4 hold-out 1회 평가(3모드 × 3반복).
+
+### 11.9 CoreGuard Phase 2b — v1 → v2, 호환·성능, hold-out R23 1회 평가
+
+**v1 PHPT(enforce) 결과 → v2 수정(`442eb10`):**
+- v1은 B 대비 회귀 35건이었다(SOAP 20, Zend 13, SimpleXML 2). Zend의 `oom_*`·`new_oom` 실패는 **오탐**이었다. 8.4.27 지연 OOM 경로(`zend_alloc.c:3669`의 `zend_try/zend_catch`)와 `soap_error_handler`는 bailout을 잡았다가 **다시 던지는데**, 그 사이에 루트 거부가 일어난다. 사용자 코드는 재개되지 않는다. 또 stderr 이벤트 줄 자체가 PHPT 출력을 바꿨다.
+- v2: 루트 거부는 검사를 **무장만** 하고, 검사는 다음 opcode 경계(VM interrupt)에서 한다. 다시 던지는 경로에서는 opcode가 실행되지 않으므로 이벤트가 없다. `COREGUARD_LOG=<file>`을 추가했다.
+
+**v2 검증**(두 C 빌드 모두 패치 SHA `80c07a30…`, `build-manifest.json`):
+
+| 항목 | 결과 | 증적 |
+|---|---|---|
+| 개발 테스트(튜닝 R49 + 합성) | 30/30 | `coreguard-p2b-tests-20261023T163832-asanext` |
+| PHPT observe(7,922 테스트) | **B 대비 회귀 0**. 이벤트 22건(재개 사례) | `coreguard-phpt-20261023T164403-…`, `logs/cg-events-phpt-observe.log` |
+| PHPT enforce | **회귀 19건**(SOAP 16, `arginfo_zpp_mismatch*` 2, session `gh12504` 1). 모두 잡힌 bailout 뒤 실행이 실제로 재개되는 테스트이며, enforce가 그 요청을 끝냈다 | `coreguard-phpt-20261023T164426-…` |
+| 성능(req/s 중앙값 / p95 ms) | B: health 9,078/1.27, session 6,016/2.68, unser 9,312/1.28, upload 7,166/1.60. C disabled·observe·enforce 모두 B의 반복 간 변동 안이다(예: B session 6,016~7,133). `bench.php` 0.405~0.428 s | `coreguard-perf-*-8.4.27-coreguard-normalext-{disabled,observe,enforce}`, `…-8.4.27-normalext` |
+
+**hold-out R23 1회 평가**(사전 등록 v1.1 §6a, `linux/coreguard/holdout-eval.py --cases R23`, 증적 `evidence/coreguard-holdout-20261023T164640`, `citable: true`, 목록 SHA 일치):
+
+| 모드 | 반복 3회 판정 | 관측 |
+|---|---|---|
+| B | harm 3/3 | SOAP 실패 뒤 `GC Runs: 3` 고정 |
+| disabled | `not_protected` ×3 | B와 같은 출력 |
+| observe | `detected_only` ×3 | 이벤트 기록, GC 정지는 그대로 |
+| enforce | `worker_contained` ×3 | 이벤트 뒤 25행(다음 순환 생성)에서 CoreGuard E_ERROR, GC 정지 전, ASAN 0 |
+
+**판정(Issue #3 Go/No-Go 기준):**
+1. **`prevented_before_invalid_access`는 0이다.** enforce는 피해(GC 정지) 전에 요청을 끝냈지만, 유효 요청이 유지되지 않았으므로 성공으로 세지 않는다(v1.1 규칙).
+2. **observe: Go(탐지 전용).** 회귀 0, 성능 영향은 측정 노이즈 안이다. hold-out R23에서 3/3 탐지했다. 분류는 `detect-only`다.
+3. **enforce: No-Go(기본 활성화 불가).** PHPT 19건 회귀다. 상류(PR #24338 테스트)가 GC를 켠 채 계속하길 기대하는 SOAP WSDL 오류 같은 정상 흐름도 끝내 버린다. 가용성 비용이 크다.
+4. **독립성 한계:** R23은 튜닝 R49와 같은 계열이다. 이 결과는 "같은 부류의 다른 진입점(opcache → soap)으로 일반화된다"는 약한 증거다. 새 부류의 보호를 입증한 것은 아니다.
+5. R46·R51은 아직 C에서 실행하지 않았다(v1.1: 해당 Phase가 끝날 때 1회).
