@@ -81,8 +81,13 @@
       "risky_calls": []
     },
     "R05": {
-      "status": "no_reproducer",
-      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+      "source": "[bugs #74101](https://bugs.php.net/bug.php?id=74101)",
+      "script": "R05/derived.php",
+      "format": "php",
+      "oracle": "memory_error",
+      "needs": [],
+      "risky_calls": [],
+      "note": "derived: verbatim input of block01 wrapped in unserialize()"
     },
     "R06": {
       "source": "[bugs #74614](https://bugs.php.net/bug.php?id=74614)",
@@ -104,15 +109,22 @@
     },
     "R08": {
       "status": "no_reproducer",
-      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+      "note": "checked in H2.5: description only (SAPI rinit/rshutdown mismatch), no script"
     },
     "R09": {
-      "status": "no_reproducer",
-      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+      "source": "[bugs #76409](https://bugs.php.net/bug.php?id=76409)",
+      "script": "R09/derived.php",
+      "format": "php",
+      "oracle": "memory_error",
+      "needs": [
+        "exif"
+      ],
+      "risky_calls": [],
+      "note": "derived: verbatim file content and call of block00"
     },
     "R10": {
       "status": "no_reproducer",
-      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+      "note": "checked in H2.5: FPM crash report without a script"
     },
     "R13": {
       "source": "[bugs #77843](https://bugs.php.net/bug.php?id=77843)",
@@ -137,8 +149,15 @@
       ]
     },
     "R16": {
-      "status": "no_reproducer",
-      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+      "source": "[bugs #78793](https://bugs.php.net/bug.php?id=78793)",
+      "script": "R16/derived.php",
+      "format": "php",
+      "oracle": "memory_error",
+      "needs": [
+        "exif"
+      ],
+      "risky_calls": [],
+      "note": "derived: verbatim loop of block00; the report saw it under MSan only"
     },
     "R17": {
       "source": "[bugs #79029](https://bugs.php.net/bug.php?id=79029)",
@@ -163,7 +182,7 @@
     },
     "R22": {
       "status": "no_reproducer",
-      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+      "note": "checked in H2.5: needs PostgreSQL (out of lab scope)"
     },
     "R24": {
       "source": "[Issue #10169](https://github.com/php/php-src/issues/10169)",
@@ -295,7 +314,7 @@
     },
     "R56": {
       "status": "no_reproducer",
-      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+      "note": "checked in H2.5: only a patch diff, no script"
     }
   }
 }
