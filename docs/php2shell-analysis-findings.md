@@ -1143,3 +1143,45 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
   - 소비 경로: 액션
 - 계획 문구의 **할당·해제 사이트**는 상태 ID에 넣지 않았다. 비충돌 상태에서는 할당 사이트를 얻을 수단(할당기 훅)이 없고, 할당·해제 스택은 ASAN 보고가 있을 때만 시그니처로 쓴다.
 - Stage 2의 AST/콜그래프판 후보 열거(Coccinelle 등)는 미구현이다. 정규식 스캐너는 범위·누락 보고까지 보강했고(§10.6), 그 공백은 커버리지 맵으로 보완했다.
+
+### 10.12 v2.1 — 실패-닫힘 판정기로 재도출 (2026-10-23, 계획 §13.3·§13.6-4)
+
+> 이 절은 §10.9~10.11 수치를 **대체**한다. 앞 절 수치는 판정기 결함(Issue #5)이 있던 시점의 값이다. 재도출 증적은 `evidence/rederive-v21-20261023T095350/`에 있다.
+> - **출처(R12):** 드라이버 `linux/rederive-v21.sh`. 실효 소스 커밋 `7d08b45`이다. `rederive.json`에는 WSL git의 safe.directory 문제로 `source_sha: unknown`이 기록됐다. 실행 창(09:53:50Z~11:45:40Z) 동안 로드된 파일을 건드린 커밋이 0건임을 `provenance-note.json`으로 확인했다(`reconstruction_valid: true`).
+> - 10개 단계 모두 rc=0. G3/G4 배치의 `batch.json`은 6/6 valid다.
+
+**판정기 수정 요약(#5 1~11):**
+- P0: `linux/verdicts.py`(자체 테스트 24/24) — 실행 무결성 → replay differential·FlowFusion 3축·triage 증거 칼럼.
+- P1·P2: 아래 항목을 각각 고치고 픽스처를 붙였다.
+  - G3 인과 사슬
+  - ground-truth 관측·추론 분리(15/15)
+  - readiness·PID 귀속
+  - 배치 rc(`batch-check.py` 7/7, `batch-fixtures.sh` 4/4)
+  - sancov 수집 상태와 커버리지 양성 대조
+  - 커버리지 맵의 exact/nearby/gap 분리와 바이너리 SHA 검증(7/7)
+  - G5 게이트 분리
+- 실측 확인: 존재하지 않는 수정 버전에 대한 replay는 `harness_failed`, `extinct=false`, rc 1이다. 구 코드는 `extinct=True`를 냈다.
+
+**재도출 결과와 기존 보고의 관계:**
+
+| 항목 | 기존 보고(§10.9~10.11) | v2.1 재도출 | 실제 결과가 틀렸는가 |
+|---|---|---|---|
+| ground-truth | 8.4.4 재현 3/3, 8.4.27 소멸 3/3 | 동일(P17 생산자는 이제 unserialize 줄 31 착지까지 요구). 8.4.4·8.4.27 모두 exit 0 | 아니오 |
+| G3 재발견 | 판정식: 함수명 히트 | 인과 사슬로 판정(생산자 착지 → RINIT에 닿는 요청 없음 → 귀속된 소비자 ASAN). `signature_only` 0건. 기존 두 배치의 재평가에서도 비율이 그대로 | 아니오(코드 결함만 실재) |
+| G3 (`--cov` 재실행, 600s×3) | — | ON: P17 2/3, P16 1/3, Bug S 1/3. OFF: P17 3/3, P16 2/3, Bug S 3/3. 게이트 통과(정답 쌍 제외 + ON에서 P16 또는 P17의 인과 재발견) | — |
+| G4 | ON 열세 | ON 열세 재확인: 전이 19.0 대 26.0, ASAN 시그니처 1.33 대 2.67, 첫 발견 206s 대 98s, edge 6,891 대 6,908. 피드백 우위 **미입증**(이 문법·예산 한정) | 아니오 |
+| G5 | 통과 | 환경 게이트·비교 게이트 모두 통과. 유효 실행 = 전체 실행(CLI 92/84, mod_php 80/72, FPM 111/142). 모든 실행에 워커 pid 기록. 세 생산자 착지 확인. FPM은 Bug S·P16 미재발견에 ASAN 없는 워커 교체 17건 — §10.10 결론 유지 | 아니오(게이트 산식만 보강) |
+| FlowFusion "100/100 clean" | 철회(§13.2) | 수명주기 관측 완료 **99**(정상 90 + 실행 중 fatal 6, 그중 2건은 HTTP 200인데 fatal + 컴파일 오류 4), `consumer_incomplete` 1. 융합 프로그램 정상 실행 96, 그중 clean 95. 요청 간 잔류·메모리 오류 0 | **예, 1건**: 소비자 미실행 프로그램을 clean으로 셌다 |
+| 커버리지 맵 "14/44" 등 | "도달" | 정확한 후보 줄 실행 / 근접 줄만 실행 / 공백: count_before_fallible **8 / 6 / 30**(44), init_fallible_destroy **0 / 0 / 5**, global_ptr_request_free **3 / 1 / 3**, refcount_then_fallible **3 / 2 / 8**. 미해석 주소 0%. 바이너리 SHA 일치. "14/44"는 정확 + 근접의 합이었으므로 **도달 수치로 인용하지 않는다** | 표현 과대(수치 자체는 근접 포함으로 정확) |
+| 트리아지 `residue_not_formed` | 관측 + 추론 혼합 | 양성 5종 모두 `extinct` / **`validated`**. 근거는 계측 이벤트 차분: 8.4.27 생산자 요청에서만 `php_var_(un)serialize_destroy`가 실행되고(취약 버전은 fatal로 건너뜀), 종료 시점 상태는 `absent_at_observed_shutdown`. 음성 대조군은 `no_difference`. 메커니즘 서술 "fallible 할당 + 지연 OOM"은 여전히 패치 소스에서 나온 추론이다. 검증된 것은 "생산자 컨텍스트가 정리되었다"까지다 | 아니오(명칭 과대 → 관측·추론 분리) |
+
+**R12 재실행 — findings 인용 진단:**
+- `linux/diag/pathb-flock-deadlock.py`: 8.4.4에서 자기 교착 재현(`flock` syscall 73, `locks_lock_inode_wait`, CPU 0), 8.4.27은 200 응답. `citable: true`.
+- `linux/diag/observer-effect.py`: gdb 있음 2회·없음 2회 결과 동일. `citable: true`.
+- §10.7의 인라인 코드 결과와 일치한다.
+
+**판정기 결함으로 발견·수정한 추가 오류:**
+1. 중단된 업로드는 `php_request_startup`에 닿지 않는데, 이를 관측기 실패로 처리해 CLI 유효 실행이 절반으로 집계되던 결함.
+2. 재도출 증적의 커밋 해시가 미기록된 것(WSL git safe.directory).
+
+둘 다 수정해 커밋했다(`a1a7ef1`).
