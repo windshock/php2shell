@@ -1336,3 +1336,31 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 3. hold-out 3건은 두 모드 모두 0/3이다. H3의 답은 "현재 탐색기 + 현행 테스트 융합으로는 hold-out 부류에 도달하지 못한다"이다. 도달하려면 부류를 겨냥한 입력 생성(H2.5 남은 과제: payload 문법, bailout 유발 + 회복 + GC 관찰을 결합한 구성)이 필요하다. 그 생성기는 hold-out이 아니라 튜닝 세트와 부류 정의로만 만든다.
 4. 신호 자체(G·A)는 튜닝 세트에서 작동함을 확인했다(§11.5). 실패의 원인은 신호가 아니라 도달이다.
 5. 추가 조정은 하지 않는다. 같은 풀에서 거듭 조정하면 그 풀에 과적합되고, hold-out 비교의 의미가 약해진다.
+
+### 11.8 CoreGuard — B 성능 기준선과 Phase 2b 개발 검증 (계획 §13.5, 사전 등록 v1)
+
+**B 성능 기준선**(`linux/coreguard/perf-baseline.py`, 빌드 `8.4.27-normalext` = release + asanext 확장 집합, Apache event + proxy_fcgi → php-fpm static 4, opcache on, docroot는 ext4 사본, ab n=5000 c=8 × 3회). 증적 `evidence/coreguard-perf-20261023T162420-8.4.27-normalext`(`citable: true`):
+
+| 워크로드 | req/s(중앙값) | p50 ms | p95 ms | 워커 RSS 최대 KB |
+|---|---|---|---|---|
+| health | 9,549 | 0.77 | 1.22–1.27 | 11,540 |
+| session | 6,275 | 0.84–0.96 | 1.52–2.09 | 11,700 |
+| unser_small | 9,566 | 0.77–0.78 | 1.21–1.24 | 11,764 |
+| upload_small | 7,258 | 0.96–1.11 | 1.49–2.02 | 12,716 |
+| `Zend/bench.php`(CLI, opcache 없음) | Total 0.410–0.411 s | | | |
+
+- session은 반복마다 8,083 → 6,275 → 6,061로 떨어진다. 세션 파일이 누적되기 때문으로 보이며, C도 같은 조건에서 비교한다. 이 수치는 이 호스트(WSL2, 6코어)에서의 **상대 비교용**이다.
+
+**Phase 2b(설계 `docs/coreguard/phase2b-design.md`, 패치 `0001-phase2b-gc-resume-guard.patch`, 빌드 `8.4.27-coreguard-asanext` = 실험 사본 + 패치, 원본 소스 변경 0):**
+- 개발 검증 `linux/coreguard/phase2b-tests.py`, 증적 `evidence/coreguard-p2b-tests-20261023T162403-asanext`(`citable: true`): **30/30 통과**, hold-out 실행 0.
+
+| 테스트 | B | disabled | observe | enforce |
+|---|---|---|---|---|
+| T1 R49(튜닝) | GC 정지(`protected=true`, collected 0) | B와 동일 | 이벤트 + B와 같은 출력 | 이벤트 + 11행(순환 생성 루프 시작)에서 CoreGuard E_ERROR로 종료, 메모리 증가 전 |
+| T2 정상 순환 + GC | 정상 | 동일 | 이벤트 없음 | 이벤트 없음 |
+| T3 종료형 fatal | — | 동일 | 이벤트 없음 | 이벤트 없음 |
+| T4 잡힌 bailout 뒤 순환 없는 코드 | `protected=true` 잔류 | 동일 | **이벤트 없음** | 이벤트 없음 |
+
+- ASAN 보고는 모든 모드에서 0이다. disabled의 stdout은 4건 모두 B와 같다.
+- T4는 탐지 한계를 확인한다. 보호가 남아 있어도 루트 거부가 없으면 이벤트도 없다(피해도 아직 없다).
+- 다음: C(`coreguard-normalext`) 성능과 B/C PHPT 비교, 그다음 사전 등록 §6-4 hold-out 1회 평가(3모드 × 3반복).
