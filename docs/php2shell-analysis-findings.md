@@ -1229,3 +1229,25 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 | R23 GH-10026 (SOAP 후 gc_protect 잔류) | capability_gap(soap) | capability_gap | H2.5 `asanext` 빌드 후 재실행한다. 원 이슈 버전은 외부 호스트에 접속하므로 쓰지 않고, PR 테스트(127.0.0.1)만 쓴다 |
 | R49 GH-24361 (opcache_compile_file 후 GC 보호 잔류) | capability_gap(opcache) | capability_gap | 위와 같음 |
 | R18 #79760 (get_gc OOM 뒤 GC 정리 불일치) | no_reproducer | — | 원천에 스크립트가 없다(Laravel 테스트 중 관측). 재현 코드를 구성해야 한다 |
+
+**H2 2차 (H2.5 확장 빌드 `asanext`, 2026-10-23):**
+- 증적: `evidence/corpus-h2-20261023T132556-asanext`, R49 재판정 `…T132648-asanext`. 둘 다 `citable: true`.
+- 빌드: asan + opcache·soap·XML 계열·filter·exif·mbstring(`--disable-mbregex`)을 8.4.4와 8.4.27 모두 만들었다.
+- 사례 37건: 스크립트 있음 28, `no_reproducer` 8, `excluded_weaponized` 1.
+  - R54(GH-24481)는 보고의 코드가 실제 앱 가젯 체인 기반의 무기화된 phar 페이로드뿐이라 **실행하지 않았다**(안전 경계).
+
+| 기록 | 패턴 | 8.4.4 | 8.4.27 | 근거·해석 |
+|---|---|---|---|---|
+| R23 GH-10026 | SOAP 예외 회복 후 `gc_protect` 잔류 | **재현** | **재현** | 출력 `GC Runs: 3`이 SOAP 실패 뒤 증가하지 않는다(GC 정지). 공개 미해결 이슈 |
+| R49 GH-24361 | opcache 컴파일 오류 회복 후 GC 보호 잔류 | **재현** | **재현** | protected-after `bool(true)`, 이후 `gc_collect_cycles()` 0. 1차 오라클은 컴파일 결과를 읽은 결함이 있어 실제 출력으로 확인하고 수정했다(R5) |
+| R46 PR #22710 | `zend_hash_clean` 중 bailout → 이중 정리 | **재현** | **재현** | ASAN SEGV `php_var_serialize_intern` ← `ps_srlzr_encode_php`. 수정 PR 미병합 |
+| R51 GH-24455 | lazy object reset + 소멸자 재진입 | **재현** | **재현** | `zend_mm_panic` ← `zend_mm_get_next_free_slot`(Zend 힙 무결성 검출). 공개 미해결 이슈 |
+| R55 GH-24488 | SimpleXML GC 이중 해제 | 미재현 | **재현** | **8.4.27 긴급 릴리스가 들여온 회귀** — 기록 내용과 일치 |
+| R41 GH-20352 | 출력 핸들러 오류 해제 중 `ob_start` 재진입 | **재현** | 미재현 | 2025-11 수정이 8.4.27에 포함됐다 — 수정 시점과 일치 |
+| R42 GH-21499 | RecursiveArrayIterator raw 버킷 포인터 | **재현**(디버그 assertion `refcount > 0` 실패, SIGABRT) | 미재현 | 2026-03 수정 — 수정 시점과 일치 |
+| 나머지 21건(R01~R04, R06, R07, R13, R14, R17, R19, R24~R27, R32~R35, R38, R47, R50) | — | 미재현 | 미재현 | 대부분 8.4.4 이전에 수정된 기록이다. 수정 전 빌드가 없어 **수정 효과를 이 랩에서 확인하지 못한다**. 미재현은 안전 판정이 아니다 |
+
+**의미:**
+1. 현행 공식 수정 릴리스(8.4.27)에서 공개 미해결 경로 5건이 재현된다(GC 보호 잔류 2, 정리 중 bailout 1, 재진입 1, 회귀 1). 모두 이미 공개된 기록이라 D1 대상이 아니며, **CoreGuard "공식 패치 밖 새 실패 경로" 평가의 실재 후보**다.
+2. 이 재현은 CLI 단일 스크립트 기준이다. HTTP 요청 수명주기 탐색기(H2.5 PHP 코드 액션)의 도달성은 별도 과제다.
+3. 할당기: `USE_ZEND_ALLOC=1`(Zend MM)로 실행했다. 일부 오류는 ASAN 대신 Zend 힙 무결성 검사(`zend_mm_panic`)나 디버그 assertion으로 검출됐다.
