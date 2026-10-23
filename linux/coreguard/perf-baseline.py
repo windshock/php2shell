@@ -118,7 +118,9 @@ def ab(args_extra, url, n, c, out_csv):
                 failed=int(failed.group(1)) if failed else None,
                 non2xx=int(non2xx.group(1)) if non2xx else 0,
                 p50_ms=pct.get(50), p95_ms=pct.get(95), p99_ms=pct.get(99),
-                stderr=res.stderr[-300:])
+                stderr=res.stderr[-300:],
+                # keep ab's own output when it could not be parsed
+                stdout_tail=None if rps else text[-600:])
 
 
 def main():
