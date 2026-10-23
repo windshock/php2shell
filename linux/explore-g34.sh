@@ -27,5 +27,5 @@ for s in $seeds; do
     echo "exit=$? $(tail -c 400 "$out.log" | tr -d '\n' | cut -c1-300)"
   done
 done
-python3 linux/explore-report.py g4 --on "$root"/on-s* --off "$root"/off-s* > "$root/g4.json"
+python3 linux/explore-report.py g4 --on "$root"/on-s*/ --off "$root"/off-s*/ > "$root/g4.json"
 echo "ROOT=$root"

@@ -976,3 +976,31 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 - **한계:**
   - `inj:` 표기는 시퀀스 단위다. 주입이 걸린 시퀀스에서 생긴 자연 OOM도 `inj:`로 표기된다(예: `inj:oom:2^21@Unknown:0`).
   - pre-RINIT 파싱 창은 주입 범위 밖이다(§12.3 제약 유지).
+
+### 10.9 v2 G3·1f — hold-out 재발견, 최소화·차등 (2026-10-23)
+
+**설정** `explore-g34-20261023T034906-8.4.4`:
+- 8.4.4, CLI 서버, gdb 관측, 900s × (ON 3회 + OFF 3회, RNG seed 1~3), 순차 실행.
+- 초기 코퍼스는 양성 단일 요청 시드 4개다. 정답 쌍 `parse_oom>upload_nofile`(P16), `parse_oom>upload_small`(Bug S), `runtime_oom>upload_small`(P17)은 시드에서 제외했다(`--exclude-pairs`, summary에 기록).
+- 문법 공간은 **6,514,872**이고, 실행 수는 회당 약 120~140이다.
+
+**G3 — hold-out 재발견** (`explore-report.py g3`):
+
+| 경로(소비자 시그니처) | ON s1 | ON s2 | ON s3 | OFF s1 | OFF s2 | OFF s3 |
+|---|---|---|---|---|---|---|
+| P16 (`ps_files_close`) | ✗ 생성 단계 | 104s | 178s | 612s | 109s | 493s |
+| Bug S (`php_add_var_hash`) | 466s | ✗ 생성 단계 | 526s | 216s | 464s | 224s |
+| P17 (`tmp_var`) | 637s | 80s | 186s | 88s | 411s | 63s |
+
+- 재발견 경로가 정답 쌍만은 아니다. 예: P17은 `runtime_oom → parse_oom`, Bug S는 `session → parse_oom → upload_cookie`로도 찾았다.
+- ON의 미발견 2건은 모두 **생성 실패**다. 정답 쌍이 한 번도 생성되지 않았고, 도달·판정 단계의 실패는 없었다.
+- **해석:** 공간은 열거 불가 규모지만, 정답이 길이 2의 인접 쌍이라 무작위 샘플링(OFF)도 3/3을 재발견했다. 따라서 이 문법에서의 재발견은 **피드백의 효과가 아니라 문법 밀도의 결과**로 판정한다(§12.6.4 G3 주의 조항).
+
+**1f — 재현·최소화·차등** (`--replay`):
+
+| 대상 | 재현 | 최소화 | 8.4.27 차등 |
+|---|---|---|---|
+| P17 발견(ON s1, 6단계 `abort_upload, runtime_oom, runtime_oom, abort_big, parse_oom, runtime_oom`) | 2/2 | **`runtime_oom(14MB) → parse_oom` 2단계** | 소멸 |
+| Bug S 발견(ON s1, `session, parse_oom, upload_cookie`) | 2/2 | 이미 최소(어느 단계를 빼도 시그니처가 사라짐. `session`은 쿠키 소비자의 전제) | 소멸(`upload_cookie` 200) |
+
+중복 제거는 시그니처 키(오류 종류 + 상위 3개 함수) 단위로 했다. 6회 실행의 고유 시그니처는 위 3종뿐이며, 모두 알려진 부류이고 8.4.27에서 소멸한다.
