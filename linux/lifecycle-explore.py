@@ -285,8 +285,15 @@ class EventBP(gdb.Breakpoint):
             out['error'] = str(exc)[:120]
         try:
             out['gc_protected'] = int(gdb.parse_and_eval("'zend_gc.c'::gc_globals")['gc_protected'])
+            out['in_shutdown'] = int(gdb.parse_and_eval('executor_globals')['flags']) & 1
         except Exception:
             pass
+        if self.name == '_zend_bailout':
+            frames, f = [], gdb.selected_frame().older()
+            while f is not None and len(frames) < 6:
+                frames.append(f.name() or '?')
+                f = f.older()
+            out['frames'] = frames
         print('EVENT ' + json.dumps(out))
         sys.stdout.flush()
         return False
@@ -294,7 +301,7 @@ class EventBP(gdb.Breakpoint):
 StateBP('php_request_startup', 'startup')
 StateBP('php_request_shutdown', 'shutdown')
 for _loc in ('php_var_unserialize_destroy', 'php_var_serialize_destroy', 'php_basic_early_rinit',
-             '_zend_bailout'):
+             '_zend_bailout', 'zend_mm_delayed_error'):
     try:
         EventBP(_loc)
     except Exception:
@@ -783,7 +790,7 @@ def observe(result, seq):
     bailouts = {}
     for ev in result.get('events') or ():
         match = re.search(r'[?&]step=(\d+)', ev.get('uri') or '')
-        if match and ev.get('name') == '_zend_bailout':
+        if match and ev.get('name') in ('_zend_bailout', 'zend_mm_delayed_error'):
             bailouts.setdefault(int(match.group(1)), []).append(ev)
     pids = {st.get('pid') for st in states if st.get('pid')}
     if result.get('worker_pid'):
@@ -832,15 +839,18 @@ def observe(result, seq):
             (ended_normally or gc != 'gc_protected')
         if gc_odd:
             keys.add('G:%s|%s' % (step['a'], gc))
-        bails = bailouts.get(idx, [])
-        # A bailout entered while GC is already protected: execution resumed
-        # after an earlier (caught) bailout without restoring the protection
-        # (invariant class of tuning case R49, plan 13.3a).
-        bail_protected = any(ev.get('gc_protected') for ev in bails)
-        if bail_protected:
-            keys.add('G:%s|bailout_while_protected' % step['a'])
-        if len(bails) > 1:
-            keys.add('R:%s|resumed_after_bailout' % step['a'])
+        evs = bailouts.get(idx, [])
+        bails = [ev for ev in evs if ev['name'] == '_zend_bailout']
+        # Memory limit reached while GC protection is set outside shutdown:
+        # the cycle collector could not run because a protection was left
+        # set (invariant class of tuning case R49, plan 13.3a). A second
+        # bailout under protection is NOT used: handlers that catch and
+        # re-raise (soap_error_handler) and aborted connections produce it
+        # normally (calibration, findings 11.5).
+        oom_protected = any(ev['name'] == 'zend_mm_delayed_error' and ev.get('gc_protected')
+                            and not ev.get('in_shutdown') for ev in evs)
+        if oom_protected:
+            keys.add('G:%s|oom_while_gc_protected' % step['a'])
         if step['failure_sites'] and step['response'].startswith('s2') and step.get('alive_after'):
             # Error recovery: a fatal/exception path that still completed the
             # request (caught bailout, handler, delayed OOM).
@@ -851,7 +861,7 @@ def observe(result, seq):
                                  file=asan['file']))
         steps.append(dict(step, state=state_norm, outcome=outcome, oracle=level,
                           violations=violations, gc_at_shutdown=gc, gc_unexpected=gc_odd,
-                          bailouts=len(bails), bailout_while_protected=bail_protected))
+                          bailouts=len(bails), oom_while_gc_protected=oom_protected))
     return keys, steps, findings
 
 
@@ -1217,13 +1227,25 @@ def self_test():
                                                   alive_after=True, asan=None, completed=False)],
                                       states=[], worker_pid=1,
                                       events=[dict(name='_zend_bailout', uri='/fused?p=0&step=0',
-                                                   gc_protected=0),
+                                                   gc_protected=0, in_shutdown=0),
+                                              dict(name='zend_mm_delayed_error',
+                                                   uri='/fused?p=0&step=0',
+                                                   gc_protected=1, in_shutdown=0),
                                               dict(name='_zend_bailout', uri='/fused?p=0&step=0',
-                                                   gc_protected=1)]),
+                                                   gc_protected=1, in_shutdown=0)]),
                                  dict(steps=[{'a': 'fused', 'p': 0}]))
-    check('second bailout under GC protection -> G bailout_while_protected + R resumed',
-          'G:fused|bailout_while_protected' in keys_r and 'R:fused|resumed_after_bailout' in keys_r
-          and steps_r[0]['bailouts'] == 2)
+    check('OOM under GC protection -> G oom_while_gc_protected',
+          'G:fused|oom_while_gc_protected' in keys_r and steps_r[0]['bailouts'] == 2)
+    keys_s, _, _ = observe(dict(steps=[dict(i=0, a='upload', response='s200',
+                                            failure_sites=['oom@x:1'], alive_after=True,
+                                            asan=None)], states=[], worker_pid=1,
+                                events=[dict(name='_zend_bailout', uri='/upload?step=0',
+                                             gc_protected=0, in_shutdown=0),
+                                        dict(name='_zend_bailout', uri='/upload?step=0',
+                                             gc_protected=1, in_shutdown=0)]),
+                           dict(steps=[{'a': 'upload'}]))
+    check('re-raised bailout under protection alone -> no G key',
+          not any(k.startswith('G:') for k in keys_s))
     check('protected GC at shutdown -> G and R keys',
           'G:fused|gc_protected' in keys_g and 'R:fused|gc_protected' in keys_g
           and steps_g[0]['gc_at_shutdown'] == 'gc_protected')
