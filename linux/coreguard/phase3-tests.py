@@ -73,10 +73,13 @@ def run(php, code, mode, w):
         env['COREGUARD_MODE'] = mode
     res = subprocess.run([str(php), '-n'] + SANDBOX + [str(w / 't.php')], capture_output=True,
                          text=True, timeout=120, cwd=w, env=env)
+    # debug-build OOM messages carry the allocator's source path, which differs
+    # between the official tree and the experiment copy
+    stdout = res.stdout.replace('ext/coreguard-src-8.4.27', 'sources/php-8.4.27')
     return dict(rc=res.returncode, event=EVENT in res.stderr,
                 asan=any('AddressSanitizer' in p.read_text(errors='replace')
                          for p in asan.glob('a.*')),
-                stdout=res.stdout[-500:], stderr=res.stderr[-300:])
+                stdout=stdout[-500:], stderr=res.stderr[-300:])
 
 
 def main():
