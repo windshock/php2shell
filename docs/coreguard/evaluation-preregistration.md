@@ -74,9 +74,33 @@ C의 모드는 `disabled`(C 빌드에서 가드 비활성, B와 같은 동작이
 4. hold-out을 평가한다(C 3모드 × 독립 반복 ≥ 3).
 5. Go/No-Go는 Issue #3 단계별 판정을 따른다. 입증하지 못하면 `detect-only` 등으로 낮춰 분류한다.
 
+## 6a. v1.1 판정 매핑 부록 (hold-out 실행 전 고정, 2026-10-23)
+
+hold-out 목록·지표는 바꾸지 않는다(목록 SHA-256 동일). §3 어휘를 CLI 실행 사실에 대응시키는 규칙만 **첫 hold-out 실행 전에** 고정한다. 구현은 `linux/coreguard/holdout-eval.py`이며, 이 규칙이 커밋된 뒤에만 실행한다.
+
+| 기록하는 사실 | 정의 |
+|---|---|
+| harm | R23: SOAP 실패 뒤 `GC Runs`가 늘지 않음. R46·R51: ASAN 보고, `zend_mm_panic`, 치명 시그널(rc 134·139 포함) |
+| event | CoreGuard 이벤트 줄 |
+| reached_end | 스크립트 끝에 붙인 표지가 출력됨(정상 반환) |
+
+| 판정 | 규칙 |
+|---|---|
+| `test_failed` | 하네스 실패(바이너리 없음, 120초 시간 초과) |
+| `not_reached` | B의 모든 반복에서 harm이 없음 → 사례를 분모에서 제외 |
+| `not_protected` | harm 있음, event 없음 |
+| `detected_only` | event와 harm(또는 ASAN)이 같은 실행에 있음 |
+| `prevented_before_invalid_access` | event 있음, harm 없음, ASAN 없음, **reached_end** |
+| `worker_contained` | event 있음, harm 없음, ASAN 없음, 가드가 작업 단위를 일찍 끝냄(CLI에서는 요청 = 프로세스). 유효 요청이 유지되지 않았으므로 `prevented`로 세지 않는다 |
+| `harm_absent_without_event` | B에서는 harm이 있었는데 이 실행에서는 event도 harm도 없음(재현 흔들림). **성공으로 세지 않는다** |
+
+- 반복은 모드마다 3회다. 사례×모드의 판정은 3회 결과를 모두 보고한다(다수결로 줄이지 않는다).
+- Phase 2b는 GC 보호 부류(R23)만 대상이다. R46·R51은 같은 실행에서 `not_protected`가 예상되며 그대로 보고한다.
+
 ## 7. 변경 이력
 
 | 버전 | 날짜 | 내용 |
 |---|---|---|
 | v0 | 2026-10-23 | 판정·지표·절차 초안. hold-out 목록은 공란 |
 | v1 | 2026-10-23 | hold-out 3건 고정(R23·R46·R51), 튜닝 2건, 회귀 대조, 공백 선언. 목록 SHA-256 `acf426107a094cb3a410687b9962982d7d72451c7ef86826f4140681b8111f4a` |
+| v1.1 | 2026-10-23 | §6a 판정 매핑 부록. 목록·지표는 그대로다. 사유: CLI 실행에는 "다음 요청"이 없어서, `worker_contained`와 `prevented`의 경계를 실행 사실(정상 반환 여부)로 미리 정해야 했다. hold-out 실행 전에 커밋한다 |
