@@ -8,6 +8,7 @@
 # from the initial corpus; the default seeds are benign single requests.
 # EXPLORE_EXTRA (env) is appended to every run, e.g. "--cov" for the
 # code-edge feedback build (Stage 1c).
+# EXPLORE_CMD (env) replaces the explorer command (failure-injection fixtures).
 # Usage: explore-g34.sh [version] [budget_s] [seeds...]
 set -u
 cd /mnt/c/Users/user/Downloads/php
@@ -18,16 +19,24 @@ seeds=${*:-1 2 3}
 stamp=$(date -u +%Y%m%dT%H%M%S)
 root=/home/phplab/php-lab/evidence/explore-g34-$stamp-$version
 mkdir -p "$root"
+runs=()
 holdout="parse_oom>upload_nofile parse_oom>upload_small runtime_oom>upload_small"
 for s in $seeds; do
   for fb in on off; do
     out="$root/$fb-s$s"
     echo "=== $fb seed=$s -> $out"
     # shellcheck disable=SC2086
-    python3 linux/lifecycle-explore.py --version "$version" --feedback "$fb" --seed "$s" \
+    ${EXPLORE_CMD:-python3 linux/lifecycle-explore.py} --version "$version" --feedback "$fb" --seed "$s" \
       --budget "$budget" --exclude-pairs $holdout ${EXPLORE_EXTRA:-} --out "$out" > "$out.log" 2>&1
-    echo "exit=$? $(tail -c 400 "$out.log" | tr -d '\n' | cut -c1-300)"
+    rc=$?
+    runs+=("$out=$rc")
+    echo "exit=$rc $(tail -c 400 "$out.log" | tr -d '\n' | cut -c1-300)"
   done
 done
 python3 linux/explore-report.py g4 --on "$root"/on-s*/ --off "$root"/off-s*/ > "$root/g4.json"
+# Issue #5-5: every run's rc / summary / aborted / harness errors decide
+# the batch exit code; batch.json separates valid from failed runs.
+python3 linux/batch-check.py "$root" "${runs[@]}"
+batch_rc=$?
 echo "ROOT=$root"
+exit $batch_rc

@@ -329,16 +329,23 @@ SANCOV_MAGIC64 = 0xC0BFFFFFFFFFFF64
 
 
 def read_sancov(cov_dir):
-    """Covered edge-guard PCs (module offsets) of the php binary."""
+    """Covered edge-guard PCs (module offsets) of the php binary, plus the
+    collection state (issue #5-6): coverage_not_collected (no file),
+    coverage_invalid (files but none with a valid header/payload),
+    coverage_valid. Returns (pcs, valid_files, status)."""
     pcs = set()
     files = sorted(Path(cov_dir).glob('php.*.sancov')) if Path(cov_dir).exists() else []
+    valid = 0
     for path in files:
         data = path.read_bytes()
-        if len(data) < 8 or int.from_bytes(data[:8], 'little') != SANCOV_MAGIC64:
+        if len(data) < 16 or int.from_bytes(data[:8], 'little') != SANCOV_MAGIC64:
             continue
+        valid += 1
         for i in range(8, len(data) - 7, 8):
             pcs.add(int.from_bytes(data[i:i + 8], 'little'))
-    return pcs, len(files)
+    status = ('coverage_not_collected' if not files else
+              'coverage_invalid' if not valid else 'coverage_valid')
+    return pcs, valid, status
 
 
 def normalize_state(state, previous):
@@ -379,6 +386,8 @@ def carried_request_state(norm):
 class Process:
     def __init__(self, prefix, out, limit, observer, fault=0, docroot=None, router=None,
                  cov=False):
+        self.fault = fault
+        self.ready_state = None
         # docroot/router default to the lab app; flowfusion-bridge.py
         # serves a fused program next to it.
         docroot = docroot or REPO / 'web'
@@ -431,7 +440,9 @@ class Process:
         self.asan_dir = out
 
     def worker_pid(self):
-        return None  # CLI: attribution uses the gdb-observed inferior pid
+        # The php process itself (observer none) or the gdb inferior; None
+        # only if it cannot be determined - attribution then stays unknown.
+        return self.inferior_pid()
 
     def start(self):
         free_port()
@@ -446,9 +457,16 @@ class Process:
                 with urllib.request.urlopen('http://127.0.0.1:%d/health?step=ready' % PORT,
                                             timeout=3) as res:
                     if json.load(res).get('ok'):
+                        self.ready_state = 'healthy'
                         return
-            except urllib.error.HTTPError:
-                return  # answering at all is ready (an armed fault may 500 it)
+            except urllib.error.HTTPError as exc:
+                # Issue #5-7: an error answer is ready ONLY when fault
+                # injection is armed (it may fail the health request itself).
+                state = readiness_state(exc.code, self.fault)
+                if state == 'fault_expected':
+                    self.ready_state = state
+                    return
+                raise RuntimeError('warmup_unhealthy: health answered HTTP %d' % exc.code)
             except Exception:
                 time.sleep(0.3)
         raise RuntimeError('startup timeout')
@@ -493,6 +511,11 @@ class Process:
         # normal request between steps and clear the very residue under
         # test (basic/session RINIT).
         return self.proc is not None and self.proc.poll() is None
+
+
+def readiness_state(http_code, fault):
+    """Warm-up verdict for an HTTP error answer (issue #5-7)."""
+    return 'fault_expected' if fault and http_code >= 500 else 'unhealthy'
 
 
 HANG_GRACE = 12.0
@@ -658,10 +681,11 @@ def execute(seq, prefix, out, observer, sapi='cli', version=None, cov=False):
                         json.loads(line[6:]))
                 except ValueError:
                     pass
-    edges, cov_files = read_sancov(out / 'cov') if cov else (set(), 0)
+    edges, cov_files, cov_status = read_sancov(out / 'cov') if cov else (set(), 0, None)
     return dict(steps=steps, states=states, events=events,
                 elapsed=round(time.time() - started, 2),
-                sapi=sapi, worker_pid=worker, edges=edges, cov_files=cov_files)
+                sapi=sapi, worker_pid=worker, edges=edges, cov_files=cov_files,
+                cov_status=cov_status, ready_state=getattr(proc, 'ready_state', None))
 
 
 # ------------------------------------------------------------ observation
@@ -692,7 +716,9 @@ def observe(result, seq):
             start = by_step[idx - 1][0] if idx - 1 in by_step else max(0, pos - 2)
             state_norm = normalize_state(st, states[start:pos])
         asan = step.get('asan')
-        attributed = bool(asan and (not pids or asan.get('pid') in pids))
+        # Issue #5-7: no known pid means attribution_unknown, never confirmed.
+        attributed = bool(asan and pids and asan.get('pid') in pids)
+        unknown = bool(asan and not pids)
         site = '|'.join(step['failure_sites']) or '-'
         outcome = '%s/%s/%s' % (re.sub(r'\d\d$', 'xx', step['response']), site,
                                 asan['sig'] if attributed else
@@ -701,6 +727,7 @@ def observe(result, seq):
             keys.add('H:%s|%s' % (state_norm, step['a']))
         violations = carried_request_state(state_norm)
         level = ('memory_error_confirmed' if attributed else
+                 'attribution_unknown' if unknown else
                  'invariant_violation_candidate' if violations else
                  'state_change_observed' if state_norm not in ('unobserved', 'observer_error')
                  and ('fresh' in state_norm or 'carried' in state_norm) else 'none')
@@ -773,9 +800,17 @@ def campaign(args):
                 findings[f['sig']] = dict(first_exec=n, first_t=record['t'], seq=seq,
                                           step=f['step'], summary=f['summary'],
                                           evidence=f['file'])
+        record.update(integrity=verdicts.integrity(seq, steps, res.get('states'),
+                                                   args.observer)['status'],
+                      worker_pid=res.get('worker_pid'))
         record.update(steps=steps, new_keys=new, elapsed=res['elapsed'],
                       new_edges=len(new_edges), edges=len(res.get('edges', ())),
                       cov_files=res.get('cov_files', 0),
+                      cov_status=(None if not args.cov else
+                                  'coverage_valid_no_new_edges'
+                                  if res.get('cov_status') == 'coverage_valid' and not new_edges
+                                  else res.get('cov_status')),
+                      ready_state=res.get('ready_state'),
                       novel_vs_fixed_matrix=not (len(seq['steps']) == 2 and
                                                  tuple(s['a'] for s in seq['steps']) in fixed_set))
         execs_log.write(json.dumps(record) + '\n')
@@ -783,6 +818,17 @@ def campaign(args):
         n += 1
         return record
 
+    if args.cov:
+        # Coverage positive control (issue #5-6): a plain health request must
+        # yield valid edges before any code-edge result is reported.
+        control = run_one(dict(limit='16M', steps=[{'a': 'health'}]), origin='coverage_control')
+        cov_ok = control.get('cov_status') in ('coverage_valid', 'coverage_valid_no_new_edges') \
+            and control.get('edges', 0) > 0
+        if not cov_ok:
+            print(json.dumps(dict(error='coverage positive control failed',
+                                  cov_status=control.get('cov_status'),
+                                  edges=control.get('edges'))))
+            return 3
     # Seeds always run first (both modes) so the budgets compare like for like.
     for seed in seeds:
         rec = run_one(seed, origin='seed')
@@ -838,6 +884,13 @@ def campaign(args):
                                 space_size=grammar_space(args.faults)),
                    unique_keys=kinds, corpus_size=len(corpus), cov=args.cov,
                    code_edge_coverage=len(seen_edges),
+                   binary_sha256=(hashlib.sha256((prefix / 'bin/php').read_bytes()).hexdigest()
+                                  if (prefix / 'bin/php').exists() else None),
+                   cov_collection=({k: sum(1 for line in (out_base / 'execs.jsonl').read_text()
+                                           .splitlines() if '"cov_status": "%s"' % k in line)
+                                    for k in ('coverage_valid', 'coverage_valid_no_new_edges',
+                                              'coverage_invalid', 'coverage_not_collected')}
+                                   if args.cov else None),
                    harness_errors=harness['total'], aborted=harness['aborted'],
                    findings=findings, time_to_first_valid_finding=(
                        min((f['first_t'] for f in findings.values()), default=None)))
@@ -990,8 +1043,38 @@ def self_test():
             x.to_bytes(8, 'little') for x in (0x1000, 0x2040, 0x1000))
         (Path(tmp) / 'php.123.sancov').write_bytes(blob)
         (Path(tmp) / 'php.9.sancov').write_bytes(b'garbage!')
-        pcs, nfiles = read_sancov(tmp)
-    check('sancov parsed, bad magic ignored', pcs == {0x1000, 0x2040} and nfiles == 2)
+        pcs, nfiles, _ = read_sancov(tmp)
+    check('sancov parsed, bad magic ignored', pcs == {0x1000, 0x2040} and nfiles == 1)
+    with tempfile.TemporaryDirectory() as tmp:
+        check('sancov missing -> coverage_not_collected',
+              read_sancov(Path(tmp) / 'none')[2] == 'coverage_not_collected')
+        (Path(tmp) / 'php.1.sancov').write_bytes(b'')
+        (Path(tmp) / 'php.2.sancov').write_bytes(b'notmagic' * 3)
+        check('sancov zero-byte and bad magic -> coverage_invalid',
+              read_sancov(tmp)[2] == 'coverage_invalid')
+        (Path(tmp) / 'php.3.sancov').write_bytes(blob)
+        check('sancov one valid file -> coverage_valid',
+              read_sancov(tmp)[1:] == (1, 'coverage_valid'))
+    check('readiness: 500 without fault is unhealthy', readiness_state(500, 0) == 'unhealthy')
+    check('readiness: 500 with armed fault is fault_expected',
+          readiness_state(500, 30) == 'fault_expected')
+    _, steps_u, found_u = observe(dict(steps=[dict(i=0, a='health', response='no_status',
+                                                   failure_sites=[], alive_after=False,
+                                                   asan=dict(sig='x:y', pid=4242, summary='', file='f'))],
+                                       states=[]), dict(steps=[{'a': 'health'}]))
+    check('ASAN without known pid -> attribution_unknown, no finding',
+          steps_u[0]['oracle'] == 'attribution_unknown' and not found_u)
+    _, steps_k, found_k = observe(dict(steps=[dict(i=0, a='health', response='no_status',
+                                                   failure_sites=[], alive_after=False,
+                                                   asan=dict(sig='x:y', pid=4242, summary='', file='f'))],
+                                       states=[], worker_pid=4242), dict(steps=[{'a': 'health'}]))
+    check('ASAN with matching pid -> confirmed',
+          steps_k[0]['oracle'] == 'memory_error_confirmed' and found_k)
+    _, steps_o, found_o = observe(dict(steps=[dict(i=0, a='health', response='no_status',
+                                                   failure_sites=[], alive_after=False,
+                                                   asan=dict(sig='x:y', pid=1, summary='', file='f'))],
+                                       states=[], worker_pid=4242), dict(steps=[{'a': 'health'}]))
+    check('ASAN of another pid -> not confirmed', not found_o)
     print('self_test=%d/%d' % (ok, total))
     return 0 if ok == total else 1
 
