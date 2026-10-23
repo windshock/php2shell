@@ -1,0 +1,1 @@
+I believe this should be fine for merge. I've done a couple of hours of fuzzing with this patch as a sanity check, which didn't turn up anything.

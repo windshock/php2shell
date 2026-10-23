@@ -1,0 +1,2 @@
+As suggested by Niki, I can confirm that the bug is related to an exception in a destructor. The exception is only created (not thrown) for the purpose of preserving the backtrace for other use if need arises (it may be thrown at a much later stage)... And as suggested it is extremely probable that the generated backtrace at the exception creation contains references to destroyed arguments. We still dont have a short reproduction case.
+Is there are way to still create an exception in this case?

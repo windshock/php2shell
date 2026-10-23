@@ -1,0 +1,13 @@
+{
+  "record": "R19",
+  "label": "[bugs #79784](https://bugs.php.net/bug.php?id=79784)",
+  "fetched_at": "2026-10-23T13:18:04Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=79784",
+      "blocks": 5,
+      "kind": "bug",
+      "title": "PHP :: Bug #79784 :: Use after free if changing array during undef var during array write fetch"
+    }
+  ]
+}

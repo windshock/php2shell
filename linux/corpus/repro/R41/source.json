@@ -1,0 +1,13 @@
+{
+  "record": "R41",
+  "label": "[Issue #20352](https://github.com/php/php-src/issues/20352)",
+  "fetched_at": "2026-10-23T13:18:13Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/20352",
+      "blocks": 8,
+      "kind": "issue",
+      "title": "UAF in php_output_handler_free via re-entrant ob_start() during error deactivation"
+    }
+  ]
+}

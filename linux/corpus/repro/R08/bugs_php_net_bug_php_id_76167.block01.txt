@@ -1,0 +1,5 @@
+The following pull request has been associated:
+
+Patch Name: Fix #76167: mbstring may use pointer from some previous request
+On GitHub:  https://github.com/php/php-src/pull/7604
+Patch:      https://github.com/php/php-src/pull/7604.patch

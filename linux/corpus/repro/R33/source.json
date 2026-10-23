@@ -1,0 +1,13 @@
+{
+  "record": "R33",
+  "label": "[Issue #16464](https://github.com/php/php-src/issues/16464)",
+  "fetched_at": "2026-10-23T13:18:10Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/16464",
+      "blocks": 4,
+      "kind": "issue",
+      "title": "Use after free in SplDoublyLinkedList"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "record": "R56",
+  "label": "[Issue #24489](https://github.com/php/php-src/issues/24489)",
+  "fetched_at": "2026-10-23T13:18:20Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/24489",
+      "blocks": 1,
+      "kind": "issue",
+      "title": "master: part of the mbstring bailout fix got lost in a merge"
+    }
+  ]
+}

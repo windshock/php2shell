@@ -1,0 +1,147 @@
+Description:
+------------
+While fuzzing the PHP interpreter, I discovered a use-after-free in the XMLWriter component. After some experimentation this seems to affect the XMLReader component as well. In both cases, the crash seems to be caused by PHP attempting to free the the object's _php_stream resource structure twice.  I am not certain if these are the same single bug, or two similar bugs.
+
+The snippets below are:
+ - poc1.php: The original minimized crashing test-case (using XMLWriter).
+ - poc2.php: The same crash in XMLWriter, triggered using fclose().
+ - poc3.php: A similar crash in XMLReader, triggered using fclose().
+
+The ASAN crash log is from poc1.php
+
+Test script:
+---------------
+<?php
+
+
+// poc1.php
+$x = array( new XMLWriter() );
+$x[0]->openUri("a");
+$x[0]->startComment();
+
+
+// poc2.php
+$x = new XMLWriter();
+$x->openUri("a");
+fclose(end(get_resources()));
+
+
+// poc3.php
+file_put_contents("a", "a");
+$x = new XMLReader();
+$x->open("a");
+fclose(end(get_resources()));
+
+
+Expected result:
+----------------
+no crash
+
+Actual result:
+--------------
+root@fuzz9:/tmp# USE_ZEND_ALLOC=0 php poc1.php 
+=================================================================
+==31318==ERROR: AddressSanitizer: heap-use-after-free on address 0x611000002980 at pc 0x55555652a31f bp 0x7fffffffbc00 sp 0x7fffffffbbf8
+READ of size 8 at 0x611000002980 thread T0
+    #0 0x55555652a31e in _php_stream_write /usr/local/src/php-7.4.1/main/streams/streams.c:1246
+    #1 0x555555abbc38 in php_libxml_streams_IO_write /usr/local/src/php-7.4.1/ext/libxml/libxml.c:384
+    #2 0x7ffff5584fc0 in xmlOutputBufferFlush (/usr/lib/x86_64-linux-gnu/libxml2.so.2+0x73fc0)
+    #3 0x7ffff5585027 in xmlOutputBufferClose (/usr/lib/x86_64-linux-gnu/libxml2.so.2+0x74027)
+    #4 0x7ffff5653d8e in xmlFreeTextWriter (/usr/lib/x86_64-linux-gnu/libxml2.so.2+0x142d8e)
+    #5 0x5555563c234c in xmlwriter_free_resource_ptr /usr/local/src/php-7.4.1/ext/xmlwriter/php_xmlwriter.c:87
+    #6 0x5555563c2470 in xmlwriter_object_free_storage /usr/local/src/php-7.4.1/ext/xmlwriter/php_xmlwriter.c:121
+    #7 0x5555566fdf37 in zend_objects_store_del /usr/local/src/php-7.4.1/Zend/zend_objects_API.c:193
+    #8 0x55555662da49 in rc_dtor_func /usr/local/src/php-7.4.1/Zend/zend_variables.c:57
+    #9 0x555556664e81 in i_zval_ptr_dtor /usr/local/src/php-7.4.1/Zend/zend_variables.h:44
+    #10 0x55555667124b in zend_array_destroy /usr/local/src/php-7.4.1/Zend/zend_hash.c:1611
+    #11 0x55555662da49 in rc_dtor_func /usr/local/src/php-7.4.1/Zend/zend_variables.c:57
+    #12 0x55555662d91f in i_zval_ptr_dtor /usr/local/src/php-7.4.1/Zend/zend_variables.h:44
+    #13 0x55555662dcf2 in zval_ptr_dtor /usr/local/src/php-7.4.1/Zend/zend_variables.c:84
+    #14 0x55555666f00a in _zend_hash_del_el_ex /usr/local/src/php-7.4.1/Zend/zend_hash.c:1305
+    #15 0x55555666f2fb in _zend_hash_del_el /usr/local/src/php-7.4.1/Zend/zend_hash.c:1328
+    #16 0x555556672a54 in zend_hash_graceful_reverse_destroy /usr/local/src/php-7.4.1/Zend/zend_hash.c:1782
+    #17 0x5555565f59cf in shutdown_executor /usr/local/src/php-7.4.1/Zend/zend_execute_API.c:277
+    #18 0x555556633d6c in zend_deactivate /usr/local/src/php-7.4.1/Zend/zend.c:1184
+    #19 0x5555564e4b9d in php_request_shutdown /usr/local/src/php-7.4.1/main/main.c:1925
+    #20 0x5555568791d7 in do_cli /usr/local/src/php-7.4.1/sapi/cli/php_cli.c:1129
+    #21 0x555556879f46 in main /usr/local/src/php-7.4.1/sapi/cli/php_cli.c:1352
+    #22 0x7ffff152f2e0 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x202e0)
+    #23 0x555555a0d909 in _start (/usr/local/bin/php+0x4b9909)
+
+0x611000002980 is located 0 bytes inside of 224-byte region [0x611000002980,0x611000002a60)
+freed by thread T0 here:
+    #0 0x7ffff6effa10 in free (/usr/lib/x86_64-linux-gnu/libasan.so.3+0xc1a10)
+    #1 0x5555565aac3e in _efree_custom /usr/local/src/php-7.4.1/Zend/zend_alloc.c:2425
+    #2 0x5555565aae5a in _efree /usr/local/src/php-7.4.1/Zend/zend_alloc.c:2545
+    #3 0x555556526919 in _php_stream_free /usr/local/src/php-7.4.1/main/streams/streams.c:521
+    #4 0x55555652c25c in stream_resource_regular_dtor /usr/local/src/php-7.4.1/main/streams/streams.c:1655
+    #5 0x55555667afd5 in zend_resource_dtor /usr/local/src/php-7.4.1/Zend/zend_list.c:74
+    #6 0x55555667bd67 in zend_close_rsrc_list /usr/local/src/php-7.4.1/Zend/zend_list.c:229
+    #7 0x5555565f5928 in shutdown_executor /usr/local/src/php-7.4.1/Zend/zend_execute_API.c:270
+    #8 0x555556633d6c in zend_deactivate /usr/local/src/php-7.4.1/Zend/zend.c:1184
+    #9 0x5555564e4b9d in php_request_shutdown /usr/local/src/php-7.4.1/main/main.c:1925
+    #10 0x5555568791d7 in do_cli /usr/local/src/php-7.4.1/sapi/cli/php_cli.c:1129
+    #11 0x555556879f46 in main /usr/local/src/php-7.4.1/sapi/cli/php_cli.c:1352
+    #12 0x7ffff152f2e0 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x202e0)
+
+previously allocated by thread T0 here:
+    #0 0x7ffff6effd28 in malloc (/usr/lib/x86_64-linux-gnu/libasan.so.3+0xc1d28)
+    #1 0x5555565acd42 in __zend_malloc /usr/local/src/php-7.4.1/Zend/zend_alloc.c:2975
+    #2 0x5555565aab5e in _malloc_custom /usr/local/src/php-7.4.1/Zend/zend_alloc.c:2416
+    #3 0x5555565aadaf in _emalloc /usr/local/src/php-7.4.1/Zend/zend_alloc.c:2535
+    #4 0x555556525655 in _php_stream_alloc /usr/local/src/php-7.4.1/main/streams/streams.c:282
+    #5 0x55555653a03d in _php_stream_fopen_from_fd_int /usr/local/src/php-7.4.1/main/streams/plain_wrapper.c:187
+    #6 0x55555653a844 in _php_stream_fopen_from_fd /usr/local/src/php-7.4.1/main/streams/plain_wrapper.c:268
+    #7 0x55555653d4f5 in _php_stream_fopen /usr/local/src/php-7.4.1/main/streams/plain_wrapper.c:1072
+    #8 0x55555653d927 in php_plain_files_stream_opener /usr/local/src/php-7.4.1/main/streams/plain_wrapper.c:1132
+    #9 0x55555652e730 in _php_stream_open_wrapper_ex /usr/local/src/php-7.4.1/main/streams/streams.c:2095
+    #10 0x555555abba5a in php_libxml_streams_IO_open_wrapper /usr/local/src/php-7.4.1/ext/libxml/libxml.c:357
+    #11 0x555555abbb85 in php_libxml_streams_IO_open_write_wrapper /usr/local/src/php-7.4.1/ext/libxml/libxml.c:371
+    #12 0x555555abbe77 in php_libxml_output_buffer_create_filename /usr/local/src/php-7.4.1/ext/libxml/libxml.c:450
+    #13 0x7ffff56530ec in xmlNewTextWriterFilename (/usr/lib/x86_64-linux-gnu/libxml2.so.2+0x1420ec)
+    #14 0x555556742276 in ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HANDLER /usr/local/src/php-7.4.1/Zend/zend_vm_execute.h:1617
+    #15 0x555556866382 in execute_ex /usr/local/src/php-7.4.1/Zend/zend_vm_execute.h:53584
+    #16 0x5555568723a2 in zend_execute /usr/local/src/php-7.4.1/Zend/zend_vm_execute.h:57664
+    #17 0x555556637471 in zend_execute_scripts /usr/local/src/php-7.4.1/Zend/zend.c:1663
+    #18 0x5555564e6e94 in php_execute_script /usr/local/src/php-7.4.1/main/main.c:2619
+    #19 0x5555568781c9 in do_cli /usr/local/src/php-7.4.1/sapi/cli/php_cli.c:961
+    #20 0x555556879f46 in main /usr/local/src/php-7.4.1/sapi/cli/php_cli.c:1352
+    #21 0x7ffff152f2e0 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x202e0)
+
+SUMMARY: AddressSanitizer: heap-use-after-free /usr/local/src/php-7.4.1/main/streams/streams.c:1246 in _php_stream_write
+Shadow bytes around the buggy address:
+  0x0c227fff84e0: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c227fff84f0: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c227fff8500: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c227fff8510: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c227fff8520: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+=>0x0c227fff8530:[fd]fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+  0x0c227fff8540: fd fd fd fd fd fd fd fd fd fd fd fd fa fa fa fa
+  0x0c227fff8550: fa fa fa fa fa fa fa fa fd fd fd fd fd fd fd fd
+  0x0c227fff8560: fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+  0x0c227fff8570: fd fd fd fd fd fd fd fd fa fa fa fa fa fa fa fa
+  0x0c227fff8580: fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Heap right redzone:      fb
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack partial redzone:   f4
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==31318==ABORTING
+
+

@@ -1,0 +1,1 @@
+@dmitry: Can you please take a look at this issue? The GC code for dealing with references added during __destruct() is not entirely correct, even in PHP 7, because the refcount check is insufficient to detect new outside reference. I don't see any simple fix for this problem :/

@@ -1,0 +1,1 @@
+Could you please specify what you mean by "exploiting it in the wild"? what exactly is being exploited? I see that the specific code can trigger UAF, but there's no security issue there, it's just a regular crash. Are you saying there's some way to remotely exploit this problem on an arbitrary (or common) PHP code? If so, could you refer to a specific example of that?

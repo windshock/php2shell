@@ -1,0 +1,62 @@
+Reduced test case:
+
+<?php
+
+class Vuln {
+    public $a;
+    public function __destruct() { 
+        global $backtrace; 
+        unset($this->a);
+        $backtrace = (new Exception)->getTrace(); 
+    }
+}
+
+function trigger_uaf($arg) {
+    $arg = str_shuffle(str_repeat('A', 79));
+    $vuln = new Vuln();
+    $vuln->a = $arg;
+}
+
+trigger_uaf('x');
+
+Valgrind:
+
+==19523== Invalid read of size 4
+==19523==    at 0x95ACE4: zend_gc_addref (zend_types.h:1035)
+==19523==    by 0x95AE04: zval_addref_p (zend_types.h:1070)
+==19523==    by 0x963E3B: debug_backtrace_get_args (zend_builtin_functions.c:2156)
+==19523==    by 0x9654C8: zend_fetch_debug_backtrace (zend_builtin_functions.c:2551)
+==19523==    by 0x96CA84: zend_default_exception_new_ex (zend_exceptions.c:215)
+==19523==    by 0x96CD2B: zend_default_exception_new (zend_exceptions.c:246)
+==19523==    by 0x944F5E: _object_and_properties_init (zend_API.c:1417)
+==19523==    by 0x944FCC: object_init_ex (zend_API.c:1431)
+==19523==    by 0x9C097F: ZEND_NEW_SPEC_CONST_UNUSED_HANDLER (zend_vm_execute.h:9225)
+==19523==    by 0xA1797F: execute_ex (zend_vm_execute.h:54571)
+==19523==    by 0x924E0A: zend_call_function (zend_execute_API.c:812)
+==19523==    by 0x98E5EA: zend_objects_destroy_object (zend_objects.c:179)
+==19523==  Address 0x124f1d40 is 0 bytes inside a block of size 104 free'd
+==19523==    at 0x4C30D3B: free (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==19523==    by 0x902F35: _efree_custom (zend_alloc.c:2425)
+==19523==    by 0x903080: _efree (zend_alloc.c:2545)
+==19523==    by 0x939CFC: zend_string_destroy (zend_variables.c:67)
+==19523==    by 0x939BFB: rc_dtor_func (zend_variables.c:57)
+==19523==    by 0x939B7E: i_zval_ptr_dtor (zend_variables.h:44)
+==19523==    by 0x939D90: zval_ptr_dtor (zend_variables.c:84)
+==19523==    by 0x992DB7: zend_std_unset_property (zend_object_handlers.c:1127)
+==19523==    by 0x9F4460: ZEND_UNSET_OBJ_SPEC_UNUSED_CONST_HANDLER (zend_vm_execute.h:32155)
+==19523==    by 0xA19883: execute_ex (zend_vm_execute.h:56539)
+==19523==    by 0x924E0A: zend_call_function (zend_execute_API.c:812)
+==19523==    by 0x98E5EA: zend_objects_destroy_object (zend_objects.c:179)
+==19523==  Block was alloc'd at
+==19523==    at 0x4C2FB0F: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==19523==    by 0x903F80: __zend_malloc (zend_alloc.c:2975)
+==19523==    by 0x902EC8: _malloc_custom (zend_alloc.c:2416)
+==19523==    by 0x903006: _emalloc (zend_alloc.c:2535)
+==19523==    by 0x78B0ED: zend_string_alloc (zend_string.h:133)
+==19523==    by 0x78B235: zend_string_init (zend_string.h:155)
+==19523==    by 0x7A9CAF: zif_str_shuffle (string.c:6096)
+==19523==    by 0x9B10AC: ZEND_DO_ICALL_SPEC_RETVAL_USED_HANDLER (zend_vm_execute.h:1314)
+==19523==    by 0xA16DF9: execute_ex (zend_vm_execute.h:53797)
+==19523==    by 0xA1AF38: zend_execute (zend_vm_execute.h:57913)
+==19523==    by 0x93E39D: zend_execute_scripts (zend.c:1665)
+==19523==    by 0x89FE54: php_execute_script (main.c:2617)

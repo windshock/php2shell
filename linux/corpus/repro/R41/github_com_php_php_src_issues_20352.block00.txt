@@ -1,0 +1,19 @@
+<?php
+class a {
+    function __destruct() {
+        ['']?->a[''];
+        ob_start(function () use (&$c) {
+            return 'x';
+        }, 1);
+        $c = new A;
+        unset($c);
+        $c = new A;
+        $array = array($c);
+        unset($c);
+        ob_start(function () use (&$c) {
+            $c = new A;
+            return 'x';
+        }, 1);
+    }
+}
+new a;

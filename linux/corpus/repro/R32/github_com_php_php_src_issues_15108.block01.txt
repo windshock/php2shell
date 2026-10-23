@@ -1,0 +1,2 @@
+➜ php examples/gc.php 
+[1]    13539 segmentation fault  php examples/gc.php

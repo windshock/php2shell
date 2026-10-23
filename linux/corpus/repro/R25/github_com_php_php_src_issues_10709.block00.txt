@@ -1,0 +1,10 @@
+<?php
+
+class B { const HW = A::HW . " extended by B"; }
+
+spl_autoload_register(function ($class) {
+    class A { const HW = "this is A"; }
+    var_dump(B::HW);
+});
+
+var_dump(new B());

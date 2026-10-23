@@ -1,0 +1,3 @@
+Automatic comment on behalf of stas
+Revision: http://git.php.net/?p=php-src.git;a=commit;h=c14eb8de974fc8a4d74f3515424c293bc7a40fba
+Log: Fix bug #78793

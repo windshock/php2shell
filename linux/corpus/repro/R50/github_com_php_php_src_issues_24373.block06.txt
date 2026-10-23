@@ -1,0 +1,2 @@
+PHP 8.5.11 (cli) (NTS) – official docker image php:8.5-cli
+PHP 8.4.26 (cli) (NTS) – official docker image php:8.4-cli

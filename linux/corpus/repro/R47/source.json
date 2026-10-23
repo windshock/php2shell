@@ -1,0 +1,13 @@
+{
+  "record": "R47",
+  "label": "[Issue #22895](https://github.com/php/php-src/issues/22895)",
+  "fetched_at": "2026-10-23T13:18:15Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/22895",
+      "blocks": 7,
+      "kind": "issue",
+      "title": "ext/soap: heap use-after-free while encoding a `MultipleIterator`"
+    }
+  ]
+}

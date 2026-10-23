@@ -1,0 +1,13 @@
+{
+  "record": "R42",
+  "label": "[Issue #21499](https://github.com/php/php-src/issues/21499)",
+  "fetched_at": "2026-10-23T13:18:14Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/21499",
+      "blocks": 6,
+      "kind": "issue",
+      "title": "Use-After-Free in RecursiveArrayIterator::getChildren()"
+    }
+  ]
+}

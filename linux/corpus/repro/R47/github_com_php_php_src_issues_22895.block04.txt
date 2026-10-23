@@ -1,0 +1,10 @@
+docker cp SOAP-NEW-009_multiple_iterator_uaf_poc.php \
+  php-asan-8420-filter-audit2:/tmp/SOAP-NEW-009_multiple_iterator_uaf_poc.php
+docker exec php-asan-8420-filter-audit2 sh -lc \
+  'env LD_LIBRARY_PATH=/opt/openssl-3.2/lib64 \
+   USE_ZEND_ALLOC=0 \
+   ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:abort_on_error=1 \
+   UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1 \
+   /src/php/sapi/cli/php \
+   /tmp/SOAP-NEW-009_multiple_iterator_uaf_poc.php \
+   > /tmp/SOAP-NEW-009_multiple_iterator_uaf_asan.txt 2>&1'

@@ -1,0 +1,5 @@
+I've applied an additional fix at https://github.com/php/php-src/commit/18f2918a0fcf66562a5e7d964188c188660e9728 for a crash observed on 7.4.
+
+After looking at this more, the current solution is still incomplete. Looking at a GC trace for https://github.com/php/php-src/blob/6b1cc1252e73e51e53194c8c65e3d2302bc83dca/Zend/tests/bug78379_2.phpt we see that the first GC run does *not* collect the cycle, even though it should. We mark the array root grey first and miss a refcount decrement due to that (as we're not decrementing if it's a property array).
+
+I think the current code may be okay to prevent crashes for 7.2, but we probably need to implement the proper refcount based variant for 7.4 to actually make this work correctly.

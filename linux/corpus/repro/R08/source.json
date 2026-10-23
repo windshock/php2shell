@@ -1,0 +1,13 @@
+{
+  "record": "R08",
+  "label": "[bugs #76167](https://bugs.php.net/bug.php?id=76167)",
+  "fetched_at": "2026-10-23T13:17:59Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=76167",
+      "blocks": 3,
+      "kind": "bug",
+      "title": "PHP :: Bug #76167 :: mbstring may use/efree() pointer from some previous request"
+    }
+  ]
+}

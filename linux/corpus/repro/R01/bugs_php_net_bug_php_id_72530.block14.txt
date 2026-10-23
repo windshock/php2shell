@@ -1,0 +1,3 @@
+Automatic comment on behalf of nikita.ppv@gmail.com
+Revision: http://git.php.net/?p=php-src.git;a=commit;h=60a7e60b61b8e4a3d455974c83f76a26546ce117
+Log: Fixed bug #72530

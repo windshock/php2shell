@@ -1,0 +1,142 @@
+Description:
+------------
+mbstring seems to assume that calls to rinit are matched with calls to rshutdown, but this may not be case. In particular, if another extension fails its rinit (after mbstring has run its), either by returning FAILURE or calling zend_error(), then rshutdown will never be called, as PG(modules_activated) will be 0.
+
+when mbstring_globals.current_detect_order_list is allocated a pointer, this pointer is freed in rshutdown:
+
+PHP_RSHUTDOWN_FUNCTION(mbstring)
+{
+	const struct mb_overload_def *p;
+	zend_function *orig;
+
+	if (MBSTRG(current_detect_order_list) != NULL) {
+		efree(MBSTRG(current_detect_order_list));
+		MBSTRG(current_detect_order_list) = NULL;
+		MBSTRG(current_detect_order_list_size) = 0;
+	}
+
+At this point, the pointer stored by current_detect_order_list may not be valid anymore, because it may have come from another request. This is because the per-request initialization of current_detect_order_list is not unconditional:
+
+static void php_mb_populate_current_detect_order_list(TSRMLS_D)
+{
+	const mbfl_encoding **entry = 0;
+	size_t nentries;
+
+	if (MBSTRG(current_detect_order_list)) {
+		return;
+	}
+
+If current_detect_order_list is filled with an invalid pointer from a previous request, it will stay so. php_mb_populate_current_detect_order_list() is called from RINIT.
+
+Solution: make php_mb_populate_current_detect_order_list() execute unconditionally.
+
+
+
+
+Expected result:
+----------------
+no crash
+
+Actual result:
+--------------
+gdb session (line numbers are for 5.6.31, but it also happens in 5.6.35):
+
+Hardware watchpoint 1: *mbstring_globals.current_detect_order_list
+Breakpoint 2 at 0x7f841794defe: file /tmp/php/ext/mbstring/mbstring.c, line 4620.
+Breakpoint 3 at 0x7f8421d8350a: file /tmp/php/main/main.c, line 1617.
+Breakpoint 4 at 0x7f8421d83c16: file /tmp/php/main/main.c, line 1819.
+Breakpoint 5 at 0x7f84179420bb: file /tmp/php/ext/mbstring/mbstring.c, line 1662.
+(gdb) c
+Continuing.
+
+Breakpoint 3, php_request_startup () at /tmp/php/main/main.c:1617
+1617	{
+(gdb) 
+Continuing.
+
+Breakpoint 2, php_mb_populate_current_detect_order_list () at /tmp/php/ext/mbstring/mbstring.c:4620
+4620		const mbfl_encoding **entry = 0;
+(gdb) 
+Continuing.
+
+Hardware watchpoint 1: *mbstring_globals.current_detect_order_list
+
+Old value = <unreadable>
+New value = (const mbfl_encoding *) 0x7f8417c6bb20 <mbfl_encoding_ascii>
+php_mb_populate_current_detect_order_list () at /tmp/php/ext/mbstring/mbstring.c:4641
+4641		MBSTRG(current_detect_order_list_size) = nentries;
+(gdb) 
+Continuing.
+
+Breakpoint 4, php_request_shutdown (dummy=0x0) at /tmp/php/main/main.c:1819
+1819	{
+(gdb) 
+Continuing.
+
+Breakpoint 3, php_request_startup () at /tmp/php/main/main.c:1617
+1617	{
+(gdb)
+Continuing.
+
+Breakpoint 2, php_mb_populate_current_detect_order_list () at /tmp/php/ext/mbstring/mbstring.c:4620
+4620		const mbfl_encoding **entry = 0;
+(gdb)
+Continuing.
+
+Hardware watchpoint 1: *mbstring_globals.current_detect_order_list
+
+Old value = (const mbfl_encoding *) 0x7f8417c6bb20 <mbfl_encoding_ascii>
+New value = (const mbfl_encoding *) 0x7f8425baebb0
+_array_init (arg=0x7f8425baeb38, size=0, __zend_filename=0x7f8421fd7a4e "/tmp/php/main/php_variables.c", __zend_lineno=630) at /tmp/php/Zend/zend_API.c:1013
+1013		_zend_hash_init(Z_ARRVAL_P(arg), size, ZVAL_PTR_DTOR, 0 ZEND_FILE_LINE_RELAY_CC);
+(gdb)
+Continuing.
+
+Breakpoint 4, php_request_shutdown (dummy=0x0) at /tmp/php/main/main.c:1819
+1819	{
+(gdb)
+Continuing.
+
+Hardware watchpoint 1: *mbstring_globals.current_detect_order_list
+
+Old value = (const mbfl_encoding *) 0x7f8425baebb0
+New value = (const mbfl_encoding *) 0x5a5a5a5a5a5a5a5a
+__memset_avx2 () at ../sysdeps/x86_64/multiarch/memset-avx2.S:86
+86	../sysdeps/x86_64/multiarch/memset-avx2.S: No such file or directory.
+(gdb)
+Continuing.
+
+Breakpoint 3, php_request_startup () at /tmp/php/main/main.c:1617
+1617	{
+(gdb)
+Continuing.
+
+Hardware watchpoint 1: *mbstring_globals.current_detect_order_list
+
+Old value = (const mbfl_encoding *) 0x5a5a5a5a5a5a5a5a
+New value = (const mbfl_encoding *) 0x0
+__memset_avx2 () at ../sysdeps/x86_64/multiarch/memset-avx2.S:144
+144	../sysdeps/x86_64/multiarch/memset-avx2.S: No such file or directory.
+(gdb)
+Continuing.
+
+Breakpoint 2, php_mb_populate_current_detect_order_list () at /tmp/php/ext/mbstring/mbstring.c:4620
+4620		const mbfl_encoding **entry = 0;
+(gdb)
+Continuing.
+
+Breakpoint 4, php_request_shutdown (dummy=0x0) at /tmp/php/main/main.c:1819
+1819	{
+(gdb)
+Continuing.
+
+Breakpoint 5, zm_deactivate_mbstring (type=1, module_number=24) at /tmp/php/ext/mbstring/mbstring.c:1662
+1662	{
+(gdb)
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00007f8421de5a94 in zend_mm_check_ptr (heap=0x55b843b361d0, ptr=0x7f8425baeb38, silent=0, __zend_filename=0x7f8417a50328 "/tmp/php/ext/mbstring/mbstring.c",
+    __zend_lineno=1667, __zend_orig_filename=0x0, __zend_orig_lineno=0) at /tmp/php/Zend/zend_alloc.c:1393
+1393		    ZEND_MM_PREV_BLOCK(p)->info._size != p->info._prev) {
+

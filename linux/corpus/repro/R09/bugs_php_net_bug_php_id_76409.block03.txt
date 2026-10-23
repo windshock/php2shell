@@ -1,0 +1,3 @@
+Automatic comment on behalf of cmbecker69@gmx.de
+Revision: http://git.php.net/?p=php-src.git;a=commit;h=3fdde65617e9f954e2c964768aac8831005497e5
+Log: Fix #76409: heap use after free in _php_stream_free

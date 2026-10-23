@@ -1,0 +1,20 @@
+After some testing I found that it matters if $some_string passed as an argument or not even if after that it is initialized. It also matters the refcount - if it is 2 it fails, 1 passes.
+
+This partial code produces crash:
+
+function f1($some_string) {
+$object = some_singleton_class::get_instance();
+$some_string = date('Y-m-d');//needs to be a function here so that refcount is 2, having just plain string is refcount=1 and doesnt produce the crash
+$object->overloaded_property = $some_string;
+}
+f1('bla');
+
+While this does not:
+function f1() {
+$object = some_singleton_class::get_instance();
+$some_string = date('Y-m-d');//needs to be a function here so that refcount is 2
+$object->overloaded_property = $some_string;
+}
+f1();
+
+Of course there are plenty other things around that which Im trying to remove. But I was wondering can the above provide some clue as to what may be happening.

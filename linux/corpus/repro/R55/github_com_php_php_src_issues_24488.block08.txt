@@ -1,0 +1,5 @@
+zend_mm_heap corrupted
+
+In Process.php line 498:
+
+  The process has been signaled with signal "6". 

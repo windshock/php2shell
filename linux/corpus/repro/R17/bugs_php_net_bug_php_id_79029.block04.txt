@@ -1,0 +1,3 @@
+Automatic comment on behalf of laruence@gmail.com
+Revision: http://git.php.net/?p=php-src.git;a=commit;h=e36daa6927c05d2e687bb77495ef206cde118b33
+Log: Fixed bug #79029 (Use After Free's in XMLReader / XMLWriter).

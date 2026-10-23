@@ -1,0 +1,140 @@
+I have deployed a debug build on the UAT server and a crash happened one day later
+
+I think the backtrace shows, the process is trying to shutdown?
+
+Howto debug further the issue?
+
+Program terminated with signal SIGSEGV, Segmentation fault.
+#0  0x0000000000a11368 in zend_objects_store_put (object=0x7f5e43ef57e0) at /home/mate/php-7.2.6-debug/Zend/zend_objects_API.c:150
+
+(gdb) bt
+#0  0x0000000000a11368 in zend_objects_store_put (object=0x7f5e43ef57e0) at /home/mate/php-7.2.6-debug/Zend/zend_objects_API.c:150
+#1  0x0000000000a0a05c in zend_object_std_init (object=0x7f5e43ef57e0, ce=0x7f5e3fe56bc0) at /home/mate/php-7.2.6-debug/Zend/zend_objects.c:36
+#2  0x0000000000a0a604 in zend_objects_new (ce=0x7f5e3fe56bc0) at /home/mate/php-7.2.6-debug/Zend/zend_objects.c:163
+#3  0x00000000009eaf0a in zend_default_exception_new_ex (class_type=0x7f5e3fe56bc0, skip_top_traces=2) at /home/mate/php-7.2.6-debug/Zend/zend_exceptions.c:210
+#4  0x00000000009eb1f8 in zend_error_exception_new (class_type=0x7f5e3fe56bc0) at /home/mate/php-7.2.6-debug/Zend/zend_exceptions.c:250
+#5  0x00000000009c431e in _object_and_properties_init (arg=0x7f5e4ba1f5a0, class_type=0x7f5e3fe56bc0, properties=0x0, __zend_filename=0xd72d30 "/home/mate/php-7.2.6-debug/Zend/zend_vm_execute.h", 
+    __zend_lineno=3231) at /home/mate/php-7.2.6-debug/Zend/zend_API.c:1332
+#6  0x00000000009c4373 in _object_init_ex (arg=0x7f5e4ba1f5a0, class_type=0x7f5e3fe56bc0, __zend_filename=0xd72d30 "/home/mate/php-7.2.6-debug/Zend/zend_vm_execute.h", __zend_lineno=3231)
+    at /home/mate/php-7.2.6-debug/Zend/zend_API.c:1340
+#7  0x0000000000a29255 in ZEND_NEW_SPEC_CONST_HANDLER () at /home/mate/php-7.2.6-debug/Zend/zend_vm_execute.h:3231
+#8  0x0000000000aa93f4 in execute_ex (ex=0x7f5e4ba1f4a0) at /home/mate/php-7.2.6-debug/Zend/zend_vm_execute.h:59929
+#9  0x00000000009a3a0f in zend_call_function (fci=0x7ffc9fbcc300, fci_cache=0x7ffc9fbcc210) at /home/mate/php-7.2.6-debug/Zend/zend_execute_API.c:819
+#10 0x00000000009a2f9b in _call_user_function_ex (object=0x0, function_name=0x7f5e4ba69540, retval_ptr=0x7ffc9fbcc370, param_count=0, params=0x7f5e4ba69550, no_separation=1)
+    at /home/mate/php-7.2.6-debug/Zend/zend_execute_API.c:654
+#11 0x00000000007ce866 in user_shutdown_function_call (zv=0x7f5e4baa1c48) at /home/mate/php-7.2.6-debug/ext/standard/basic_functions.c:5023
+#12 0x00000000009d4ef5 in zend_hash_apply (ht=0x7f5e4baa39c0, apply_func=0x7ce7a2 <user_shutdown_function_call>) at /home/mate/php-7.2.6-debug/Zend/zend_hash.c:1506
+#13 0x00000000007cec3d in php_call_shutdown_functions () at /home/mate/php-7.2.6-debug/ext/standard/basic_functions.c:5107
+#14 0x000000000092058c in php_request_shutdown (dummy=0x0) at /home/mate/php-7.2.6-debug/main/main.c:1846
+#15 0x0000000000ac15ea in main (argc=3, argv=0x7ffc9fbcd3e8) at /home/mate/php-7.2.6-debug/sapi/fpm/fpm/fpm_main.c:1994
+
+
+(gdb) bt full
+#0  0x0000000000a11368 in zend_objects_store_put (object=0x7f5e43ef57e0) at /home/mate/php-7.2.6-debug/Zend/zend_objects_API.c:150
+        handle = 2097152
+#1  0x0000000000a0a05c in zend_object_std_init (object=0x7f5e43ef57e0, ce=0x7f5e3fe56bc0) at /home/mate/php-7.2.6-debug/Zend/zend_objects.c:36
+No locals.
+#2  0x0000000000a0a604 in zend_objects_new (ce=0x7f5e3fe56bc0) at /home/mate/php-7.2.6-debug/Zend/zend_objects.c:163
+        object = 0x7f5e43ef57e0
+#3  0x00000000009eaf0a in zend_default_exception_new_ex (class_type=0x7f5e3fe56bc0, skip_top_traces=2) at /home/mate/php-7.2.6-debug/Zend/zend_exceptions.c:210
+        obj = {value = {lval = 140042919300624, dval = 6,9190395369756367e-310, counted = 0x7f5e48754e10, str = 0x7f5e48754e10, arr = 0x7f5e48754e10, obj = 0x7f5e48754e10, res = 0x7f5e48754e10, 
+            ref = 0x7f5e48754e10, ast = 0x7f5e48754e10, zv = 0x7f5e48754e10, ptr = 0x7f5e48754e10, ce = 0x7f5e48754e10, func = 0x7f5e48754e10, ww = {w1 = 1215647248, w2 = 32606}}, u1 = {v = {
+              type = 1 '\001', type_flags = 0 '\000', const_flags = 0 '\000', reserved = 0 '\000'}, type_info = 1}, u2 = {next = 32606, cache_slot = 32606, lineno = 32606, num_args = 32606, 
+            fe_pos = 32606, fe_iter_idx = 32606, access_flags = 32606, property_guard = 32606, extra = 32606}}
+        tmp = {value = {lval = 8718968882884247553, dval = 6,9244686821830323e+274, counted = 0x7900000100000001, str = 0x7900000100000001, arr = 0x7900000100000001, obj = 0x7900000100000001, 
+            res = 0x7900000100000001, ref = 0x7900000100000001, ast = 0x7900000100000001, zv = 0x7900000100000001, ptr = 0x7900000100000001, ce = 0x7900000100000001, func = 0x7900000100000001, ww = {
+              w1 = 1, w2 = 2030043137}}, u1 = {v = {type = 48 '0', type_flags = 54 '6', const_flags = 162 '\242', reserved = 2 '\002'}, type_info = 44185136}, u2 = {next = 0, cache_slot = 0, lineno = 0, 
+            num_args = 0, fe_pos = 0, fe_iter_idx = 0, access_flags = 0, property_guard = 0, extra = 0}}
+        object = 0x7f5e4870bef8
+        trace = {value = {lval = 0, dval = 0, counted = 0x0, str = 0x0, arr = 0x0, obj = 0x0, res = 0x0, ref = 0x0, ast = 0x0, zv = 0x0, ptr = 0x0, ce = 0x0, func = 0x0, ww = {w1 = 0, w2 = 0}}, u1 = {
+            v = {type = 0 '\000', type_flags = 0 '\000', const_flags = 0 '\000', reserved = 0 '\000'}, type_info = 0}, u2 = {next = 0, cache_slot = 0, lineno = 0, num_args = 0, fe_pos = 0, 
+            fe_iter_idx = 0, access_flags = 0, property_guard = 0, extra = 0}}
+        base_ce = 0x7f5e3fe56bc0
+        filename = 0x7f5e487548c0
+#4  0x00000000009eb1f8 in zend_error_exception_new (class_type=0x7f5e3fe56bc0) at /home/mate/php-7.2.6-debug/Zend/zend_exceptions.c:250
+No locals.
+#5  0x00000000009c431e in _object_and_properties_init (arg=0x7f5e4ba1f5a0, class_type=0x7f5e3fe56bc0, properties=0x0, __zend_filename=0xd72d30 "/home/mate/php-7.2.6-debug/Zend/zend_vm_execute.h", 
+    __zend_lineno=3231) at /home/mate/php-7.2.6-debug/Zend/zend_API.c:1332
+        __z = 0x7f5e4ba1f5a0
+#6  0x00000000009c4373 in _object_init_ex (arg=0x7f5e4ba1f5a0, class_type=0x7f5e3fe56bc0, __zend_filename=0xd72d30 "/home/mate/php-7.2.6-debug/Zend/zend_vm_execute.h", __zend_lineno=3231)
+    at /home/mate/php-7.2.6-debug/Zend/zend_API.c:1340
+No locals.
+#7  0x0000000000a29255 in ZEND_NEW_SPEC_CONST_HANDLER () at /home/mate/php-7.2.6-debug/Zend/zend_vm_execute.h:3231
+        result = 0x7f5e4ba1f5a0
+        constructor = 0xd8d41d2180a6e700
+        ce = 0x7f5e3fe56bc0
+        call = 0x7f5e4978aeb0
+        __PRETTY_FUNCTION__ = "ZEND_NEW_SPEC_CONST_HANDLER"
+#8  0x0000000000aa93f4 in execute_ex (ex=0x7f5e4ba1f4a0) at /home/mate/php-7.2.6-debug/Zend/zend_vm_execute.h:59929
+        orig_opline = 0x0
+        orig_execute_data = 0x0
+        orig_execute_data = 0x0
+#9  0x00000000009a3a0f in zend_call_function (fci=0x7ffc9fbcc300, fci_cache=0x7ffc9fbcc210) at /home/mate/php-7.2.6-debug/Zend/zend_execute_API.c:819
+        call_via_handler = 0
+        current_opline_before_exception = 0x0
+        i = 0
+        call = 0x7f5e4ba1f4a0
+        dummy_execute_data = {opline = 0x0, call = 0x0, return_value = 0x0, func = 0x0, This = {value = {lval = 0, dval = 0, counted = 0x0, str = 0x0, arr = 0x0, obj = 0x0, res = 0x0, ref = 0x0, 
+              ast = 0x0, zv = 0x0, ptr = 0x0, ce = 0x0, func = 0x0, ww = {w1 = 0, w2 = 0}}, u1 = {v = {type = 0 '\000', type_flags = 0 '\000', const_flags = 0 '\000', reserved = 0 '\000'}, 
+              type_info = 0}, u2 = {next = 0, cache_slot = 0, lineno = 0, num_args = 0, fe_pos = 0, fe_iter_idx = 0, access_flags = 0, property_guard = 0, extra = 0}}, prev_execute_data = 0x0, 
+          symbol_table = 0x0, run_time_cache = 0x0, literals = 0x0}
+        fci_cache_local = {initialized = 1 '\001', function_handler = 0x7f5e4bab09b8, calling_scope = 0x7f5e4baafd40, called_scope = 0x7f5e4baafd40, object = 0x0}
+        func = 0x7f5e4bab09b8
+        __PRETTY_FUNCTION__ = "zend_call_function"
+#10 0x00000000009a2f9b in _call_user_function_ex (object=0x0, function_name=0x7f5e4ba69540, retval_ptr=0x7ffc9fbcc370, param_count=0, params=0x7f5e4ba69550, no_separation=1)
+    at /home/mate/php-7.2.6-debug/Zend/zend_execute_API.c:654
+        fci = {size = 56, function_name = {value = {lval = 140042919292832, dval = 6,9190395365906608e-310, counted = 0x7f5e48752fa0, str = 0x7f5e48752fa0, arr = 0x7f5e48752fa0, obj = 0x7f5e48752fa0, 
+              res = 0x7f5e48752fa0, ref = 0x7f5e48752fa0, ast = 0x7f5e48752fa0, zv = 0x7f5e48752fa0, ptr = 0x7f5e48752fa0, ce = 0x7f5e48752fa0, func = 0x7f5e48752fa0, ww = {w1 = 1215639456, 
+---Type <return> to continue, or q <return> to quit---
+                w2 = 32606}}, u1 = {v = {type = 6 '\006', type_flags = 0 '\000', const_flags = 0 '\000', reserved = 0 '\000'}, type_info = 6}, u2 = {next = 32764, cache_slot = 32764, lineno = 32764, 
+              num_args = 32764, fe_pos = 32764, fe_iter_idx = 32764, access_flags = 32764, property_guard = 32764, extra = 32764}}, retval = 0x7ffc9fbcc370, params = 0x7f5e4ba69550, object = 0x0, 
+          no_separation = 1 '\001', param_count = 0}
+#11 0x00000000007ce866 in user_shutdown_function_call (zv=0x7f5e4baa1c48) at /home/mate/php-7.2.6-debug/ext/standard/basic_functions.c:5023
+        shutdown_function_entry = 0x7f5e4ba69570
+        retval = {value = {lval = 140042972865744, dval = 6,9190421834441975e-310, counted = 0x7f5e4ba6a4d0, str = 0x7f5e4ba6a4d0, arr = 0x7f5e4ba6a4d0, obj = 0x7f5e4ba6a4d0, res = 0x7f5e4ba6a4d0, 
+            ref = 0x7f5e4ba6a4d0, ast = 0x7f5e4ba6a4d0, zv = 0x7f5e4ba6a4d0, ptr = 0x7f5e4ba6a4d0, ce = 0x7f5e4ba6a4d0, func = 0x7f5e4ba6a4d0, ww = {w1 = 1269212368, w2 = 32606}}, u1 = {v = {
+              type = 0 '\000', type_flags = 0 '\000', const_flags = 0 '\000', reserved = 0 '\000'}, type_info = 0}, u2 = {next = 1500, cache_slot = 1500, lineno = 1500, num_args = 1500, fe_pos = 1500, 
+            fe_iter_idx = 1500, access_flags = 1500, property_guard = 1500, extra = 1500}}
+#12 0x00000000009d4ef5 in zend_hash_apply (ht=0x7f5e4baa39c0, apply_func=0x7ce7a2 <user_shutdown_function_call>) at /home/mate/php-7.2.6-debug/Zend/zend_hash.c:1506
+        idx = 0
+        p = 0x7f5e4baa1c48
+        result = 32606
+        __PRETTY_FUNCTION__ = "zend_hash_apply"
+#13 0x00000000007cec3d in php_call_shutdown_functions () at /home/mate/php-7.2.6-debug/ext/standard/basic_functions.c:5107
+        __orig_bailout = 0x7ffc9fbcc530
+        __bailout = {{__jmpbuf = {0, -3391657720383890912, 4461872, 140722988438496, 0, 0, -3391657720430028256, 3393276251474926112}, __mask_was_saved = 0, __saved_mask = {__val = {0, 0, 
+                140042972430336, 140042880155648, 12884901889, 2, 4613750086661631489, 0, 18193016, 0, 10112443, 140722988434592, 10119926, 0, 18193016, 140722988434608}}}}
+#14 0x000000000092058c in php_request_shutdown (dummy=0x0) at /home/mate/php-7.2.6-debug/main/main.c:1846
+        __orig_bailout = 0x7ffc9fbcd090
+        __bailout = {{__jmpbuf = {0, -3391657720031569376, 4461872, 140722988438496, 0, 0, -3391657720394376672, 3393276606627224096}, __mask_was_saved = 0, __saved_mask = {__val = {9960506, 0, 64, 
+                4294967430, 1268777024, 0, 14072368, 68719476876, 140042972430400, 455266533782, 459561500677, 140042972888768, 140042972868608, 140042972430336, 140042972888768, 140042972888736}}}}
+        report_memleaks = 1 '\001'
+#15 0x0000000000ac15ea in main (argc=3, argv=0x7ffc9fbcd3e8) at /home/mate/php-7.2.6-debug/sapi/fpm/fpm/fpm_main.c:1994
+        primary_script = 0x7f5e4ba021e0 "\240\372pE^\177"
+        __orig_bailout = 0x0
+        __bailout = {{__jmpbuf = {0, -3391657720939636192, 4461872, 140722988438496, 0, 0, -3391657720042055136, 3393276932330134048}, __mask_was_saved = 0, __saved_mask = {__val = {0, 1, 
+                140043140272488, 140043080367256, 140043140203752, 0, 0, 140043140273344, 140722988437840, 6974919656, 140722988437824, 4131212846, 4334078, 4294967295, 140043138079430, 
+                140043080389648}}}}
+        exit_status = 0
+        cgi = 0
+        c = -1
+        use_extended_info = 0
+        file_handle = {handle = {fd = 1376739320, fp = 0x7f5e520f5ff8, stream = {handle = 0x7f5e520f5ff8, isatty = 1398796655, mmap = {len = 140043102358456, pos = 140722988437464, map = 0xff8760ae, 
+                buf = 0x3fe1d82 <error: Cannot access memory at address 0x3fe1d82>, old_handle = 0x7ffc0000002e, old_closer = 0x7f5e557f3e14 <do_lookup_x+372>}, reader = 0x7f5e520f5ff8, fsizer = 0x846, 
+              closer = 0x7f5e55a004e8}}, filename = 0x7f5e4ba02000 "\340!\240K^\177", opened_path = 0x0, type = ZEND_HANDLE_FILENAME, free_filename = 0 '\000'}
+        orig_optind = 1
+        orig_optarg = 0x0
+        ini_entries_len = 0
+        max_requests = 100
+        requests = 57
+        fcgi_fd = 0
+        request = 0x2bba150
+        fpm_config = 0x7ffc9fbce8ba ""
+        fpm_prefix = 0x0
+        fpm_pid = 0x0
+        test_conf = 0
+        force_daemon = -1
+        force_stderr = 0
+        php_information = 0
+        php_allow_to_run_as_root = 0
+        __func__ = "main"

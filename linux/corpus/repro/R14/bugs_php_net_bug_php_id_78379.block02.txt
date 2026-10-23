@@ -1,0 +1,1 @@
+Changing the empty array in the test case to a non-empty compile-time constant like [1] allows it to be reproduced in PHP 7.3 and git master. It was just the immutable empty array that stopped the test from working.

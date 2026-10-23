@@ -1,0 +1,4 @@
+#0 zval_ptr_dtor
+#1 zend_hash_destroy
+#2 php_var_serialize_destroy
+#3 zif_serialize

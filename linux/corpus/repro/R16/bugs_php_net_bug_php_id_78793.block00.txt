@@ -1,0 +1,154 @@
+Description:
+------------
+$f = "ext/exif/tests/bug77950.tiff";
+for ($i = 0; $i < 10; $i++) {
+    fprintf(STDERR, "ITERATION $i:\n");
+    @exif_read_data($f);
+}
+
+This produces a use-after-free (use-of-uninitialized-value with heap deallocation origin) when run under memory sanitizer on the 7th iteration.
+
+Unfortunately I have not been able to reproduce this under address sanitizer. Based on the fact that this needs multiple iterations, I'm assuming that this is sensitive to the precise memory layout, and memory sanitizer happens to produce the right one.
+
+==19395==WARNING: MemorySanitizer: use-of-uninitialized-value
+    #0 0x2119042 in ap_php_conv_10 /home/nikic/php-src-msan/main/snprintf.c:351:2
+    #1 0x212e319 in format_converter /home/nikic/php-src-msan/main/snprintf.c:882:10
+    #2 0x211f70f in strx_printv /home/nikic/php-src-msan/main/snprintf.c:1237:7
+    #3 0x2117fc3 in ap_php_snprintf /home/nikic/php-src-msan/main/snprintf.c:1282:2
+    #4 0xd0a857 in add_assoc_image_info /home/nikic/php-src-msan/ext/exif/exif.c:2451:10
+    #5 0xcf8932 in zif_exif_read_data /home/nikic/php-src-msan/ext/exif/exif.c:4598:2
+    #6 0x322e991 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /home/nikic/php-src-msan/Zend/zend_vm_execute.h:1226:2
+    #7 0x2d67c7f in execute_ex /home/nikic/php-src-msan/Zend/zend_vm_execute.h:51318:7
+    #8 0x2d6927f in zend_execute /home/nikic/php-src-msan/Zend/zend_vm_execute.h:55571:2
+    #9 0x28399d3 in zend_execute_scripts /home/nikic/php-src-msan/Zend/zend.c:1645:4
+    #10 0x2100536 in php_execute_script /home/nikic/php-src-msan/main/main.c:2586:14
+    #11 0x34c922d in do_cli /home/nikic/php-src-msan/sapi/cli/php_cli.c:959:5
+    #12 0x34c0e06 in main /home/nikic/php-src-msan/sapi/cli/php_cli.c:1350:18
+    #13 0x7fadee90fb96 in __libc_start_main /build/glibc-OTsEL5/glibc-2.27/csu/../csu/libc-start.c:310
+    #14 0x4368e9 in _start (/home/nikic/php-src-msan/sapi/cli/php+0x4368e9)
+
+  Uninitialized value was stored to memory at
+    #0 0x2118d9f in ap_php_conv_10 /home/nikic/php-src-msan/main/snprintf.c:347:23
+    #1 0x212e319 in format_converter /home/nikic/php-src-msan/main/snprintf.c:882:10
+    #2 0x211f70f in strx_printv /home/nikic/php-src-msan/main/snprintf.c:1237:7
+    #3 0x2117fc3 in ap_php_snprintf /home/nikic/php-src-msan/main/snprintf.c:1282:2
+    #4 0xd0a857 in add_assoc_image_info /home/nikic/php-src-msan/ext/exif/exif.c:2451:10
+    #5 0xcf8932 in zif_exif_read_data /home/nikic/php-src-msan/ext/exif/exif.c:4598:2
+    #6 0x322e991 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /home/nikic/php-src-msan/Zend/zend_vm_execute.h:1226:2
+    #7 0x2d67c7f in execute_ex /home/nikic/php-src-msan/Zend/zend_vm_execute.h:51318:7
+    #8 0x2d6927f in zend_execute /home/nikic/php-src-msan/Zend/zend_vm_execute.h:55571:2
+    #9 0x28399d3 in zend_execute_scripts /home/nikic/php-src-msan/Zend/zend.c:1645:4
+    #10 0x2100536 in php_execute_script /home/nikic/php-src-msan/main/main.c:2586:14
+    #11 0x34c922d in do_cli /home/nikic/php-src-msan/sapi/cli/php_cli.c:959:5
+    #12 0x34c0e06 in main /home/nikic/php-src-msan/sapi/cli/php_cli.c:1350:18
+    #13 0x7fadee90fb96 in __libc_start_main /build/glibc-OTsEL5/glibc-2.27/csu/../csu/libc-start.c:310
+
+  Uninitialized value was stored to memory at
+    #0 0x2118818 in ap_php_conv_10 /home/nikic/php-src-msan/main/snprintf.c:321:13
+    #1 0x212e319 in format_converter /home/nikic/php-src-msan/main/snprintf.c:882:10
+    #2 0x211f70f in strx_printv /home/nikic/php-src-msan/main/snprintf.c:1237:7
+    #3 0x2117fc3 in ap_php_snprintf /home/nikic/php-src-msan/main/snprintf.c:1282:2
+    #4 0xd0a857 in add_assoc_image_info /home/nikic/php-src-msan/ext/exif/exif.c:2451:10
+    #5 0xcf8932 in zif_exif_read_data /home/nikic/php-src-msan/ext/exif/exif.c:4598:2
+    #6 0x322e991 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /home/nikic/php-src-msan/Zend/zend_vm_execute.h:1226:2
+    #7 0x2d67c7f in execute_ex /home/nikic/php-src-msan/Zend/zend_vm_execute.h:51318:7
+    #8 0x2d6927f in zend_execute /home/nikic/php-src-msan/Zend/zend_vm_execute.h:55571:2
+    #9 0x28399d3 in zend_execute_scripts /home/nikic/php-src-msan/Zend/zend.c:1645:4
+    #10 0x2100536 in php_execute_script /home/nikic/php-src-msan/main/main.c:2586:14
+    #11 0x34c922d in do_cli /home/nikic/php-src-msan/sapi/cli/php_cli.c:959:5
+    #12 0x34c0e06 in main /home/nikic/php-src-msan/sapi/cli/php_cli.c:1350:18
+    #13 0x7fadee90fb96 in __libc_start_main /build/glibc-OTsEL5/glibc-2.27/csu/../csu/libc-start.c:310
+
+  Uninitialized value was stored to memory at
+    #0 0x21184af in ap_php_conv_10 /home/nikic/php-src-msan/main/snprintf.c
+    #1 0x212e319 in format_converter /home/nikic/php-src-msan/main/snprintf.c:882:10
+    #2 0x211f70f in strx_printv /home/nikic/php-src-msan/main/snprintf.c:1237:7
+    #3 0x2117fc3 in ap_php_snprintf /home/nikic/php-src-msan/main/snprintf.c:1282:2
+    #4 0xd0a857 in add_assoc_image_info /home/nikic/php-src-msan/ext/exif/exif.c:2451:10
+    #5 0xcf8932 in zif_exif_read_data /home/nikic/php-src-msan/ext/exif/exif.c:4598:2
+    #6 0x322e991 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /home/nikic/php-src-msan/Zend/zend_vm_execute.h:1226:2
+    #7 0x2d67c7f in execute_ex /home/nikic/php-src-msan/Zend/zend_vm_execute.h:51318:7
+    #8 0x2d6927f in zend_execute /home/nikic/php-src-msan/Zend/zend_vm_execute.h:55571:2
+    #9 0x28399d3 in zend_execute_scripts /home/nikic/php-src-msan/Zend/zend.c:1645:4
+    #10 0x2100536 in php_execute_script /home/nikic/php-src-msan/main/main.c:2586:14
+    #11 0x34c922d in do_cli /home/nikic/php-src-msan/sapi/cli/php_cli.c:959:5
+    #12 0x34c0e06 in main /home/nikic/php-src-msan/sapi/cli/php_cli.c:1350:18
+    #13 0x7fadee90fb96 in __libc_start_main /build/glibc-OTsEL5/glibc-2.27/csu/../csu/libc-start.c:310
+
+  Uninitialized value was stored to memory at
+    #0 0x2129fb3 in format_converter /home/nikic/php-src-msan/main/snprintf.c:807:14
+    #1 0x211f70f in strx_printv /home/nikic/php-src-msan/main/snprintf.c:1237:7
+    #2 0x2117fc3 in ap_php_snprintf /home/nikic/php-src-msan/main/snprintf.c:1282:2
+    #3 0xd0a857 in add_assoc_image_info /home/nikic/php-src-msan/ext/exif/exif.c:2451:10
+    #4 0xcf8932 in zif_exif_read_data /home/nikic/php-src-msan/ext/exif/exif.c:4598:2
+    #5 0x322e991 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /home/nikic/php-src-msan/Zend/zend_vm_execute.h:1226:2
+    #6 0x2d67c7f in execute_ex /home/nikic/php-src-msan/Zend/zend_vm_execute.h:51318:7
+    #7 0x2d6927f in zend_execute /home/nikic/php-src-msan/Zend/zend_vm_execute.h:55571:2
+    #8 0x28399d3 in zend_execute_scripts /home/nikic/php-src-msan/Zend/zend.c:1645:4
+    #9 0x2100536 in php_execute_script /home/nikic/php-src-msan/main/main.c:2586:14
+    #10 0x34c922d in do_cli /home/nikic/php-src-msan/sapi/cli/php_cli.c:959:5
+    #11 0x34c0e06 in main /home/nikic/php-src-msan/sapi/cli/php_cli.c:1350:18
+    #12 0x7fadee90fb96 in __libc_start_main /build/glibc-OTsEL5/glibc-2.27/csu/../csu/libc-start.c:310
+
+  Uninitialized value was stored to memory at
+    #0 0xd5a64a in exif_iif_add_value /home/nikic/php-src-msan/ext/exif/exif.c:2186:26
+    #1 0xd04751 in exif_iif_add_tag /home/nikic/php-src-msan/ext/exif/exif.c:2227:2
+    #2 0xd3e3f0 in exif_process_IFD_TAG /home/nikic/php-src-msan/ext/exif/exif.c:3529:2
+    #3 0xd49d49 in exif_process_IFD_in_MAKERNOTE /home/nikic/php-src-msan/ext/exif/exif.c:3172:8
+    #4 0xd3ccfd in exif_process_IFD_TAG /home/nikic/php-src-msan/ext/exif/exif.c:3477:10
+    #5 0xd274b2 in exif_process_IFD_in_TIFF /home/nikic/php-src-msan/ext/exif/exif.c:4148:12
+    #6 0xd25f89 in exif_process_IFD_in_TIFF /home/nikic/php-src-msan/ext/exif/exif.c:4119:7
+    #7 0xd25f89 in exif_process_IFD_in_TIFF /home/nikic/php-src-msan/ext/exif/exif.c:4119:7
+    #8 0xd25f89 in exif_process_IFD_in_TIFF /home/nikic/php-src-msan/ext/exif/exif.c:4119:7
+    #9 0xd25f89 in exif_process_IFD_in_TIFF /home/nikic/php-src-msan/ext/exif/exif.c:4119:7
+    #10 0xd1b38e in exif_scan_FILE_header /home/nikic/php-src-msan/ext/exif/exif.c:4231:9
+    #11 0xd1963d in exif_read_from_impl /home/nikic/php-src-msan/ext/exif/exif.c:4357:8
+    #12 0xcfb4f0 in exif_read_from_stream /home/nikic/php-src-msan/ext/exif/exif.c:4374:8
+    #13 0xcfd036 in exif_read_from_file /home/nikic/php-src-msan/ext/exif/exif.c:4401:8
+    #14 0xcf4f80 in zif_exif_read_data /home/nikic/php-src-msan/ext/exif/exif.c:4476:9
+    #15 0x322e991 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /home/nikic/php-src-msan/Zend/zend_vm_execute.h:1226:2
+    #16 0x2d67c7f in execute_ex /home/nikic/php-src-msan/Zend/zend_vm_execute.h:51318:7
+    #17 0x2d6927f in zend_execute /home/nikic/php-src-msan/Zend/zend_vm_execute.h:55571:2
+    #18 0x28399d3 in zend_execute_scripts /home/nikic/php-src-msan/Zend/zend.c:1645:4
+    #19 0x2100536 in php_execute_script /home/nikic/php-src-msan/main/main.c:2586:14
+
+  Uninitialized value was stored to memory at
+    #0 0xd29af5 in php_ifd_get32u /home/nikic/php-src-msan/ext/exif/exif.c:1474:3
+    #1 0xd5a57f in exif_iif_add_value /home/nikic/php-src-msan/ext/exif/exif.c:2186:28
+    #2 0xd04751 in exif_iif_add_tag /home/nikic/php-src-msan/ext/exif/exif.c:2227:2
+    #3 0xd3e3f0 in exif_process_IFD_TAG /home/nikic/php-src-msan/ext/exif/exif.c:3529:2
+    #4 0xd49d49 in exif_process_IFD_in_MAKERNOTE /home/nikic/php-src-msan/ext/exif/exif.c:3172:8
+    #5 0xd3ccfd in exif_process_IFD_TAG /home/nikic/php-src-msan/ext/exif/exif.c:3477:10
+    #6 0xd274b2 in exif_process_IFD_in_TIFF /home/nikic/php-src-msan/ext/exif/exif.c:4148:12
+    #7 0xd25f89 in exif_process_IFD_in_TIFF /home/nikic/php-src-msan/ext/exif/exif.c:4119:7
+    #8 0xd25f89 in exif_process_IFD_in_TIFF /home/nikic/php-src-msan/ext/exif/exif.c:4119:7
+    #9 0xd25f89 in exif_process_IFD_in_TIFF /home/nikic/php-src-msan/ext/exif/exif.c:4119:7
+    #10 0xd25f89 in exif_process_IFD_in_TIFF /home/nikic/php-src-msan/ext/exif/exif.c:4119:7
+    #11 0xd1b38e in exif_scan_FILE_header /home/nikic/php-src-msan/ext/exif/exif.c:4231:9
+    #12 0xd1963d in exif_read_from_impl /home/nikic/php-src-msan/ext/exif/exif.c:4357:8
+    #13 0xcfb4f0 in exif_read_from_stream /home/nikic/php-src-msan/ext/exif/exif.c:4374:8
+    #14 0xcfd036 in exif_read_from_file /home/nikic/php-src-msan/ext/exif/exif.c:4401:8
+    #15 0xcf4f80 in zif_exif_read_data /home/nikic/php-src-msan/ext/exif/exif.c:4476:9
+    #16 0x322e991 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /home/nikic/php-src-msan/Zend/zend_vm_execute.h:1226:2
+    #17 0x2d67c7f in execute_ex /home/nikic/php-src-msan/Zend/zend_vm_execute.h:51318:7
+    #18 0x2d6927f in zend_execute /home/nikic/php-src-msan/Zend/zend_vm_execute.h:55571:2
+    #19 0x28399d3 in zend_execute_scripts /home/nikic/php-src-msan/Zend/zend.c:1645:4
+
+  Uninitialized value was created by a heap deallocation
+    #0 0x43ce59 in free (/home/nikic/php-src-msan/sapi/cli/php+0x43ce59)
+    #1 0x2542e28 in _efree_custom /home/nikic/php-src-msan/Zend/zend_alloc.c:2425:3
+    #2 0x2542402 in _efree /home/nikic/php-src-msan/Zend/zend_alloc.c:2545:3
+    #3 0xd56453 in exif_file_sections_free /home/nikic/php-src-msan/ext/exif/exif.c:2063:4
+    #4 0xd0050c in exif_discard_imageinfo /home/nikic/php-src-msan/ext/exif/exif.c:4293:2
+    #5 0xcf895b in zif_exif_read_data /home/nikic/php-src-msan/ext/exif/exif.c:4604:2
+    #6 0x322e991 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /home/nikic/php-src-msan/Zend/zend_vm_execute.h:1226:2
+    #7 0x2d67c7f in execute_ex /home/nikic/php-src-msan/Zend/zend_vm_execute.h:51318:7
+    #8 0x2d6927f in zend_execute /home/nikic/php-src-msan/Zend/zend_vm_execute.h:55571:2
+    #9 0x28399d3 in zend_execute_scripts /home/nikic/php-src-msan/Zend/zend.c:1645:4
+    #10 0x2100536 in php_execute_script /home/nikic/php-src-msan/main/main.c:2586:14
+    #11 0x34c922d in do_cli /home/nikic/php-src-msan/sapi/cli/php_cli.c:959:5
+    #12 0x34c0e06 in main /home/nikic/php-src-msan/sapi/cli/php_cli.c:1350:18
+    #13 0x7fadee90fb96 in __libc_start_main /build/glibc-OTsEL5/glibc-2.27/csu/../csu/libc-start.c:310
+
+
+

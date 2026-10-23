@@ -1,0 +1,13 @@
+{
+  "record": "R05",
+  "label": "[bugs #74101 / CVE-2017-12934](https://bugs.php.net/bug.php?id=74101)",
+  "fetched_at": "2026-10-23T13:17:57Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=74101",
+      "blocks": 9,
+      "kind": "bug",
+      "title": "PHP :: Sec Bug #74101 :: Unserialize Heap Use-After-Free (READ: 1) in zval_get_type"
+    }
+  ]
+}

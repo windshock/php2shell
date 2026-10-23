@@ -1,0 +1,3 @@
+Candidate patch: https://gist.github.com/nikic/3f6c3b98d453803285112b0b3856c541
+
+@kalle: Can you check whether this looks right? If I've diagnosed the issue correctly, we're increasing the start pointer by an offset, but not decreasing the length by the same offset, resulting in a potential out of bounds read.

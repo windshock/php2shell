@@ -1,0 +1,18 @@
+Your patch prevents the array being freed, but it doesn't stop its reference count from going negative, since gc_mark_grey() is still the same, and it won't collect cycles that include the shared array as part of the loop. Both issues can be seen in this test case:
+
+class E {}
+function f() {
+	$e1 = new E;
+	$e2 = new E;
+	$a = ['e2' => $e2];
+	$e1->a = (object)$a;
+	$e2->e1 = $e1;
+	$e2->a = (object)$a;
+}
+f();
+gc_collect_cycles();
+echo "End\n";
+
+With ZEND_GC_DEBUG=2 you can see it report rc=-1 for object(E)#2, then it says there is "Nothing to free".
+
+It's just a memory leak rather than a crash, but I'm considering doing a patch of my own along the lines of the third paragraph of the bug description, so we can see if that looks better.

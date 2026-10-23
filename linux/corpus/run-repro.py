@@ -12,6 +12,7 @@ Verdict per run (fail-closed, R1/R2):
                    PHPT expectation mismatch (expect), or the custom check
   not_reproduced   the run completed and the oracle did not fire
   no_reproducer    the source has no script (recorded, never run)
+  excluded_weaponized  the only code is a weaponized exploit (never run)
 A not_reproduced on one build is NOT a safety verdict for that build.
 Every summary carries provenance (R12).
 
@@ -47,6 +48,17 @@ def phpt_sections(text):
     return sections
 
 
+def extract_php(text):
+    """bugs.php.net blocks mix prose and code: keep from the first '<?' up
+    to the next tracker section marker."""
+    start = text.find('<?')
+    if start < 0:
+        return text
+    code = text[start:]
+    cut = re.search(r'\n\s*(Expected result|Actual result|Patches|History|Backtrace)\s*:', code)
+    return code[:cut.start()] if cut else code
+
+
 def modules(php):
     res = subprocess.run([str(php), '-n', '-m'], capture_output=True, text=True)
     return {line.strip().lower() for line in res.stdout.splitlines() if line.strip()}
@@ -77,14 +89,20 @@ def run_case(rid, case, version, flavor, root):
     out = root / rid / version
     out.mkdir(parents=True, exist_ok=True)
     rec = dict(record=rid, version=version, flavor=flavor, source=case.get('source'))
-    if case.get('status') == 'no_reproducer':
-        rec.update(verdict='no_reproducer', note=case.get('note'))
+    if case.get('status') in ('no_reproducer', 'excluded_weaponized'):
+        # Never run: no script, or the only code is a weaponized exploit
+        # (outside the safety boundary).
+        rec.update(verdict=case['status'], note=case.get('note'))
         return rec
     php = BASE / 'install' / ('%s-%s' % (version, flavor)) / 'bin/php'
     if not php.exists():
         rec.update(verdict='harness_failed', reason='binary missing: %s' % php)
         return rec
     text = (HERE / 'repro' / case['script']).read_text(encoding='utf-8')
+    if text.lstrip().startswith('diff --git'):
+        # A test file quoted as a patch: keep the added lines without '+'.
+        text = '\n'.join(l[1:] for l in text.splitlines()
+                         if l.startswith('+') and not l.startswith('+++')) + '\n'
     ini, expect = [], None
     if case['format'] == 'phpt':
         sec = phpt_sections(text)
@@ -95,7 +113,7 @@ def run_case(rid, case, version, flavor, root):
             if fmt in sec:
                 expect = (fmt, sec[fmt])
     else:
-        code = text
+        code = extract_php(text) if case.get('extract') else text
         needs = []
     needs = sorted(set(needs) | {n.lower() for n in case.get('needs', [])})
     have = modules(php)

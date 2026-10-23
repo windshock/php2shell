@@ -1,21 +1,301 @@
 {
   "scope": "#4 H2 independent reproduction cases (plan 13.4). Scripts are the verbatim reproducer blocks fetched into linux/corpus/repro/ by fetch-repro.py; they were read before use. Oracle kinds: memory_error = ASAN report or fatal signal; expect = PHPT --EXPECT(F)-- comparison; custom = a named check over the output.",
   "cases": {
-    "R18": {"source": "bugs #79760", "status": "no_reproducer",
-            "note": "the report has no script (observed while running the Laravel test suite with the default memory limit); a reproducer must be constructed before H2 can judge it"},
-    "R23": {"source": "PR #10283 test gh10026.phpt (local 127.0.0.1 variant; the issue version contacts an external host and is not used)",
-            "script": "R23/github_com_php_php_src_pull_10283.block00.txt", "format": "phpt",
-            "oracle": "expect", "needs": ["soap"]},
-    "R26": {"source": "GH-12073", "script": "R26/github_com_php_php_src_issues_12073.block00.txt",
-            "format": "php", "oracle": "memory_error",
-            "note": "the script sets memory_limit=4875K itself; reported as a shutdown segfault on FPM"},
-    "R35": {"source": "GH-16726", "script": "R35/github_com_php_php_src_issues_16726.block00.txt",
-            "format": "php", "oracle": "memory_error"},
-    "R46": {"source": "PR #22710 test hash_clean_bailout.phpt",
-            "script": "R46/github_com_php_php_src_pull_22710.block00.txt", "format": "phpt",
-            "oracle": "memory_error"},
-    "R49": {"source": "GH-24361", "script": "R49/github_com_php_php_src_issues_24361.block00.txt",
-            "format": "php", "oracle": "custom", "custom": "gc_protected_after_compile_error",
-            "needs": ["opcache"]}
+    "R18": {
+      "source": "bugs #79760",
+      "status": "no_reproducer",
+      "note": "the report has no script (observed while running the Laravel test suite with the default memory limit); a reproducer must be constructed before H2 can judge it"
+    },
+    "R23": {
+      "source": "PR #10283 test gh10026.phpt (local 127.0.0.1 variant; the issue version contacts an external host and is not used)",
+      "script": "R23/github_com_php_php_src_pull_10283.block00.txt",
+      "format": "phpt",
+      "oracle": "expect",
+      "needs": [
+        "soap"
+      ]
+    },
+    "R26": {
+      "source": "GH-12073",
+      "script": "R26/github_com_php_php_src_issues_12073.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "note": "the script sets memory_limit=4875K itself; reported as a shutdown segfault on FPM"
+    },
+    "R35": {
+      "source": "GH-16726",
+      "script": "R35/github_com_php_php_src_issues_16726.block00.txt",
+      "format": "php",
+      "oracle": "memory_error"
+    },
+    "R46": {
+      "source": "PR #22710 test hash_clean_bailout.phpt",
+      "script": "R46/github_com_php_php_src_pull_22710.block00.txt",
+      "format": "phpt",
+      "oracle": "memory_error"
+    },
+    "R49": {
+      "source": "GH-24361",
+      "script": "R49/github_com_php_php_src_issues_24361.block00.txt",
+      "format": "php",
+      "oracle": "custom",
+      "custom": "gc_protected_after_compile_error",
+      "needs": [
+        "opcache"
+      ]
+    },
+    "R01": {
+      "source": "[bugs #72530](https://bugs.php.net/bug.php?id=72530)",
+      "script": "R01/bugs_php_net_bug_php_id_72530.block06.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R02": {
+      "source": "[bugs #73092 / CVE-2016-7479](https://bugs.php.net/bug.php?id=73092)",
+      "script": "R02/bugs_php_net_bug_php_id_73092.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R03": {
+      "source": "[bugs #73147](https://bugs.php.net/bug.php?id=73147)",
+      "script": "R03/bugs_php_net_bug_php_id_73147.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R04": {
+      "source": "[bugs #73900](https://bugs.php.net/bug.php?id=73900)",
+      "script": "R04/bugs_php_net_bug_php_id_73900.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R05": {
+      "status": "no_reproducer",
+      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+    },
+    "R06": {
+      "source": "[bugs #74614](https://bugs.php.net/bug.php?id=74614)",
+      "script": "R06/bugs_php_net_bug_php_id_74614.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R07": {
+      "source": "[bugs #76047](https://bugs.php.net/bug.php?id=76047)",
+      "script": "R07/bugs_php_net_bug_php_id_76047.block05.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R08": {
+      "status": "no_reproducer",
+      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+    },
+    "R09": {
+      "status": "no_reproducer",
+      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+    },
+    "R10": {
+      "status": "no_reproducer",
+      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+    },
+    "R13": {
+      "source": "[bugs #77843](https://bugs.php.net/bug.php?id=77843)",
+      "script": "R13/bugs_php_net_bug_php_id_77843.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": [
+        "https://"
+      ]
+    },
+    "R14": {
+      "source": "[bugs #78379](https://bugs.php.net/bug.php?id=78379)",
+      "script": "R14/bugs_php_net_bug_php_id_78379.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": [
+        "https://"
+      ]
+    },
+    "R16": {
+      "status": "no_reproducer",
+      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+    },
+    "R17": {
+      "source": "[bugs #79029](https://bugs.php.net/bug.php?id=79029)",
+      "script": "R17/bugs_php_net_bug_php_id_79029.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [
+        "xmlreader",
+        "xmlwriter"
+      ],
+      "risky_calls": []
+    },
+    "R19": {
+      "source": "[bugs #79784](https://bugs.php.net/bug.php?id=79784)",
+      "script": "R19/bugs_php_net_bug_php_id_79784.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R22": {
+      "status": "no_reproducer",
+      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+    },
+    "R24": {
+      "source": "[Issue #10169](https://github.com/php/php-src/issues/10169)",
+      "script": "R24/github_com_php_php_src_issues_10169.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R25": {
+      "source": "[Issue #10709](https://github.com/php/php-src/issues/10709)",
+      "script": "R25/github_com_php_php_src_issues_10709.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R27": {
+      "source": "[Issue #12468](https://github.com/php/php-src/issues/12468)",
+      "script": "R27/github_com_php_php_src_issues_12468.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R32": {
+      "source": "[Issue #15108](https://github.com/php/php-src/issues/15108)",
+      "script": "R32/github_com_php_php_src_issues_15108.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R33": {
+      "source": "[Issue #16464](https://github.com/php/php-src/issues/16464)",
+      "script": "R33/github_com_php_php_src_issues_16464.block03.txt",
+      "format": "phpt",
+      "oracle": "memory_error",
+      "extract": false,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R34": {
+      "source": "[Issue #16479](https://github.com/php/php-src/issues/16479)",
+      "script": "R34/github_com_php_php_src_issues_16479.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R38": {
+      "source": "[Issue #18640](https://github.com/php/php-src/issues/18640)",
+      "script": "R38/github_com_php_php_src_issues_18640.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [
+        "soap"
+      ],
+      "risky_calls": []
+    },
+    "R41": {
+      "source": "[Issue #20352](https://github.com/php/php-src/issues/20352)",
+      "script": "R41/github_com_php_php_src_issues_20352.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R42": {
+      "source": "[Issue #21499](https://github.com/php/php-src/issues/21499)",
+      "script": "R42/github_com_php_php_src_issues_21499.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R47": {
+      "source": "[Issue #22895](https://github.com/php/php-src/issues/22895)",
+      "script": "R47/github_com_php_php_src_issues_22895.block03.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [
+        "soap"
+      ],
+      "risky_calls": []
+    },
+    "R50": {
+      "source": "[Issue #24373](https://github.com/php/php-src/issues/24373)",
+      "script": "R50/github_com_php_php_src_issues_24373.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R51": {
+      "source": "[Issue #24455](https://github.com/php/php-src/issues/24455)",
+      "script": "R51/github_com_php_php_src_issues_24455.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [],
+      "risky_calls": []
+    },
+    "R54": {
+      "status": "excluded_weaponized",
+      "source": "GH-24481",
+      "note": "the only code in the report is a weaponized phar payload built on a real application gadget chain (phpBB/Guzzle, \"exploit.php id\"); no minimal reproducer. Not run: outside the safety boundary (no weaponized code). The record stays in the corpus as reported, unverified here."
+    },
+    "R55": {
+      "source": "[Issue #24488](https://github.com/php/php-src/issues/24488)",
+      "script": "R55/github_com_php_php_src_issues_24488.block00.txt",
+      "format": "php",
+      "oracle": "memory_error",
+      "extract": true,
+      "needs": [
+        "simplexml"
+      ],
+      "risky_calls": []
+    },
+    "R56": {
+      "status": "no_reproducer",
+      "note": "no <?php block in the fetched sources (tracker test script may be in another page format); a reproducer must be extracted or constructed"
+    }
   }
 }

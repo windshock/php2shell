@@ -1,0 +1,10 @@
+./php-fuzz-execute poc2.php.orig
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 18257342
+INFO: Loaded 1 modules   (147832 inline 8-bit counters): 147832 [0x1d60c20, 0x1d84d98),
+INFO: Loaded 1 PC tables (147832 PCs): 147832 [0x1d84d98,0x1fc6518),
+./php-fuzz-execute: Running 1 inputs 1 time(s) each.
+Running: poc2.php.orig
+=================================================================
+==2886385==ERROR: AddressSanitizer: heap-use-after-free on address 0x6060000121d1 at pc 0x0000012d7b10 bp 0x7fffffffd770 sp 0x7fffffffd768
+READ of size 1 at 0x6060000121d1 thread T0

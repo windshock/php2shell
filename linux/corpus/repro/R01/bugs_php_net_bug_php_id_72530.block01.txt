@@ -1,0 +1,12 @@
+update fix, and fix other bugs:
+```
+	var_push_dtor_no_addref(var_hash, rval);
+	}
+	*rval = *rval_ref;
++	Z_ADDREF_PP(rval_ref);
++	if (Z_REFCOUNT_PP(rval) > 1) {
++		SEPARATE_ZVAL_IF_NOT_REF(rval);
++	}
+	Z_ADDREF_PP(rval);
+	Z_SET_ISREF_PP(rval);
+```

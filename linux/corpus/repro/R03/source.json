@@ -1,0 +1,13 @@
+{
+  "record": "R03",
+  "label": "[bugs #73147](https://bugs.php.net/bug.php?id=73147)",
+  "fetched_at": "2026-10-23T13:17:55Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=73147",
+      "blocks": 21,
+      "kind": "bug",
+      "title": "PHP :: Sec Bug #73147 :: Use After Free in unserialize()"
+    }
+  ]
+}

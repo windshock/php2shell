@@ -1,0 +1,1 @@
+This has been fixed by https://github.com/php/php-src/commit/0426b916df396a23e5c34514e4f2f0627efdcdf0. Note that this is effectively a duplicate of bug #72610. I'm not marking it as a duplicate as this bug has simpler reproduce cases where the security impact is clearer.

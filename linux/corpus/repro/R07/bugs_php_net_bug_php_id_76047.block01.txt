@@ -1,0 +1,1 @@
+Based on the valgrind trace, I'd say that what happens is that a destructor throws an exception, which captures a backtrace, which contains the function arguments, some of which have already been destroyed by that point.

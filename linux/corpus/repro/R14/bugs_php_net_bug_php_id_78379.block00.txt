@@ -1,0 +1,158 @@
+Description:
+------------
+I isolated the reproducible crash described at https://phabricator.wikimedia.org/T228346 . I made a small test case which demonstrates the issue. Although the reduced test case doesn't crash with a normal build, I hope the output demonstrates the severity of the situation. My short test case aborts when run with AddressSanitizer, reporting "heap-use-after-free".
+
+The issue is that when you cast from an array to an object, the array is referenced rather than duplicated, so multiple objects may refer to a single array. When the GC runs on the resulting objects, it does not check the reference count of the property array. So elements of the property array have their reference counts decremented and not incremented again, even though the property array that contains them is still live.
+
+To correctly apply the garbage collection algorithm described in the paper referenced in zend_gc.c, the property array should be considered a child of the object. Declared properties in properties_table are children, but undeclared properties are not.
+
+In the test script, the GC frees the empty array, which is a compile-time constant. Then that memory location is reused during the subsequent "new C", causing var_dump() to show "*RECURSION*".
+
+Test script:
+---------------
+<?php
+
+class C {
+	public function __construct() {
+		$this->p = (object)["x" => []];
+	}
+}
+class E {
+}
+$e = new E;
+$e->f = new E;
+$e->f->e = $e;
+$e->a = new C;
+$e = null;
+gc_collect_cycles();
+var_dump( new C );
+
+
+Expected result:
+----------------
+object(C)#2 (1) {
+  ["p"]=>
+  object(stdClass)#1 (1) {
+    ["x"]=>
+    array(0) {
+    }
+  }
+}
+
+
+Actual result:
+--------------
+object(C)#2 (1) {
+  ["p"]=>
+  object(stdClass)#1 (1) {
+    ["x"]=>
+    array(1) {
+      ["p"]=>
+      *RECURSION*
+    }
+  }
+}
+
+Or with USE_ZEND_ALLOC=0 and AddressSanitizer:
+
+    =================================================================
+==25026==ERROR: AddressSanitizer: heap-use-after-free on address 0x60600000a168 at pc 0x55fd7492b790 bp 0x7ffe52626d30 sp 0x7ffe52626d20
+READ of size 4 at 0x60600000a168 thread T0
+    #0 0x55fd7492b78f in php_var_dump /srv/php/git/ext/standard/var.c:122
+    #1 0x55fd7492b2d9 in php_object_property_dump /srv/php/git/ext/standard/var.c:79
+    #2 0x55fd7492c367 in php_var_dump /srv/php/git/ext/standard/var.c:164
+    #3 0x55fd7492b2d9 in php_object_property_dump /srv/php/git/ext/standard/var.c:79
+    #4 0x55fd7492c367 in php_var_dump /srv/php/git/ext/standard/var.c:164
+    #5 0x55fd7492c931 in zif_var_dump /srv/php/git/ext/standard/var.c:210
+    #6 0x55fd74d5b961 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /srv/php/git/Zend/zend_vm_execute.h:573
+    #7 0x55fd74ef1977 in execute_ex /srv/php/git/Zend/zend_vm_execute.h:59747
+    #8 0x55fd74f01595 in zend_execute /srv/php/git/Zend/zend_vm_execute.h:63776
+    #9 0x55fd74c624af in zend_execute_scripts /srv/php/git/Zend/zend.c:1498
+    #10 0x55fd74b06a4d in php_execute_script /srv/php/git/main/main.c:2599
+    #11 0x55fd74f07d72 in do_cli /srv/php/git/sapi/cli/php_cli.c:1011
+    #12 0x55fd74f0a011 in main /srv/php/git/sapi/cli/php_cli.c:1403
+    #13 0x7f53cf173b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+    #14 0x55fd73e6a509 in _start (/opt/php7.2/bin/php+0x48f509)
+
+0x60600000a168 is located 8 bytes inside of 56-byte region [0x60600000a160,0x60600000a198)
+freed by thread T0 here:
+    #0 0x7f53d03e87b8 in __interceptor_free (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xde7b8)
+    #1 0x55fd74bcdfb5 in _efree /srv/php/git/Zend/zend_alloc.c:2446
+    #2 0x55fd74cf328e in zend_gc_collect_cycles /srv/php/git/Zend/zend_gc.c:1193
+    #3 0x55fd74ca853a in zif_gc_collect_cycles /srv/php/git/Zend/zend_builtin_functions.c:356
+    #4 0x55fd74d5b961 in ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HANDLER /srv/php/git/Zend/zend_vm_execute.h:573
+    #5 0x55fd74ef1977 in execute_ex /srv/php/git/Zend/zend_vm_execute.h:59747
+    #6 0x55fd74f01595 in zend_execute /srv/php/git/Zend/zend_vm_execute.h:63776
+    #7 0x55fd74c624af in zend_execute_scripts /srv/php/git/Zend/zend.c:1498
+    #8 0x55fd74b06a4d in php_execute_script /srv/php/git/main/main.c:2599
+    #9 0x55fd74f07d72 in do_cli /srv/php/git/sapi/cli/php_cli.c:1011
+    #10 0x55fd74f0a011 in main /srv/php/git/sapi/cli/php_cli.c:1403
+    #11 0x7f53cf173b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+
+previously allocated by thread T0 here:
+    #0 0x7f53d03e8b50 in __interceptor_malloc (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xdeb50)
+    #1 0x55fd74bcfb28 in __zend_malloc /srv/php/git/Zend/zend_alloc.c:2830
+    #2 0x55fd74bcde60 in _emalloc /srv/php/git/Zend/zend_alloc.c:2431
+    #3 0x55fd74c6e9d3 in _array_init /srv/php/git/Zend/zend_API.c:1090
+    #4 0x55fd74c0488b in zend_try_ct_eval_array /srv/php/git/Zend/zend_compile.c:6994
+    #5 0x55fd74c12048 in zend_eval_const_expr /srv/php/git/Zend/zend_compile.c:8628
+    #6 0x55fd74c0469f in zend_try_ct_eval_array /srv/php/git/Zend/zend_compile.c:6978
+    #7 0x55fd74c09bc4 in zend_compile_array /srv/php/git/Zend/zend_compile.c:7603
+    #8 0x55fd74c0ff69 in zend_compile_expr /srv/php/git/Zend/zend_compile.c:8350
+    #9 0x55fd74c07115 in zend_compile_cast /srv/php/git/Zend/zend_compile.c:7274
+    #10 0x55fd74c0fe49 in zend_compile_expr /srv/php/git/Zend/zend_compile.c:8313
+    #11 0x55fd74be4dcf in zend_compile_assign /srv/php/git/Zend/zend_compile.c:3022
+    #12 0x55fd74c0fd29 in zend_compile_expr /srv/php/git/Zend/zend_compile.c:8272
+    #13 0x55fd74c0f786 in zend_compile_stmt /srv/php/git/Zend/zend_compile.c:8238
+    #14 0x55fd74bf7e0c in zend_compile_stmt_list /srv/php/git/Zend/zend_compile.c:5378
+    #15 0x55fd74c0f559 in zend_compile_stmt /srv/php/git/Zend/zend_compile.c:8150
+    #16 0x55fd74bfcc9b in zend_compile_func_decl /srv/php/git/Zend/zend_compile.c:5990
+    #17 0x55fd74c0f6c6 in zend_compile_stmt /srv/php/git/Zend/zend_compile.c:8206
+    #18 0x55fd74bf7e0c in zend_compile_stmt_list /srv/php/git/Zend/zend_compile.c:5378
+    #19 0x55fd74c0f559 in zend_compile_stmt /srv/php/git/Zend/zend_compile.c:8150
+    #20 0x55fd74c0009b in zend_compile_class_decl /srv/php/git/Zend/zend_compile.c:6416
+    #21 0x55fd74c0f716 in zend_compile_stmt /srv/php/git/Zend/zend_compile.c:8218
+    #22 0x55fd74c0f175 in zend_compile_top_stmt /srv/php/git/Zend/zend_compile.c:8124
+    #23 0x55fd74c0f11d in zend_compile_top_stmt /srv/php/git/Zend/zend_compile.c:8119
+    #24 0x55fd74b8c0d0 in zend_compile Zend/zend_language_scanner.l:602
+    #25 0x55fd74b8c569 in compile_file Zend/zend_language_scanner.l:636
+    #26 0x55fd746527de in phar_compile_file /srv/php/git/ext/phar/phar.c:3332
+    #27 0x55fd74c62419 in zend_execute_scripts /srv/php/git/Zend/zend.c:1492
+    #28 0x55fd74b06a4d in php_execute_script /srv/php/git/main/main.c:2599
+    #29 0x55fd74f07d72 in do_cli /srv/php/git/sapi/cli/php_cli.c:1011
+
+SUMMARY: AddressSanitizer: heap-use-after-free /srv/php/git/ext/standard/var.c:122 in php_var_dump
+Shadow bytes around the buggy address:
+  0x0c0c7fff93d0: 00 00 00 fa fa fa fa fa 00 00 00 00 00 00 00 fa
+  0x0c0c7fff93e0: fa fa fa fa 00 00 00 00 00 00 00 fa fa fa fa fa
+  0x0c0c7fff93f0: 00 00 00 00 00 00 00 fa fa fa fa fa 00 00 00 00
+  0x0c0c7fff9400: 00 00 00 00 fa fa fa fa 00 00 00 00 00 00 00 fa
+  0x0c0c7fff9410: fa fa fa fa fd fd fd fd fd fd fd fd fa fa fa fa
+=>0x0c0c7fff9420: 00 00 00 00 00 00 00 00 fa fa fa fa fd[fd]fd fd
+  0x0c0c7fff9430: fd fd fd fa fa fa fa fa 00 00 00 00 00 00 00 fa
+  0x0c0c7fff9440: fa fa fa fa 00 00 00 00 00 00 00 00 fa fa fa fa
+  0x0c0c7fff9450: fd fd fd fd fd fd fd fa fa fa fa fa fd fd fd fd
+  0x0c0c7fff9460: fd fd fd fa fa fa fa fa fd fd fd fd fd fd fd fa
+  0x0c0c7fff9470: fa fa fa fa 00 00 00 00 00 00 00 fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==25026==ABORTING
+
+

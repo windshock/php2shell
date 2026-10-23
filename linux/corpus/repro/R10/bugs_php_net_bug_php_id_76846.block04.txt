@@ -1,0 +1,3 @@
+#4  0x00000000009eb1f8 in zend_error_exception_new (class_type=0x7f5e3fe56bc0) at /home/mate/php-7.2.6-debug/Zend/zend_exceptions.c:250
+
+This was a Symfony OutOfMemoryException

@@ -1,0 +1,17 @@
+<?php
+class D {
+    public $self;
+    public function __destruct() {
+        $a = [];
+        for ($i = 0; $i < 6000; $i++) { $o = new stdClass(); $a[] =
+        serialize($a);
+    }
+}
+$shared = [];
+for ($i = 0; $i < 30000; $i++) { $shared[] = new stdClass(); }
+$list = [];
+foreach ($shared as $o) { $list[] = $o; $list[] = $o; }
+gc_collect_cycles();
+$d = new D(); $d->self = $d; unset($d);
+serialize($list);
+echo "survived\n";

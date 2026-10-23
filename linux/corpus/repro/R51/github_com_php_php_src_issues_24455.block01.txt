@@ -1,0 +1,2 @@
+ERROR: AddressSanitizer: heap-use-after-free
+zend_object_make_lazy Zend/zend_lazy_objects.c:338

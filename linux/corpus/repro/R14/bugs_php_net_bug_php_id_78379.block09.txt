@@ -1,0 +1,3 @@
+I guess it's good enough. The trace output is certainly better than it was.
+
+I did start work on a patch which tries to make property tables be children of objects. The problem I ran into is making sure property tables are not directly destroyed by the garbage collector, since zend_object_std_dtor() etc. doesn't check if the property array has already been destroyed before destroying it, leading to an assertion failure. Maybe it is a thing to try against master rather than in a bugfix for all branches.

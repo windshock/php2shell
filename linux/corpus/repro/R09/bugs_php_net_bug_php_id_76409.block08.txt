@@ -1,0 +1,2 @@
+I don't think CVE has something to do with publicity. CVE is an issue identifier, which allows to track it across distributions, builds, etc. and which is issued for security issues. It doesn't matter whether it was disclosed publicly or not and which version fixes it - CVE allows to track security issues in every version and thus to have a picture which issue is fixed where. 
+It looks like this one also should be a security issue since exif bugs usually deal with external data. Not sure where this fix has been applied and whether it need a backport, will check.

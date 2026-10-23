@@ -1,0 +1,1 @@
+CC="clang" CXX="clang++" CFLAGS="-fsanitize=address -g -O0" CXXFLAGS="-fsanitize=address -g -O0" ./configure --enable-debug --enable-address-sanitizer --disable-shared --with-pic

@@ -1,0 +1,11 @@
+The use of unserialize() here is a red herring -- what is actually causing the memory errors is the attempt to acquire a reference into the SplFixedArray. A reduced reproduce script is the following (run under valgrind):
+
+<?php
+$a = new stdClass;
+$b = new SplFixedArray(1);
+$b[0] = $a;
+$c = &$b[0];
+
+As such, I do not believe this qualifies as a security issue under https://wiki.php.net/security: The issue cannot be triggered through user input. Instead, what triggers the issue is specific and atypical local code, namely the "$c = &$b[0]" line (it is atypical because ArrayAccess objects do not support references).
+
+I believe the cause of this issue is the code at https://github.com/php/php-src/blob/f07e4c033cf4edda8dcbf14c5a964e4d283fa8a8/Zend/zend_execute.c#L1637, which seems to assume that result is already in retval (which happens to be the case for non-internal implementations of offsetGet()).

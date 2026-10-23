@@ -1,0 +1,1 @@
+@ben at redsnapper dot net: This issue has already been fixed a few months ago. There is no CVE, because this issue cannot be exploited remotely.

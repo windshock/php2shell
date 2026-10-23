@@ -1,0 +1,13 @@
+{
+  "record": "R14",
+  "label": "[bugs #78379](https://bugs.php.net/bug.php?id=78379)",
+  "fetched_at": "2026-10-23T13:18:02Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=78379",
+      "blocks": 13,
+      "kind": "bug",
+      "title": "PHP :: Bug #78379 :: Cast to object confuses GC, causes crash"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+<?php
+
+class LocalSoapClient extends SoapClient
+{
+    public function __doRequest(
+        $request,
+        $location,
+        $action,
+        $version,
+        $one_way = false
+    ): ?string {
+        return '';
+    }
+}
+
+$iterator = new MultipleIterator();
+$iterator->attachIterator(new ArrayIterator([0]));
+
+$client = new LocalSoapClient(null, [
+    'location' => 'http://127.0.0.1/',
+    'uri' => 'urn:audit',
+]);
+
+$client->__soapCall(
+    'audit',
+    [new SoapVar($iterator, SOAP_ENC_ARRAY)]
+);

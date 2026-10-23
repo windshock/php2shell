@@ -1,0 +1,16 @@
+Slightly simplified test code (valgrind):
+
+class X implements JsonSerializable {
+    public $prop = "value";
+    public function jsonSerialize() {
+        global $arr;
+        unset($arr[0]);
+        var_dump($this);
+        return $this;
+    }
+}
+
+$arr = [new X()];
+var_dump(json_encode([&$arr]));
+
+We need to make sure a ref is kept when calling jsonSerialize() and probably also when recursing over arrays/objects in general (as something may be unset at a higher level).

@@ -1,0 +1,2 @@
+Assigned CVE: CVE-2016-7479
+Please associate it with this bug.

@@ -1,0 +1,13 @@
+{
+  "record": "R54",
+  "label": "[Issue #24481](https://github.com/php/php-src/issues/24481)",
+  "fetched_at": "2026-10-23T13:18:18Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/24481",
+      "blocks": 6,
+      "kind": "issue",
+      "title": "Use-after-free in var_destroy() during unserialize() re-entrancy allows __destruct to read a freed var_entries chunk"
+    }
+  ]
+}

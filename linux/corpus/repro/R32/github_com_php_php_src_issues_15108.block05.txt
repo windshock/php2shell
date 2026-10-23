@@ -1,0 +1,105 @@
+==87715==ERROR: AddressSanitizer: heap-use-after-free on address 0x51000000a4f8 at pc 0x57088c5b6023 bp 0x74f3600001e0 sp 0x74f3600001d0
+WRITE of size 4 at 0x51000000a4f8 thread T0
+    #0 0x57088c5b6022 in zend_dispatch_try_catch_finally_helper_SPEC /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:3201
+    #1 0x57088c5b7491 in ZEND_FAST_RET_SPEC_HANDLER /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:3376
+    #2 0x57088c6fd26b in execute_ex /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:57344
+    #3 0x57088c7646c7 in zend_generator_resume /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:767
+    #4 0x57088c766dde in zend_generator_iterator_move_forward /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:1070
+    #5 0x57088c763afd in zend_generator_get_next_delegated_value /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:657
+    #6 0x57088c76443e in zend_generator_resume /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:746
+    #7 0x57088c766dde in zend_generator_iterator_move_forward /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:1070
+    #8 0x57088c5b2dda in zend_fe_fetch_object_helper_SPEC /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:2889
+    #9 0x57088c6346ac in ZEND_FE_FETCH_R_SPEC_VAR_HANDLER /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:22349
+    #10 0x57088c705ec0 in execute_ex /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:59453
+    #11 0x57088c4be636 in zend_call_function /run/media/niels/MoreData/php-8.3/Zend/zend_execute_API.c:957
+    #12 0x57088c7c3eed in zend_fiber_execute /run/media/niels/MoreData/php-8.3/Zend/zend_fibers.c:595
+    #13 0x57088c7c29df in zend_fiber_trampoline /run/media/niels/MoreData/php-8.3/Zend/zend_fibers.c:378
+    #14 0x57088c3714fe in make_fcontext /run/media/niels/MoreData/php-8.3/Zend/asm/make_x86_64_sysv_elf_gas.S:174
+
+0x51000000a4f8 is located 184 bytes inside of 192-byte region [0x51000000a440,0x51000000a500)
+freed by thread T0 here:
+    #0 0x74f3670fb422 in free /usr/src/debug/gcc/gcc/libsanitizer/asan/asan_malloc_linux.cpp:52
+    #1 0x57088c45b135 in _efree_custom /run/media/niels/MoreData/php-8.3/Zend/zend_alloc.c:2500
+    #2 0x57088c45b355 in _efree /run/media/niels/MoreData/php-8.3/Zend/zend_alloc.c:2620
+    #3 0x57088c760548 in zend_generator_close /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:174
+    #4 0x57088c7616b9 in zend_generator_free_storage /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:331
+    #5 0x57088c795a68 in zend_objects_store_del /run/media/niels/MoreData/php-8.3/Zend/zend_objects_API.c:200
+    #6 0x57088c4f3a5a in rc_dtor_func /run/media/niels/MoreData/php-8.3/Zend/zend_variables.c:57
+    #7 0x57088c4f3927 in i_zval_ptr_dtor /run/media/niels/MoreData/php-8.3/Zend/zend_variables.h:44
+    #8 0x57088c4f3d33 in zval_ptr_dtor /run/media/niels/MoreData/php-8.3/Zend/zend_variables.c:84
+    #9 0x57088c7669e7 in zend_generator_iterator_dtor /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:1018
+    #10 0x57088c71b6cc in iter_wrapper_free /run/media/niels/MoreData/php-8.3/Zend/zend_iterators.c:66
+    #11 0x57088c795a68 in zend_objects_store_del /run/media/niels/MoreData/php-8.3/Zend/zend_objects_API.c:200
+    #12 0x57088c4f3a5a in rc_dtor_func /run/media/niels/MoreData/php-8.3/Zend/zend_variables.c:57
+    #13 0x57088c4f3927 in i_zval_ptr_dtor /run/media/niels/MoreData/php-8.3/Zend/zend_variables.h:44
+    #14 0x57088c4f3d33 in zval_ptr_dtor /run/media/niels/MoreData/php-8.3/Zend/zend_variables.c:84
+    #15 0x57088c760b9d in zend_generator_dtor_storage /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:236
+    #16 0x57088c794b36 in zend_objects_store_call_destructors /run/media/niels/MoreData/php-8.3/Zend/zend_objects_API.c:59
+    #17 0x57088c4b7432 in shutdown_destructors /run/media/niels/MoreData/php-8.3/Zend/zend_execute_API.c:262
+    #18 0x57088c4fa804 in zend_call_destructors /run/media/niels/MoreData/php-8.3/Zend/zend.c:1277
+    #19 0x57088c379903 in php_request_shutdown /run/media/niels/MoreData/php-8.3/main/main.c:1872
+    #20 0x57088c8eaade in do_cli /run/media/niels/MoreData/php-8.3/sapi/cli/php_cli.c:1136
+    #21 0x57088c8eb5fd in main /run/media/niels/MoreData/php-8.3/sapi/cli/php_cli.c:1340
+    #22 0x74f366a04c87  (/usr/lib/libc.so.6+0x25c87) (BuildId: 32a656aa5562eece8c59a585f5eacd6cf5e2307b)
+    #23 0x74f366a04d4b in __libc_start_main (/usr/lib/libc.so.6+0x25d4b) (BuildId: 32a656aa5562eece8c59a585f5eacd6cf5e2307b)
+    #24 0x57088ba03fa4 in _start (/run/media/niels/MoreData/php-8.3/sapi/cli/php+0x603fa4) (BuildId: f6f1253d1c36c6d565165052c6df0747aae8e047)
+
+previously allocated by thread T0 here:
+    #0 0x74f3670fca31 in malloc /usr/src/debug/gcc/gcc/libsanitizer/asan/asan_malloc_linux.cpp:69
+    #1 0x57088c45da4b in __zend_malloc /run/media/niels/MoreData/php-8.3/Zend/zend_alloc.c:3128
+    #2 0x57088c45b051 in _malloc_custom /run/media/niels/MoreData/php-8.3/Zend/zend_alloc.c:2491
+    #3 0x57088c45b2ac in _emalloc /run/media/niels/MoreData/php-8.3/Zend/zend_alloc.c:2610
+    #4 0x57088c5a9b21 in ZEND_GENERATOR_CREATE_SPEC_HANDLER /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:2156
+    #5 0x57088c6fccec in execute_ex /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:57260
+    #6 0x57088c4be636 in zend_call_function /run/media/niels/MoreData/php-8.3/Zend/zend_execute_API.c:957
+    #7 0x57088c4bf659 in zend_call_known_function /run/media/niels/MoreData/php-8.3/Zend/zend_execute_API.c:1051
+    #8 0x57088c71cc65 in zend_call_known_instance_method /run/media/niels/MoreData/php-8.3/Zend/zend_API.h:853
+    #9 0x57088c71cc9f in zend_call_known_instance_method_with_0_params /run/media/niels/MoreData/php-8.3/Zend/zend_API.h:859
+    #10 0x57088c71e6b8 in zend_user_it_new_iterator /run/media/niels/MoreData/php-8.3/Zend/zend_interfaces.c:92
+    #11 0x57088c71f10c in zend_user_it_get_new_iterator /run/media/niels/MoreData/php-8.3/Zend/zend_interfaces.c:242
+    #12 0x57088c6018f1 in ZEND_YIELD_FROM_SPEC_TMPVAR_HANDLER /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:14929
+    #13 0x57088c70328a in execute_ex /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:58729
+    #14 0x57088c7646c7 in zend_generator_resume /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:767
+    #15 0x57088c764d6c in zend_generator_ensure_initialized /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:823
+    #16 0x57088c764dd8 in zend_generator_rewind /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:831
+    #17 0x57088c766e2a in zend_generator_iterator_rewind /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:1078
+    #18 0x57088c598cf5 in zend_fe_reset_iterator /run/media/niels/MoreData/php-8.3/Zend/zend_execute.c:4968
+    #19 0x57088c6a46de in ZEND_FE_RESET_R_SPEC_CV_HANDLER /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:39959
+    #20 0x57088c70aaa1 in execute_ex /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:60599
+    #21 0x57088c4be636 in zend_call_function /run/media/niels/MoreData/php-8.3/Zend/zend_execute_API.c:957
+    #22 0x57088c7c3eed in zend_fiber_execute /run/media/niels/MoreData/php-8.3/Zend/zend_fibers.c:595
+    #23 0x57088c7c29df in zend_fiber_trampoline /run/media/niels/MoreData/php-8.3/Zend/zend_fibers.c:378
+
+SUMMARY: AddressSanitizer: heap-use-after-free /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:3201 in zend_dispatch_try_catch_finally_helper_SPEC
+Shadow bytes around the buggy address:
+  0x51000000a200: fa fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+  0x51000000a280: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 fa
+  0x51000000a300: fa fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+  0x51000000a380: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 fa
+  0x51000000a400: fa fa fa fa fa fa fa fa fd fd fd fd fd fd fd fd
+=>0x51000000a480: fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd[fd]
+  0x51000000a500: fa fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+  0x51000000a580: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51000000a600: fa fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+  0x51000000a680: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 fa
+  0x51000000a700: fa fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==87715==ABORTING

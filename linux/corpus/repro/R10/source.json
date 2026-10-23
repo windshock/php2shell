@@ -1,0 +1,13 @@
+{
+  "record": "R10",
+  "label": "[bugs #76846](https://bugs.php.net/bug.php?id=76846)",
+  "fetched_at": "2026-10-23T13:18:00Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=76846",
+      "blocks": 7,
+      "kind": "bug",
+      "title": "PHP :: Bug #76846 :: Segfault in shutdown function after memory limit error"
+    }
+  ]
+}

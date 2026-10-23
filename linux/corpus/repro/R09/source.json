@@ -1,0 +1,13 @@
+{
+  "record": "R09",
+  "label": "[bugs #76409 / CVE-2018-12882](https://bugs.php.net/bug.php?id=76409)",
+  "fetched_at": "2026-10-23T13:18:00Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=76409",
+      "blocks": 10,
+      "kind": "bug",
+      "title": "PHP :: Sec Bug #76409 :: heap use after free in _php_stream_free"
+    }
+  ]
+}

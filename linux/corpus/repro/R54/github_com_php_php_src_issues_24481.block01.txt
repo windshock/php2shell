@@ -1,0 +1,9 @@
+<paste the real stderr from `php exploit.php "id"` on your target, e.g.:
+[ptr] bin=0x... zif=0x... cec=0x... hdl=0x... buf=0x... zv=0x... obj=0x...
+[ptr] call ok
+uid=... gid=... groups=...
+OR, if it fails:
+[!] no bin base
+[!] buf not found (spray-only mode)
+[ptr] ret=...
+>

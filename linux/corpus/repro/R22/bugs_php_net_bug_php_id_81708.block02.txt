@@ -1,0 +1,3 @@
+Automatic comment on behalf of cmb69 (author) and smalyshev (committer)
+Revision: https://github.com/php/php-src/commit/dce5e561a63fc970de722636ad8c09e9b079e8ae
+Log: Fix #81708: UAF due to php_filter_float() failing for ints

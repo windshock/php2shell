@@ -1,0 +1,1 @@
+Yes, I know this particular one can be easily fixed. The problem is that every __wakeup that modifies any property would produce the same problem.

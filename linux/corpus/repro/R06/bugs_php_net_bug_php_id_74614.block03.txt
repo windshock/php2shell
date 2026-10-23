@@ -1,0 +1,10 @@
+Fix:
+```
+static zend_always_inline int process_nested_data(UNSERIALIZE_PARAMETER, HashTable *ht, zend_long elements, int objprops)
+{
++	if (elements > (ht)->nTableSize) {
++		return 0;
++	}
+	
+	while (elements-- > 0) {
+```

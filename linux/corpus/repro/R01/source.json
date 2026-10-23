@@ -1,0 +1,13 @@
+{
+  "record": "R01",
+  "label": "[bugs #72530](https://bugs.php.net/bug.php?id=72530)",
+  "fetched_at": "2026-10-23T13:17:54Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=72530",
+      "blocks": 20,
+      "kind": "bug",
+      "title": "PHP :: Bug #72530 :: Use After Free in GC with Certain Destructors"
+    }
+  ]
+}

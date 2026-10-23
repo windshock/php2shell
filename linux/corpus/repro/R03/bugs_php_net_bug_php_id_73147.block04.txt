@@ -1,0 +1,9 @@
+the follow patch can fix this bug:
+
+```
++	zval tmp;
++	ZVAL_STRINGL(&tmp, "string", sizeof("string") - 1);
++	Z_OBJ_HANDLER_P(exception, unset_property)(exception, &tmp, NULL);
++	zval_ptr_dtor(&tmp);
+	zend_update_property_str(base_ce, exception, "string", sizeof("string")-1, str);
+```

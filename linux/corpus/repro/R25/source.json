@@ -1,0 +1,13 @@
+{
+  "record": "R25",
+  "label": "[Issue #10709](https://github.com/php/php-src/issues/10709)",
+  "fetched_at": "2026-10-23T13:18:07Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/10709",
+      "blocks": 3,
+      "kind": "issue",
+      "title": "Recursion in class constant AST evaluation"
+    }
+  ]
+}

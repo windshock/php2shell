@@ -1,0 +1,13 @@
+{
+  "record": "R34",
+  "label": "[Issue #16479](https://github.com/php/php-src/issues/16479)",
+  "fetched_at": "2026-10-23T13:18:11Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/16479",
+      "blocks": 2,
+      "kind": "issue",
+      "title": "Use after free in SplObjectStorage"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Very likely caused by https://github.com/php/php-src/blob/PHP-7.2/Zend/zend_objects_API.c#L144. If the object store reallocation causes a bailout the stored size will be twice as large as it actually is, so if a new object is created during shutdown it's going to write past the allocation. The change of the size variable should be moved until after the erealloc.

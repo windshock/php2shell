@@ -1,0 +1,9 @@
+A bit more obvious test case:
+
+<?php
+set_error_handler(function () { 
+    $GLOBALS['a'] = null;
+});
+$a[$c] = 'x' ;
+
+This is quite similar to bug #78598, with the difference that the relevant notice here comes from an undef var, rather than undef offset.

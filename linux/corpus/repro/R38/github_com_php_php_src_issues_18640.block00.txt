@@ -1,0 +1,26 @@
+<?php
+$wsdl = __DIR__."/bug35142.wsdl";
+class TestSoapClient extends SoapClient {
+}
+$soapClient = new TestSoapClient($wsdl,
+array('trace' => 1, 'exceptions' => 0,
+'classmap' => array('logOnEvent' => 'LogOnEvent',
+'events' => 'IVREvents'),
+'features' => SOAP_SINGLE_ELEMENT_ARRAYS));
+$timestamp = new LogOnEvent(34567, $timestamp);
+$logOffEvents[] = new LogOffEvent(34567, $timestamp, "Smoked");
+$logOffEvents[] = new LogOffEvent(34568, $timestamp, "SmokeFree");
+$ivrEvents = new IVREvents("1.0", 101, 12345, 'IVR', $logOnEvent, $logOffEvents);
+$result = $soapClient->PostEvents($ivrEvents);
+class LogOffEvent {
+function __construct($audienceMemberId, $timestamp, $smokeStatus) {
+$this->timestamp = $timestamp;
+}
+}
+class LogOnEvent {
+}
+class IVREvents {
+function __construct($version, $activityId, $messageId, $source, $timestamp=NULL, $logOffEvent=NULL) {
+$this->logOffEvent = $logOffEvent;
+}
+}

@@ -1,0 +1,5 @@
+The following pull request has been associated:
+
+Patch Name: Fix handling of destructors during GC
+On GitHub:  https://github.com/php/php-src/pull/4489
+Patch:      https://github.com/php/php-src/pull/4489.patch

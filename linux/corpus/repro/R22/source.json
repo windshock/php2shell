@@ -1,0 +1,13 @@
+{
+  "record": "R22",
+  "label": "[bugs #81708 / CVE-2021-21708](https://bugs.php.net/bug.php?id=81708)",
+  "fetched_at": "2026-10-23T13:18:05Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=81708",
+      "blocks": 4,
+      "kind": "bug",
+      "title": "PHP :: Sec Bug #81708 :: UAF due to php_filter_float() failing for ints"
+    }
+  ]
+}

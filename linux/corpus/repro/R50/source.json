@@ -1,0 +1,13 @@
+{
+  "record": "R50",
+  "label": "[Issue #24373](https://github.com/php/php-src/issues/24373)",
+  "fetched_at": "2026-10-23T13:18:16Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/24373",
+      "blocks": 7,
+      "kind": "issue",
+      "title": "serialize() called from a destructor during var_hash destruction reuses the outer var_hash (wrong back references, use-after-free)"
+    }
+  ]
+}

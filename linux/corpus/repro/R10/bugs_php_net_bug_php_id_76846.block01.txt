@@ -1,0 +1,4 @@
+> Does it help to search for a bug, if I install a version with
+> enable-debug?
+
+Probably.  Please do so.

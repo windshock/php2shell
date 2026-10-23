@@ -1,0 +1,13 @@
+{
+  "record": "R38",
+  "label": "[Issue #18640](https://github.com/php/php-src/issues/18640)",
+  "fetched_at": "2026-10-23T13:18:12Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/18640",
+      "blocks": 7,
+      "kind": "issue",
+      "title": "heap-use-after-free ext/soap/php_encoding.c:299:32 in soap_check_zval_ref"
+    }
+  ]
+}

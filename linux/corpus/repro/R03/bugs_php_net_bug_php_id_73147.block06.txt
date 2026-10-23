@@ -1,0 +1,1 @@
+You can handle the DateInterval::__wakeup() like PHP5.

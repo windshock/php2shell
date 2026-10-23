@@ -1,0 +1,3 @@
+Patch for this and the similar bug #74614: https://gist.github.com/nikic/2a3deba4e2f1e2f912a36f904160ca51
+
+This is PHP 7 only, so assigning to ab for the release management.

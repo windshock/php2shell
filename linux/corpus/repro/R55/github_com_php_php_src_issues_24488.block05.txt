@@ -1,0 +1,15 @@
+Invalid read of size 4
+   at zend_gc_collect_cycles (zend_gc.c:2070)
+   by zif_gc_collect_cycles (zend_builtin_functions.c:124)
+ Address 0xb4b0324 is 4 bytes inside a block of size 56 free'd
+   at free
+   by zend_gc_collect_cycles (zend_gc.c:2081)        <- obj->handlers->free_obj(obj)
+ Block was alloc'd at
+   by _zend_new_array_0 (zend_hash.c:327)
+   by sxe_get_prop_hash (simplexml.c:1096)
+   by zend_std_get_properties_for (zend_object_handlers.c:2643)
+   by zif_get_object_vars (zend_builtin_functions.c:801)
+
+Invalid write of size 4
+   at zend_gc_collect_cycles (zend_gc.c:2089)
+   ... (26 invalid accesses total)

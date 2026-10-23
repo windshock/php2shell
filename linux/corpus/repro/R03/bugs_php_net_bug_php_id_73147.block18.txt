@@ -1,0 +1,6 @@
+From CVE-assign:
+"Use CVE-2016-9137 for the ext/curl/curl_file.c vulnerability that was
+fixed in 5.6.27 and 7.0.12.
+
+Use CVE-2016-9138 for the remaining security problem associated with
+__wakeup that is still present in 5.6.27 and 7.0.12."

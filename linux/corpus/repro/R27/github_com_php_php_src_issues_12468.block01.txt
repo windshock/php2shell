@@ -1,0 +1,45 @@
+==440859==ERROR: AddressSanitizer: heap-use-after-free on address 0x60400006f6d4 at pc 0x0000020167d4 bp 0x7fff4dafa180 sp 0x7fff4dafa178
+READ of size 4 at 0x60400006f6d4 thread T0
+    #0 0x20167d3 in zend_string_release_ex /home/dmitry/php/php8.3/Zend/zend_string.h:353
+    #1 0x201e2ac in destroy_zend_class /home/dmitry/php/php8.3/Zend/zend_opcode.c:388
+    #2 0x1fff45b in shutdown_executor /home/dmitry/php/php8.3/Zend/zend_execute_API.c:455
+    #3 0x20722a0 in zend_deactivate /home/dmitry/php/php8.3/Zend/zend.c:1285
+    #4 0x1df2da3 in php_request_shutdown /home/dmitry/php/php8.3/main/main.c:1874
+    #5 0x28074b8 in do_cli /home/dmitry/php/php8.3/sapi/cli/php_cli.c:1136
+    #6 0x2808469 in main /home/dmitry/php/php8.3/sapi/cli/php_cli.c:1340
+    #7 0x7f390c44a54f in __libc_start_call_main (/usr/lib64/../lib64/libc.so.6+0x2754f)
+    #8 0x7f390c44a608 in __libc_start_main_impl (/usr/lib64/../lib64/libc.so.6+0x27608)
+    #9 0x6088f4 in _start (/home/dmitry/php/php8.3/CGI-DEBUG-64/sapi/cli/php+0x6088f4)
+
+0x60400006f6d4 is located 4 bytes inside of 40-byte region [0x60400006f6d0,0x60400006f6f8)
+freed by thread T0 here:
+    #0 0x7f39100b9388 in __interceptor_free.part.0 (/usr/lib64/../lib64/libasan.so.8+0xb9388)
+    #1 0x1f5b098 in _efree_custom /home/dmitry/php/php8.3/Zend/zend_alloc.c:2502
+    #2 0x1f5b3b1 in _efree /home/dmitry/php/php8.3/Zend/zend_alloc.c:2622
+    #3 0x20169c3 in zend_string_release_ex /home/dmitry/php/php8.3/Zend/zend_string.h:360
+    #4 0x201e2ac in destroy_zend_class /home/dmitry/php/php8.3/Zend/zend_opcode.c:388
+    #5 0x1fff45b in shutdown_executor /home/dmitry/php/php8.3/Zend/zend_execute_API.c:455
+    #6 0x20722a0 in zend_deactivate /home/dmitry/php/php8.3/Zend/zend.c:1285
+    #7 0x1df2da3 in php_request_shutdown /home/dmitry/php/php8.3/main/main.c:1874
+    #8 0x28074b8 in do_cli /home/dmitry/php/php8.3/sapi/cli/php_cli.c:1136
+    #9 0x2808469 in main /home/dmitry/php/php8.3/sapi/cli/php_cli.c:1340
+    #10 0x7f390c44a54f in __libc_start_call_main (/usr/lib64/../lib64/libc.so.6+0x2754f)
+
+previously allocated by thread T0 here:
+    #0 0x7f39100ba6af in __interceptor_malloc (/usr/lib64/../lib64/libasan.so.8+0xba6af)
+    #1 0x1f5fa37 in __zend_malloc /home/dmitry/php/php8.3/Zend/zend_alloc.c:3130
+    #2 0x1f5af06 in _malloc_custom /home/dmitry/php/php8.3/Zend/zend_alloc.c:2493
+    #3 0x1f5b2e4 in _emalloc /home/dmitry/php/php8.3/Zend/zend_alloc.c:2612
+    #4 0x1ed503e in zend_string_alloc /home/dmitry/php/php8.3/Zend/zend_string.h:174
+    #5 0x1ed5249 in zend_string_init /home/dmitry/php/php8.3/Zend/zend_string.h:196
+    #6 0x1eed082 in lex_scan Zend/zend_language_scanner.l:2441
+    #7 0x1f7769e in zendlex /home/dmitry/php/php8.3/Zend/zend_compile.c:1962
+    #8 0x1eba6d0 in zendparse /home/dmitry/php/php8.3/Zend/zend_language_parser.c:5154
+    #9 0x1edb922 in zend_compile Zend/zend_language_scanner.l:600
+    #10 0x1edc33a in compile_file Zend/zend_language_scanner.l:654
+    #11 0x156628a in phar_compile_file /home/dmitry/php/php8.3/ext/phar/phar.c:3349
+    #12 0x2078742 in zend_execute_scripts /home/dmitry/php/php8.3/Zend/zend.c:1871
+    #13 0x1df6139 in php_execute_script /home/dmitry/php/php8.3/main/main.c:2492
+    #14 0x2805caf in do_cli /home/dmitry/php/php8.3/sapi/cli/php_cli.c:966
+    #15 0x2808469 in main /home/dmitry/php/php8.3/sapi/cli/php_cli.c:1340
+    #16 0x7f390c44a54f in __libc_start_call_main (/usr/lib64/../lib64/libc.so.6+0x2754f)

@@ -1,0 +1,1 @@
+Hmmm... I suspect there might be also other places, I'm not sure how to handle this problem in general, as reference allows to overwrite anything, by definition, that's how reference is supposed to work.

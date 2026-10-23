@@ -1,0 +1,11 @@
+./configure \
+    --disable-all \
+    --enable-debug-assertions \
+    --enable-option-checking=fatal \
+    --enable-fuzzer \
+    --enable-exif \
+    --enable-opcache \
+    --without-pcre-jit \
+    --disable-phpdbg \
+    --disable-cgi \
+    --with-pic --enable-address-sanitizer

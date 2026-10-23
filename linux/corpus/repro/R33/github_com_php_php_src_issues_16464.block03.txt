@@ -1,0 +1,51 @@
+diff --git a/Zend/tests/gh16464.phpt b/Zend/tests/gh16464.phpt
+new file mode 100644
+index 0000000000..75f34fc250
+--- /dev/null
++++ b/Zend/tests/gh16464.phpt
+@@ -0,0 +1,29 @@
++--TEST--
++Use-after-free in SplDoublyLinkedList::offsetSet() when modifying list in destructor of overwritten object
++--FILE--
++<?php
++
++class C {
++    public $a;
++
++    function __destruct() {
++        global $list;
++        var_dump($list->pop());
++    }
++}
++
++$list = new SplDoublyLinkedList;
++$list->add(0, new C);
++$list[0] = 42;
++var_dump($list);
++
++?>
++--EXPECTF--
++int(42)
++object(SplDoublyLinkedList)#%d (2) {
++  ["flags":"SplDoublyLinkedList":private]=>
++  int(0)
++  ["dllist":"SplDoublyLinkedList":private]=>
++  array(0) {
++  }
++}
+diff --git a/ext/spl/spl_dllist.c b/ext/spl/spl_dllist.c
+index 186b9a34c7..6592efc4e5 100644
+--- a/ext/spl/spl_dllist.c
++++ b/ext/spl/spl_dllist.c
+@@ -737,8 +737,10 @@ PHP_METHOD(SplDoublyLinkedList, offsetSet)
+ 		if (element != NULL) {
+ 			/* the element is replaced, delref the old one as in
+ 			 * SplDoublyLinkedList::pop() */
+-			zval_ptr_dtor(&element->data);
++			zval garbage;
++			ZVAL_COPY_VALUE(&garbage, &element->data);
+ 			ZVAL_COPY(&element->data, value);
++			zval_ptr_dtor(&garbage);
+ 		} else {
+ 			zval_ptr_dtor(value);
+ 			zend_argument_error(spl_ce_OutOfRangeException, 1, "is an invalid offset");

@@ -1,0 +1,9 @@
+Thanks for reporting; I can confirm this issue.  Suggested patch:
+
+<https://gist.github.com/cmb69/b05cceb34e310438ab960ec3bbd1a59b>
+
+Stas, can you please handle this?  Note that for PHP-8.1+ the
+SKIPIF section should be replaced by:
+
+--EXTENSIONS--
+filter

@@ -1,0 +1,5 @@
+The following patch has been added/updated:
+
+Patch Name: avoid-double-free.patch
+Revision:   1528027735
+URL:        https://bugs.php.net/patch-display.php?bug=76409&patch=avoid-double-free.patch&revision=1528027735

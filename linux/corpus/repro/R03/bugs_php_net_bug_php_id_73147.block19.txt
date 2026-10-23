@@ -1,0 +1,5 @@
+The following patch has been added/updated:
+
+Patch Name: demo17
+Revision:   1559803573
+URL:        https://bugs.php.net/patch-display.php?bug=73147&patch=demo17&revision=1559803573

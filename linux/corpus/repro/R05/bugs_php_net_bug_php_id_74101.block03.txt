@@ -1,0 +1,1 @@
+Has anyone looked at this?  It is past the 90 mark and there are no comments on this bug except for my own.  A use-after-free accessible during unserialize() seems serious.

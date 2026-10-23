@@ -1,0 +1,4 @@
+<paste the real output from the same PoC on a patched build, or the documented
+expected behavior if you have neither:
+[ptr] ret=...   (inner R:1500 rejected, no zif_system dispatch)
+>

@@ -1,0 +1,17 @@
+#4  zend_mm_panic (message="zend_mm_heap corrupted") at ./Zend/zend_alloc.c:404
+#5  zend_mm_get_next_free_slot (heap=<optimized out>, bin_num=6, slot=<optimized out>) at ./Zend/zend_alloc.c:1456
+#6  zend_mm_alloc_small (heap=<optimized out>, bin_num=6) at ./Zend/zend_alloc.c:1545
+#7  _emalloc_56 () at ./Zend/zend_alloc.c:2840
+#8  _zend_new_array_0 () at ./Zend/zend_hash.c:326
+#9  zend_fetch_debug_backtrace (return_value=0x7fffffffb200, skip_last=0, options=<optimized out>, limit=0) at ./Zend/zend_builtin_functions.c:2092
+#10 zend_default_exception_new (class_type=0x7fffdfe0a8d0) at ./Zend/zend_exceptions.c:299
+#11 _object_and_properties_init (arg=0x7ffff6e232b0, class_type=0x7fffdfe0a8d0, properties=0x0) at ./Zend/zend_API.c:1863
+#12 object_init_ex (arg=0x7ffff6e232b0, class_type=0x7fffdfe0a8d0) at ./Zend/zend_API.c:1877
+#13 ZEND_NEW_SPEC_CONST_UNUSED_HANDLER () at ./Zend/zend_vm_execute.h:11316
+#14 execute_ex (ex=0x10) at ./Zend/zend_vm_execute.h:117699
+#15 zend_execute (op_array=0x7ffff6e98000, return_value=0x0) at ./Zend/zend_vm_execute.h:122038
+#16 zend_execute_script (type=8, retval=0x0, file_handle=0x7fffffffd840) at ./Zend/zend.c:1990
+#17 php_execute_script_ex (primary_file=<optimized out>, retval=0x0) at ./main/main.c:2688
+#18 php_execute_script (primary_file=<optimized out>) at ./main/main.c:2728
+#19 do_cli (argc=11, argv=0x555555ff8490) at ./sapi/cli/php_cli.c:960
+#20 main (argc=11, argv=0x555555ff8490) at ./sapi/cli/php_cli.c:1383

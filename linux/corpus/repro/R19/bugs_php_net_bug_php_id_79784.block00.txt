@@ -1,0 +1,21 @@
+Description:
+------------
+LOG:
+---
+php: /home/yongheng/php_clean/Zend/zend_hash.c:71: void _zend_is_inconsistent(const HashTable *, const char *, int): Assertion `0' failed.
+---
+
+Test script:
+---------------
+<?
+try {
+    define ( ob_start ( function () {
+        global $a ;
+        array ( list ( $a   ) = $b  ) ;
+    }
+    , 20 )  )  ;
+}catch ( Error ) {
+    $a [ $c ] = 'x' ;
+}
+
+

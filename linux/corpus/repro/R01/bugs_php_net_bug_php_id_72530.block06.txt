@@ -1,0 +1,23 @@
+Right, issue not fully fixed :( Here's a reduced testcase without unserialize (generates memory errors under valgrind):
+
+<?php
+
+class ryat {
+    var $ryat;
+    var $chtg;
+
+    function __destruct() {
+        $this->chtg = $this->ryat;
+        $this->ryat = 1;
+    }
+}
+
+$o = new ryat;
+$o->ryat = $o;
+$x =& $o->chtg;
+
+unset($o);
+gc_collect_cycles();
+var_dump($x);
+
+The problem is that the GC uses refcount to check whether a new reference has been added during destruction. However, in this case refcount of object(ryat) stays the same, while a reference to it still becomes externally visible.

@@ -1,0 +1,4 @@
+Requesting a CVE for a bug which had been reported and discussed
+publicly is pretty strange.
+
+Stas, would do you think?

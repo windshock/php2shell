@@ -1,0 +1,13 @@
+{
+  "record": "R27",
+  "label": "[Issue #12468](https://github.com/php/php-src/issues/12468)",
+  "fetched_at": "2026-10-23T13:18:08Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/12468",
+      "blocks": 3,
+      "kind": "issue",
+      "title": "Use after free because of incorrect prop_info->doc_comment reference counting (without opcache only)"
+    }
+  ]
+}

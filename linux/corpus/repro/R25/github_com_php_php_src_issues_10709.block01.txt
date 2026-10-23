@@ -1,0 +1,124 @@
+string(23) "this is A extended by B"
+=================================================================
+==587089==ERROR: AddressSanitizer: heap-use-after-free on address 0x60c000008998 at pc 0x000001a961e2 bp 0x7ffce2c99f70 sp 0x7ffce2c99f68
+READ of size 8 at 0x60c000008998 thread T0
+    #0 0x1a961e1 in zend_ast_evaluate_inner /home/ilutov/Developer/php-src/Zend/zend_ast.c:546
+    #1 0x1a95d63 in zend_ast_evaluate_ex /home/ilutov/Developer/php-src/Zend/zend_ast.c:522
+    #2 0x15c8f62 in zval_update_constant_with_ctx /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:696
+    #3 0x15c92ba in zval_update_constant_ex /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:710
+    #4 0x17a29c6 in ZEND_FETCH_CLASS_CONSTANT_SPEC_CONST_CONST_HANDLER /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:7243
+    #5 0x19de180 in execute_ex /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:57172
+    #6 0x15cd115 in zend_call_function /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:938
+    #7 0x15cea26 in zend_call_known_function /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1032
+    #8 0xf557b2 in spl_perform_autoload /home/ilutov/Developer/php-src/ext/spl/php_spl.c:448
+    #9 0x15d0943 in zend_lookup_class_ex /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1198
+    #10 0x15d3041 in zend_fetch_class_by_name /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1664
+    #11 0x17c99dd in ZEND_NEW_SPEC_CONST_UNUSED_HANDLER /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:10454
+    #12 0x19dfe1e in execute_ex /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:57468
+    #13 0x19f4e41 in zend_execute /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:60935
+    #14 0x163aa29 in zend_execute_scripts /home/ilutov/Developer/php-src/Zend/zend.c:1798
+    #15 0x13cfd7e in php_execute_script /home/ilutov/Developer/php-src/main/main.c:2482
+    #16 0x1d856ab in do_cli /home/ilutov/Developer/php-src/sapi/cli/php_cli.c:964
+    #17 0x1d87d13 in main %s:%d
+    #18 0x7f73b0a4a50f in __libc_start_call_main (/lib64/libc.so.6+0x2750f)
+    #19 0x7f73b0a4a5c8 in __libc_start_main@GLIBC_2.2.5 (/lib64/libc.so.6+0x275c8)
+    #20 0x603e24 in _start (/home/ilutov/Developer/php-src/sapi/cli/php+0x603e24)
+
+0x60c000008998 is located 24 bytes inside of 128-byte region [0x60c000008980,0x60c000008a00)
+freed by thread T0 here:
+    #0 0x7f73b16b9388 in __interceptor_free.part.0 (/lib64/libasan.so.8+0xb9388)
+    #1 0x1527f17 in tracked_free /home/ilutov/Developer/php-src/Zend/zend_alloc.c:2845
+    #2 0x1526179 in _efree_custom /home/ilutov/Developer/php-src/Zend/zend_alloc.c:2480
+    #3 0x1526486 in _efree /home/ilutov/Developer/php-src/Zend/zend_alloc.c:2600
+    #4 0x1a9e9a9 in zend_ast_ref_destroy /home/ilutov/Developer/php-src/Zend/zend_ast.c:1176
+    #5 0x162993b in rc_dtor_func /home/ilutov/Developer/php-src/Zend/zend_variables.c:57
+    #6 0x15bc122 in zval_ptr_dtor_nogc /home/ilutov/Developer/php-src/Zend/zend_variables.h:35
+    #7 0x15c8f8e in zval_update_constant_with_ctx /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:699
+    #8 0x15c92ba in zval_update_constant_ex /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:710
+    #9 0x17a29c6 in ZEND_FETCH_CLASS_CONSTANT_SPEC_CONST_CONST_HANDLER /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:7243
+    #10 0x19de180 in execute_ex /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:57172
+    #11 0x15cd115 in zend_call_function /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:938
+    #12 0x15cea26 in zend_call_known_function /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1032
+    #13 0xf557b2 in spl_perform_autoload /home/ilutov/Developer/php-src/ext/spl/php_spl.c:448
+    #14 0x15d0943 in zend_lookup_class_ex /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1198
+    #15 0x15d2def in zend_fetch_class /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1620
+    #16 0x15b83b1 in zend_get_class_constant_ex /home/ilutov/Developer/php-src/Zend/zend_constants.c:336
+    #17 0x1a9a02a in zend_ast_evaluate_inner /home/ilutov/Developer/php-src/Zend/zend_ast.c:855
+    #18 0x1a95d63 in zend_ast_evaluate_ex /home/ilutov/Developer/php-src/Zend/zend_ast.c:522
+    #19 0x1a9614f in zend_ast_evaluate_inner /home/ilutov/Developer/php-src/Zend/zend_ast.c:544
+    #20 0x1a95d63 in zend_ast_evaluate_ex /home/ilutov/Developer/php-src/Zend/zend_ast.c:522
+    #21 0x15c8f62 in zval_update_constant_with_ctx /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:696
+    #22 0x15c92ba in zval_update_constant_ex /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:710
+    #23 0x17a29c6 in ZEND_FETCH_CLASS_CONSTANT_SPEC_CONST_CONST_HANDLER /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:7243
+    #24 0x19de180 in execute_ex /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:57172
+    #25 0x15cd115 in zend_call_function /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:938
+    #26 0x15cea26 in zend_call_known_function /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1032
+    #27 0xf557b2 in spl_perform_autoload /home/ilutov/Developer/php-src/ext/spl/php_spl.c:448
+    #28 0x15d0943 in zend_lookup_class_ex /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1198
+    #29 0x15d3041 in zend_fetch_class_by_name /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1664
+
+previously allocated by thread T0 here:
+    #0 0x7f73b16ba6af in __interceptor_malloc (/lib64/libasan.so.8+0xba6af)
+    #1 0x1527c50 in tracked_malloc /home/ilutov/Developer/php-src/Zend/zend_alloc.c:2826
+    #2 0x1525fef in _malloc_custom /home/ilutov/Developer/php-src/Zend/zend_alloc.c:2471
+    #3 0x15263bb in _emalloc /home/ilutov/Developer/php-src/Zend/zend_alloc.c:2590
+    #4 0x1a9deb3 in zend_ast_copy /home/ilutov/Developer/php-src/Zend/zend_ast.c:1118
+    #5 0x15ad394 in zend_const_expr_to_zval /home/ilutov/Developer/php-src/Zend/zend_compile.c:10147
+    #6 0x158baf6 in zend_compile_class_const_decl /home/ilutov/Developer/php-src/Zend/zend_compile.c:7718
+    #7 0x158bd8d in zend_compile_class_const_group /home/ilutov/Developer/php-src/Zend/zend_compile.c:7733
+    #8 0x15ae289 in zend_compile_stmt /home/ilutov/Developer/php-src/Zend/zend_compile.c:10264
+    #9 0x157864f in zend_compile_stmt_list /home/ilutov/Developer/php-src/Zend/zend_compile.c:6283
+    #10 0x15ae0ef in zend_compile_stmt /home/ilutov/Developer/php-src/Zend/zend_compile.c:10202
+    #11 0x158fc15 in zend_compile_class_decl /home/ilutov/Developer/php-src/Zend/zend_compile.c:7999
+    #12 0x15adcb1 in zend_compile_top_stmt /home/ilutov/Developer/php-src/Zend/zend_compile.c:10177
+    #13 0x15ad996 in zend_compile_top_stmt /home/ilutov/Developer/php-src/Zend/zend_compile.c:10166
+    #14 0x14b0859 in zend_compile Zend/zend_language_scanner.l:619
+    #15 0x14b277c in compile_string Zend/zend_language_scanner.l:815
+    #16 0x173b0fc in zend_include_or_eval /home/ilutov/Developer/php-src/Zend/zend_execute.c:4878
+    #17 0x1801a35 in ZEND_INCLUDE_OR_EVAL_SPEC_TMPVAR_HANDLER /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:14730
+    #18 0x19e3820 in execute_ex /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:58068
+    #19 0x15cd115 in zend_call_function /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:938
+    #20 0x15cea26 in zend_call_known_function /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1032
+    #21 0xf557b2 in spl_perform_autoload /home/ilutov/Developer/php-src/ext/spl/php_spl.c:448
+    #22 0x15d0943 in zend_lookup_class_ex /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1198
+    #23 0x15d3041 in zend_fetch_class_by_name /home/ilutov/Developer/php-src/Zend/zend_execute_API.c:1664
+    #24 0x17c99dd in ZEND_NEW_SPEC_CONST_UNUSED_HANDLER /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:10454
+    #25 0x19dfe1e in execute_ex /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:57468
+    #26 0x19f4e41 in zend_execute /home/ilutov/Developer/php-src/Zend/zend_vm_execute.h:60935
+    #27 0x163aa29 in zend_execute_scripts /home/ilutov/Developer/php-src/Zend/zend.c:1798
+    #28 0x13cfd7e in php_execute_script /home/ilutov/Developer/php-src/main/main.c:2482
+    #29 0x1d856ab in do_cli /home/ilutov/Developer/php-src/sapi/cli/php_cli.c:964
+
+SUMMARY: AddressSanitizer: heap-use-after-free /home/ilutov/Developer/php-src/Zend/zend_ast.c:546 in zend_ast_evaluate_inner
+Shadow bytes around the buggy address:
+  0x0c187fff90e0: fa fa fa fa fa fa fa fa fd fd fd fd fd fd fd fd
+  0x0c187fff90f0: fd fd fd fd fd fd fd fd fa fa fa fa fa fa fa fa
+  0x0c187fff9100: fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+  0x0c187fff9110: fa fa fa fa fa fa fa fa fd fd fd fd fd fd fd fd
+  0x0c187fff9120: fd fd fd fd fd fd fd fd fa fa fa fa fa fa fa fa
+=>0x0c187fff9130: fd fd fd[fd]fd fd fd fd fd fd fd fd fd fd fd fd
+  0x0c187fff9140: fa fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+  0x0c187fff9150: 00 00 00 00 00 00 00 fa fa fa fa fa fa fa fa fa
+  0x0c187fff9160: fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+  0x0c187fff9170: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c187fff9180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==587089==ABORTING

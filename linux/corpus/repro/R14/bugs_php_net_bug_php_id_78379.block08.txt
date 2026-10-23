@@ -1,0 +1,2 @@
+Proposed patches https://gist.github.com/dstogov/43a992d481f65ac16c454e1a292be38e
+seem to fix the second problem

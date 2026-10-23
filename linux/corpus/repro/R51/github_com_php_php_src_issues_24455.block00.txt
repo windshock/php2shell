@@ -1,0 +1,19 @@
+<?php
+
+class Target {
+    public ?Trigger $trigger = null;
+}
+
+class Trigger {
+    public function __construct(private object $target) {}
+
+    public function __destruct() {
+        unset($this->target->trigger);
+    }
+}
+
+$reflection = new ReflectionClass(Target::class);
+$target = new Target();
+$target->trigger = new Trigger($target);
+
+$reflection->resetAsLazyGhost($target, static function (): void {});

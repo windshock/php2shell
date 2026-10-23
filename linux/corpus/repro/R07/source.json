@@ -1,0 +1,13 @@
+{
+  "record": "R07",
+  "label": "[bugs #76047](https://bugs.php.net/bug.php?id=76047)",
+  "fetched_at": "2026-10-23T13:17:58Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=76047",
+      "blocks": 9,
+      "kind": "bug",
+      "title": "PHP :: Bug #76047 :: Use-after-free when accessing already destructed backtrace arguments"
+    }
+  ]
+}

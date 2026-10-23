@@ -1,0 +1,13 @@
+{
+  "record": "R02",
+  "label": "[bugs #73092 / CVE-2016-7479](https://bugs.php.net/bug.php?id=73092)",
+  "fetched_at": "2026-10-23T13:17:54Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=73092",
+      "blocks": 4,
+      "kind": "bug",
+      "title": "PHP :: Sec Bug #73092 :: Unserialize use-after-free when resizing object&#039;s properties hash table"
+    }
+  ]
+}

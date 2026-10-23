@@ -1,0 +1,15 @@
+=================================================================
+==1623721==ERROR: AddressSanitizer: heap-use-after-free on address 0x506000082640 at pc 0x5604cfa03987 bp 0x7ffe9664c080 sp 0x7ffe9664c070
+READ of size 4 at 0x506000082640 thread T0
+    #0 0x5604cfa03986 in zend_gc_addref /src/php/Zend/zend_types.h:1340
+    #1 0x5604cfa03deb in zval_addref_p /src/php/Zend/zend_types.h:1389
+    #2 0x5604cfa2fce8 in to_xml_array /src/php/ext/soap/php_encoding.c:2310
+freed by thread T0 here:
+    #7 0x5604cfa2fbf3 in to_xml_array /src/php/ext/soap/php_encoding.c:2305
+previously allocated by thread T0 here:
+    #4 0x5604d0d01d02 in _zend_new_array /src/php/Zend/zend_hash.c:291
+    #5 0x5604cfcdfd34 in spl_multiple_iterator_get_all /src/php/ext/spl/spl_observer.c:1301
+    #6 0x5604cfce0d29 in zim_MultipleIterator_current /src/php/ext/spl/spl_observer.c:1368
+SUMMARY: AddressSanitizer: heap-use-after-free /src/php/Zend/zend_types.h:1340 in zend_gc_addref
+==1623721==ABORTING
+Aborted

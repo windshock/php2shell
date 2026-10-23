@@ -1,0 +1,1 @@
+https://github.com/mm0r1/exploits/tree/master/php7-backtrace-bypass

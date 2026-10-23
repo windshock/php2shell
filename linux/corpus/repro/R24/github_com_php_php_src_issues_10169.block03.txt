@@ -1,0 +1,17 @@
+<?
+class d
+{
+    public string $b;
+}
+class c
+{
+    function __toString()
+    {
+        global $a;
+        $a     = new d;
+        $a->dd = "";
+        return "";
+    }
+}
+$a    = new d;
+$a->b = new c;

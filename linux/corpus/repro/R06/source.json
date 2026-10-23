@@ -1,0 +1,13 @@
+{
+  "record": "R06",
+  "label": "[bugs #74614](https://bugs.php.net/bug.php?id=74614)",
+  "fetched_at": "2026-10-23T13:17:57Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=74614",
+      "blocks": 8,
+      "kind": "bug",
+      "title": "PHP :: Sec Bug #74614 :: Use-after-free in PHP7&#039;s unserialize()"
+    }
+  ]
+}

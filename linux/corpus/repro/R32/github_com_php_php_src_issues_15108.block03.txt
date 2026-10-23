@@ -1,0 +1,16 @@
+    public function testIssue88(): void
+    {
+        $subscription = $this->subscriber->subscribe('foo');
+        delay(0.1); // Enter event loop so subscriber has time to connect.
+        $subscription->unsubscribe();
+
+        $subscription = $this->subscriber->subscribe('foo');
+
+        async(fn () => $this->redis->publish('foo', 'bar'));
+
+        $this->getNextValue(Pipeline::fromIterable($subscription)->getIterator());
+
+        $receivedValue = $this->getNextValue(Pipeline::fromIterable($subscription)->getIterator());
+
+        $this->assertSame('bar', $receivedValue);
+    }

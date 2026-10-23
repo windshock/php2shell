@@ -1,0 +1,3 @@
+This bug is publicly referenced as the cause in the following exploit bypassing disable_functions()
+
+https://github.com/mm0r1/exploits/tree/master/php7-gc-bypass

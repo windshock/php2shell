@@ -1,0 +1,16 @@
+<?php
+
+class C {
+    public $a;
+
+    function __destruct() {
+        global $list;
+        $list->pop();
+    }
+}
+
+$list = new SplDoublyLinkedList;
+$list->add(0, new C);
+$list[0] = 1;
+var_dump($list);
+

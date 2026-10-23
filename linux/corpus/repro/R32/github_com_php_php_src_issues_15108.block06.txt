@@ -1,0 +1,15 @@
+AddressSanitizer:DEADLYSIGNAL
+=================================================================
+==87700==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000000 (pc 0x598cb9f6409b bp 0x76a807c00610 sp 0x76a807c00560 T0)
+==87700==The signal is caused by a READ memory access.
+==87700==Hint: address points to the zero page.
+    #0 0x598cb9f6409b in zend_generator_get_next_delegated_value /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:695
+    #1 0x598cb9f6443e in zend_generator_resume /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:746
+    #2 0x598cb9f66dde in zend_generator_iterator_move_forward /run/media/niels/MoreData/php-8.3/Zend/zend_generators.c:1070
+    #3 0x598cb9db2dda in zend_fe_fetch_object_helper_SPEC /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:2889
+    #4 0x598cb9e346ac in ZEND_FE_FETCH_R_SPEC_VAR_HANDLER /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:22349
+    #5 0x598cb9f05ec0 in execute_ex /run/media/niels/MoreData/php-8.3/Zend/zend_vm_execute.h:59453
+    #6 0x598cb9cbe636 in zend_call_function /run/media/niels/MoreData/php-8.3/Zend/zend_execute_API.c:957
+    #7 0x598cb9fc3eed in zend_fiber_execute /run/media/niels/MoreData/php-8.3/Zend/zend_fibers.c:595
+    #8 0x598cb9fc29df in zend_fiber_trampoline /run/media/niels/MoreData/php-8.3/Zend/zend_fibers.c:378
+    #9 0x598cb9b714fe in make_fcontext /run/media/niels/MoreData/php-8.3/Zend/asm/make_x86_64_sysv_elf_gas.S:174

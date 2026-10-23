@@ -1,0 +1,3 @@
+I also noticed that in related small test cases, the elements of the property array were visited more than once by gc_mark_grey(), and thus had their reference counts decremented below zero, because the property array was not marked grey and did not have its colour checked. A negative reference count protected the elements from deletion, hiding the bug.
+
+(The field is unsigned, by negative I mean 0xffffffff)

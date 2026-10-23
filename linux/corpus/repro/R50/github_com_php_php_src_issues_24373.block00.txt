@@ -1,0 +1,13 @@
+<?php
+class D {
+    public function __serialize(): array { return []; }
+    public function __destruct() {
+        $o = new stdClass();
+        $GLOBALS['inner'] = serialize([$o, $o]);
+    }
+}
+class Outer {
+    public function __serialize(): array { return ["d" => new D()];
+}
+serialize([new Outer(), new stdClass()]);
+echo $GLOBALS['inner'], "\n";

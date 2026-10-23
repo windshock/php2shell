@@ -1,0 +1,11 @@
+array_init_size(return_value, num_elements);
+...
+if (SPL_MULTIPLE_ITERATOR_GET_ALL_CURRENT == get_type) {
+    zend_call_known_instance_method_with_0_params(
+        it->ce->iterator_funcs_ptr->zf_current, it, &retval);
+} else {
+    zend_call_known_instance_method_with_0_params(
+        it->ce->iterator_funcs_ptr->zf_key, it, &retval);
+}
+...
+add_next_index_zval(return_value, &retval);

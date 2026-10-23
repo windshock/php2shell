@@ -1,0 +1,5 @@
+It looks like this can also be reproduced with a much more concise test case:
+O:9:"Exception":799999999999999999999999999997:0i:0;a:0:{}i:2;i:0;i:0;R:2;
+
+Also worth mentioning is that UBSAN produces this interesting line while processing the input:
+ext/standard/var_unserializer.re:345:20: runtime error: signed integer overflow: 7999999999999999999 * 10 cannot be represented in type 'long'

@@ -1,0 +1,81 @@
+Another example of triggering this (or at least a similar) crash slightly differently and without instrumented builds of PHP (but still with USE_ZEND_ALLOC=0):
+cyoung@Tyrell:~/unserialize/crash_analysis/out$ ~/php/php-src-php-7.1.2RC1/sapi/cli/php  -r 'var_dump(unserialize(base64_decode("Tzo5OiJFeGNlcHRpb24iOjc5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5Nzp7aTowO2E6MDp7fWk6NjA7ZDozMDAwMDAwMDAwNjE3MDAyOTU3OUUtMTE4O2k6MjtkOjAwMDMxO2k6MjtkOis5NTcxMzMzMzAwMEUtMDAwMDM1ODtpOjI7ZDo0OTU3MTExRS0wMDAwMzE4O2k6MDYyO2k6MTtpOjA7UjoyO2k6")));'
+bool(false)
+*** Error in `/home/cyoung/php/php-src-php-7.1.2RC1/sapi/cli/php': munmap_chunk(): invalid pointer: 0x000000000235e350 ***
+======= Backtrace: =========
+/lib/x86_64-linux-gnu/libc.so.6(+0x777e5)[0x7fb0035d97e5]
+/lib/x86_64-linux-gnu/libc.so.6(cfree+0x1a8)[0x7fb0035e5ae8]
+/home/cyoung/php/php-src-php-7.1.2RC1/sapi/cli/php(php_request_shutdown+0x23f)[0x6ac22f]
+/home/cyoung/php/php-src-php-7.1.2RC1/sapi/cli/php[0x7b5dec]
+/home/cyoung/php/php-src-php-7.1.2RC1/sapi/cli/php[0x42b50c]
+/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0xf0)[0x7fb003582830]
+/home/cyoung/php/php-src-php-7.1.2RC1/sapi/cli/php(_start+0x29)[0x42b649]
+======= Memory map: ========
+00400000-00c70000 r-xp 00000000 fc:02 1837275                            /home/cyoung/php/php-src-php-7.1.2RC1/sapi/cli/php
+00e6f000-00ef4000 r--p 0086f000 fc:02 1837275                            /home/cyoung/php/php-src-php-7.1.2RC1/sapi/cli/php
+00ef4000-00f09000 rw-p 008f4000 fc:02 1837275                            /home/cyoung/php/php-src-php-7.1.2RC1/sapi/cli/php
+00f09000-00f27000 rw-p 00000000 00:00 0
+02227000-02370000 rw-p 00000000 00:00 0                                  [heap]
+7fb000d43000-7fb000d59000 r-xp 00000000 fc:00 549                        /lib/x86_64-linux-gnu/libgcc_s.so.1
+7fb000d59000-7fb000f58000 ---p 00016000 fc:00 549                        /lib/x86_64-linux-gnu/libgcc_s.so.1
+7fb000f58000-7fb000f59000 rw-p 00015000 fc:00 549                        /lib/x86_64-linux-gnu/libgcc_s.so.1
+7fb000f59000-7fb0010cb000 r-xp 00000000 fc:00 4962                       /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.21
+7fb0010cb000-7fb0012cb000 ---p 00172000 fc:00 4962                       /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.21
+7fb0012cb000-7fb0012d5000 r--p 00172000 fc:00 4962                       /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.21
+7fb0012d5000-7fb0012d7000 rw-p 0017c000 fc:00 4962                       /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.21
+7fb0012d7000-7fb0012db000 rw-p 00000000 00:00 0
+7fb0012db000-7fb002b91000 r-xp 00000000 fc:00 21478                      /usr/lib/x86_64-linux-gnu/libicudata.so.55.1
+7fb002b91000-7fb002d90000 ---p 018b6000 fc:00 21478                      /usr/lib/x86_64-linux-gnu/libicudata.so.55.1
+7fb002d90000-7fb002d91000 r--p 018b5000 fc:00 21478                      /usr/lib/x86_64-linux-gnu/libicudata.so.55.1
+7fb002d91000-7fb002d92000 rw-p 018b6000 fc:00 21478                      /usr/lib/x86_64-linux-gnu/libicudata.so.55.1
+7fb002d92000-7fb002db3000 r-xp 00000000 fc:00 563                        /lib/x86_64-linux-gnu/liblzma.so.5.0.0
+7fb002db3000-7fb002fb2000 ---p 00021000 fc:00 563                        /lib/x86_64-linux-gnu/liblzma.so.5.0.0
+7fb002fb2000-7fb002fb3000 r--p 00020000 fc:00 563                        /lib/x86_64-linux-gnu/liblzma.so.5.0.0
+7fb002fb3000-7fb002fb4000 rw-p 00021000 fc:00 563                        /lib/x86_64-linux-gnu/liblzma.so.5.0.0
+7fb002fb4000-7fb002fcd000 r-xp 00000000 fc:00 646                        /lib/x86_64-linux-gnu/libz.so.1.2.8
+7fb002fcd000-7fb0031cc000 ---p 00019000 fc:00 646                        /lib/x86_64-linux-gnu/libz.so.1.2.8
+7fb0031cc000-7fb0031cd000 r--p 00018000 fc:00 646                        /lib/x86_64-linux-gnu/libz.so.1.2.8
+7fb0031cd000-7fb0031ce000 rw-p 00019000 fc:00 646                        /lib/x86_64-linux-gnu/libz.so.1.2.8
+7fb0031ce000-7fb00334d000 r-xp 00000000 fc:00 21474                      /usr/lib/x86_64-linux-gnu/libicuuc.so.55.1
+7fb00334d000-7fb00354d000 ---p 0017f000 fc:00 21474                      /usr/lib/x86_64-linux-gnu/libicuuc.so.55.1
+7fb00354d000-7fb00355d000 r--p 0017f000 fc:00 21474                      /usr/lib/x86_64-linux-gnu/libicuuc.so.55.1
+7fb00355d000-7fb00355e000 rw-p 0018f000 fc:00 21474                      /usr/lib/x86_64-linux-gnu/libicuuc.so.55.1
+7fb00355e000-7fb003562000 rw-p 00000000 00:00 0
+7fb003562000-7fb003721000 r-xp 00000000 fc:00 25684                      /lib/x86_64-linux-gnu/libc-2.23.so
+7fb003721000-7fb003921000 ---p 001bf000 fc:00 25684                      /lib/x86_64-linux-gnu/libc-2.23.so
+7fb003921000-7fb003925000 r--p 001bf000 fc:00 25684                      /lib/x86_64-linux-gnu/libc-2.23.so
+7fb003925000-7fb003927000 rw-p 001c3000 fc:00 25684                      /lib/x86_64-linux-gnu/libc-2.23.so
+7fb003927000-7fb00392b000 rw-p 00000000 00:00 0
+7fb00392b000-7fb003ada000 r-xp 00000000 fc:00 21488                      /usr/lib/x86_64-linux-gnu/libxml2.so.2.9.3
+7fb003ada000-7fb003cda000 ---p 001af000 fc:00 21488                      /usr/lib/x86_64-linux-gnu/libxml2.so.2.9.3
+7fb003cda000-7fb003ce2000 r--p 001af000 fc:00 21488                      /usr/lib/x86_64-linux-gnu/libxml2.so.2.9.3
+7fb003ce2000-7fb003ce4000 rw-p 001b7000 fc:00 21488                      /usr/lib/x86_64-linux-gnu/libxml2.so.2.9.3
+7fb003ce4000-7fb003ce5000 rw-p 00000000 00:00 0
+7fb003ce5000-7fb003ce8000 r-xp 00000000 fc:00 25683                      /lib/x86_64-linux-gnu/libdl-2.23.so
+7fb003ce8000-7fb003ee7000 ---p 00003000 fc:00 25683                      /lib/x86_64-linux-gnu/libdl-2.23.so
+7fb003ee7000-7fb003ee8000 r--p 00002000 fc:00 25683                      /lib/x86_64-linux-gnu/libdl-2.23.so
+7fb003ee8000-7fb003ee9000 rw-p 00003000 fc:00 25683                      /lib/x86_64-linux-gnu/libdl-2.23.so
+7fb003ee9000-7fb003ff1000 r-xp 00000000 fc:00 25691                      /lib/x86_64-linux-gnu/libm-2.23.so
+7fb003ff1000-7fb0041f0000 ---p 00108000 fc:00 25691                      /lib/x86_64-linux-gnu/libm-2.23.so
+7fb0041f0000-7fb0041f1000 r--p 00107000 fc:00 25691                      /lib/x86_64-linux-gnu/libm-2.23.so
+7fb0041f1000-7fb0041f2000 rw-p 00108000 fc:00 25691                      /lib/x86_64-linux-gnu/libm-2.23.so
+7fb0041f2000-7fb004209000 r-xp 00000000 fc:00 89638                      /lib/x86_64-linux-gnu/libresolv-2.23.so
+7fb004209000-7fb004409000 ---p 00017000 fc:00 89638                      /lib/x86_64-linux-gnu/libresolv-2.23.so
+7fb004409000-7fb00440a000 r--p 00017000 fc:00 89638                      /lib/x86_64-linux-gnu/libresolv-2.23.so
+7fb00440a000-7fb00440b000 rw-p 00018000 fc:00 89638                      /lib/x86_64-linux-gnu/libresolv-2.23.so
+7fb00440b000-7fb00440d000 rw-p 00000000 00:00 0
+7fb00440d000-7fb004433000 r-xp 00000000 fc:00 25673                      /lib/x86_64-linux-gnu/ld-2.23.so
+7fb004504000-7fb0045c9000 rw-p 00000000 00:00 0
+7fb0045c9000-7fb004617000 r--p 00000000 fc:00 522423                     /usr/lib/locale/sd_IN@devanagari/LC_CTYPE
+7fb004617000-7fb00461f000 rw-p 00000000 00:00 0
+7fb004628000-7fb004629000 rw-p 00000000 00:00 0
+7fb004629000-7fb004630000 r--s 00000000 fc:00 25518                      /usr/lib/x86_64-linux-gnu/gconv/gconv-modules.cache
+7fb004630000-7fb004632000 rw-p 00000000 00:00 0
+7fb004632000-7fb004633000 r--p 00025000 fc:00 25673                      /lib/x86_64-linux-gnu/ld-2.23.so
+7fb004633000-7fb004634000 rw-p 00026000 fc:00 25673                      /lib/x86_64-linux-gnu/ld-2.23.so
+7fb004634000-7fb004635000 rw-p 00000000 00:00 0
+7ffcbdd36000-7ffcbdd57000 rw-p 00000000 00:00 0                          [stack]
+7ffcbddf8000-7ffcbddfa000 r--p 00000000 00:00 0                          [vvar]
+7ffcbddfa000-7ffcbddfc000 r-xp 00000000 00:00 0                          [vdso]
+ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
+Aborted

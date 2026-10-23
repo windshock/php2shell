@@ -1,0 +1,13 @@
+{
+  "record": "R04",
+  "label": "[bugs #73900](https://bugs.php.net/bug.php?id=73900)",
+  "fetched_at": "2026-10-23T13:17:56Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=73900",
+      "blocks": 9,
+      "kind": "bug",
+      "title": "PHP :: Bug #73900 :: Use After Free in unserialize() SplFixedArray"
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+=================================================================
+==393723==ERROR: AddressSanitizer: heap-use-after-free on address 0x50d000004e51 at pc 0x602cec0b61d7 bp 0x7fff1aec3e70 sp 0x7fff1aec3e60
+READ of size 1 at 0x50d000004e51 thread T0
+    #0 0x602cec0b61d6 in spl_array_set_array /home/or4nge/php-src/ext/spl/spl_array.c:977
+    #1 0x602cec0b687a in zim_ArrayIterator___construct /home/or4nge/php-src/ext/spl/spl_array.c:1716
+    #2 0x602cec7224f6 in ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HANDLER /home/or4nge/php-src/Zend/zend_vm_execute.h:1988
+    #3 0x602cec7224f6 in execute_ex /home/or4nge/php-src/Zend/zend_vm_execute.h:110293
+    #4 0x602cec6ec873 in zend_execute /home/or4nge/php-src/Zend/zend_vm_execute.h:115447
+    #5 0x602cec840195 in zend_execute_script /home/or4nge/php-src/Zend/zend.c:1980
+    #6 0x602cec365c26 in php_execute_script_ex /home/or4nge/php-src/main/main.c:2648
+    #7 0x602cec844dcc in do_cli /home/or4nge/php-src/sapi/cli/php_cli.c:949
+    #8 0x602ceb8d6792 in main /home/or4nge/php-src/sapi/cli/php_cli.c:1360
+    #9 0x7b3a02e29d8f in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:58
+    #10 0x7b3a02e29e3f in __libc_start_main_impl ../csu/libc-start.c:392
+    #11 0x602ceb8d7a04 in _start (/home/or4nge/php-src/sapi/cli/php+0x4d7a04)
+
+0x50d000004e51 is located 17 bytes inside of 136-byte region [0x50d000004e40,0x50d000004ec8)
+freed by thread T0 here:
+    #0 0x7b3a034b4537 in __interceptor_free ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:127
+    #1 0x602cec753e98 in zend_array_destroy /home/or4nge/php-src/Zend/zend_hash.c:1876
+    #2 0x602cec7e7f7e in zend_objects_store_del /home/or4nge/php-src/Zend/zend_objects_API.c:196
+    #3 0x602cec5cd9f7 in ZEND_UNSET_CV_SPEC_CV_UNUSED_HANDLER /home/or4nge/php-src/Zend/zend_vm_execute.h:49497
+    #4 0x602cec6fa515 in execute_ex /home/or4nge/php-src/Zend/zend_vm_execute.h:115045
+    #5 0x602cec6ec873 in zend_execute /home/or4nge/php-src/Zend/zend_vm_execute.h:115447
+    #6 0x602cec840195 in zend_execute_script /home/or4nge/php-src/Zend/zend.c:1980
+    #7 0x602cec365c26 in php_execute_script_ex /home/or4nge/php-src/main/main.c:2648
+    #8 0x602cec844dcc in do_cli /home/or4nge/php-src/sapi/cli/php_cli.c:949
+    #9 0x602ceb8d6792 in main /home/or4nge/php-src/sapi/cli/php_cli.c:1360
+    #10 0x7b3a02e29d8f in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:58
+
+previously allocated by thread T0 here:
+    #0 0x7b3a034b4887 in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x602cec4b8d54 in __zend_malloc /home/or4nge/php-src/Zend/zend_alloc.c:3542
+    #2 0x602cec75c171 in zend_array_dup /home/or4nge/php-src/Zend/zend_hash.c:2498
+    #3 0x602cec0b600b in spl_array_set_array /home/or4nge/php-src/ext/spl/spl_array.c:974
+    #4 0x602cec0b687a in zim_ArrayIterator___construct /home/or4nge/php-src/ext/spl/spl_array.c:1716
+    #5 0x602cec7224f6 in ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HANDLER /home/or4nge/php-src/Zend/zend_vm_execute.h:1988
+    #6 0x602cec7224f6 in execute_ex /home/or4nge/php-src/Zend/zend_vm_execute.h:110293
+    #7 0x602cec6ec873 in zend_execute /home/or4nge/php-src/Zend/zend_vm_execute.h:115447
+    #8 0x602cec840195 in zend_execute_script /home/or4nge/php-src/Zend/zend.c:1980
+    #9 0x602cec365c26 in php_execute_script_ex /home/or4nge/php-src/main/main.c:2648
+    #10 0x602cec844dcc in do_cli /home/or4nge/php-src/sapi/cli/php_cli.c:949
+    #11 0x602ceb8d6792 in main /home/or4nge/php-src/sapi/cli/php_cli.c:1360
+    #12 0x7b3a02e29d8f in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:58
+
+SUMMARY: AddressSanitizer: heap-use-after-free /home/or4nge/php-src/ext/spl/spl_array.c:977 in spl_array_set_array
+Shadow bytes around the buggy address:
+  0x0a1a7fff8970: 00 00 fa fa fa fa fa fa fa fa 00 00 00 00 00 00
+  0x0a1a7fff8980: 00 00 00 00 00 00 00 00 00 00 00 fa fa fa fa fa
+  0x0a1a7fff8990: fa fa fa fa 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0a1a7fff89a0: 00 00 00 00 00 fa fa fa fa fa fa fa fa fa 00 00
+  0x0a1a7fff89b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 fa
+=>0x0a1a7fff89c0: fa fa fa fa fa fa fa fa fd fd[fd]fd fd fd fd fd
+  0x0a1a7fff89d0: fd fd fd fd fd fd fd fd fd fa fa fa fa fa fa fa
+  0x0a1a7fff89e0: fa fa 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0a1a7fff89f0: 00 00 00 fa fa fa fa fa fa fa fa fa 00 00 00 00
+  0x0a1a7fff8a00: 00 00 00 00 00 00 00 00 00 00 00 00 00 fa fa fa
+  0x0a1a7fff8a10: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+  Shadow gap:              cc
+==393723==ABORTING

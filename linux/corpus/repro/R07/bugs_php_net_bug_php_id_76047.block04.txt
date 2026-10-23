@@ -1,0 +1,8 @@
+Heads up! Someone posted an active exploit against this bug on GitHub in late October 2019 and then posted it on reddit today, 2019-01-29.
+
+This bug needs to be fixed ASAP since it affects PHP 7.0-7.4 and people are already exploiting it in the wild. 
+
+The person who uploaded the exploit, without notifying you guys, really needs to be publicly shamed. This is reprehensible and illegal in the United States.
+
+* https://github.com/mm0r1/exploits/tree/master/php7-backtrace-bypass
+* https://www.reddit.com/r/PHP/comments/ew83rx/php_7074_disable_functions_bypass_0day_poc/

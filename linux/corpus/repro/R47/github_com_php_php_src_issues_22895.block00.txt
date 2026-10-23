@@ -1,0 +1,15 @@
+while (iter->funcs->valid(iter) == SUCCESS) {
+    val = iter->funcs->get_current_data(iter);
+    if (iter->funcs->get_current_key) {
+        zval key;
+        iter->funcs->get_current_key(iter, &key);
+
+        array_set_zval_key(Z_ARRVAL(array_copy), &key, val);
+        zval_ptr_dtor(val);
+        zval_ptr_dtor(&key);
+    } else {
+        add_next_index_zval(&array_copy, val);
+    }
+    Z_TRY_ADDREF_P(val);
+    iter->funcs->move_forward(iter);
+}

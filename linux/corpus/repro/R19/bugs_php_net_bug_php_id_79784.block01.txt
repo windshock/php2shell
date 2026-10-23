@@ -1,0 +1,49 @@
+Reduced:
+
+<?php
+ob_start(function () { 
+    $GLOBALS['a'] = null;
+}, 20);
+$a[$c] = 'x' ;
+
+Valgrind:
+
+==1075083== Invalid read of size 4
+==1075083==    at 0x9D66FF: _zend_is_inconsistent (zend_hash.c:54)
+==1075083==    by 0x9DDEFD: zend_hash_find (zend_hash.c:2240)
+==1075083==    by 0x9ED077: zend_hash_find_ex (zend_hash.h:188)
+==1075083==    by 0x9F3911: zend_fetch_dimension_address_inner (zend_execute.c:2085)
+==1075083==    by 0x9F3B53: zend_fetch_dimension_address_inner_W (zend_execute.c:2152)
+==1075083==    by 0xA617C5: ZEND_ASSIGN_DIM_SPEC_CV_CV_OP_DATA_CONST_HANDLER (zend_vm_execute.h:47136)
+==1075083==    by 0xA69F6F: execute_ex (zend_vm_execute.h:55946)
+==1075083==    by 0xA6A21D: zend_execute (zend_vm_execute.h:56094)
+==1075083==    by 0x9C442A: zend_execute_scripts (zend.c:1667)
+==1075083==    by 0x92BF71: php_execute_script (main.c:2537)
+==1075083==    by 0xAA91B6: do_cli (php_cli.c:955)
+==1075083==    by 0xAAA2AE: main (php_cli.c:1353)
+==1075083==  Address 0x8ebebb8 is 8 bytes inside a block of size 56 free'd
+==1075083==    at 0x483CA3F: free (in /usr/lib/x86_64-linux-gnu/valgrind/vgpreload_memcheck-amd64-linux.so)
+==1075083==    by 0x98A6FA: _efree_custom (zend_alloc.c:2426)
+==1075083==    by 0x98A851: _efree (zend_alloc.c:2546)
+==1075083==    by 0x9DBCF8: zend_array_destroy (zend_hash.c:1662)
+==1075083==    by 0x9BFF72: rc_dtor_func (zend_variables.c:57)
+==1075083==    by 0x9EE297: zend_assign_to_variable (zend_execute.h:141)
+==1075083==    by 0xA2DBE3: ZEND_ASSIGN_DIM_SPEC_VAR_CONST_OP_DATA_CONST_HANDLER (zend_vm_execute.h:22094)
+==1075083==    by 0xA67C3F: execute_ex (zend_vm_execute.h:54181)
+==1075083==    by 0x9ACB1D: zend_call_function (zend_execute_API.c:785)
+==1075083==    by 0x9D25DD: zend_fcall_info_call (zend_API.c:3496)
+==1075083==    by 0x945A43: php_output_handler_op (output.c:960)
+==1075083==    by 0x945E03: php_output_op (output.c:1057)
+==1075083==  Block was alloc'd at
+==1075083==    at 0x483B7F3: malloc (in /usr/lib/x86_64-linux-gnu/valgrind/vgpreload_memcheck-amd64-linux.so)
+==1075083==    by 0x98B83F: __zend_malloc (zend_alloc.c:2992)
+==1075083==    by 0x98A689: _malloc_custom (zend_alloc.c:2417)
+==1075083==    by 0x98A7D3: _emalloc (zend_alloc.c:2536)
+==1075083==    by 0x9D718E: _zend_new_array (zend_hash.c:278)
+==1075083==    by 0xA61A3E: ZEND_ASSIGN_DIM_SPEC_CV_CV_OP_DATA_CONST_HANDLER (zend_vm_execute.h:47182)
+==1075083==    by 0xA69F6F: execute_ex (zend_vm_execute.h:55946)
+==1075083==    by 0xA6A21D: zend_execute (zend_vm_execute.h:56094)
+==1075083==    by 0x9C442A: zend_execute_scripts (zend.c:1667)
+==1075083==    by 0x92BF71: php_execute_script (main.c:2537)
+==1075083==    by 0xAA91B6: do_cli (php_cli.c:955)
+==1075083==    by 0xAAA2AE: main (php_cli.c:1353)

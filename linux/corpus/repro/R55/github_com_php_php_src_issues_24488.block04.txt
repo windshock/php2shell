@@ -1,0 +1,2 @@
+$ USE_ZEND_ALLOC=0 php one-shot.php
+free(): double free detected in tcache 2

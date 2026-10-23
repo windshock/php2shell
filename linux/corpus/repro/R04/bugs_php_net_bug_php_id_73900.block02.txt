@@ -1,0 +1,1 @@
+Nikita, could you take a look? Looks like both elements of SplFixedArray point to the same str, but it is freed prematurely instead of being separated when assignment is made. The refcount is correct 2 when leaving unserialize but then is decreased to 1 in ZEND_FETCH_DIM_W_SPEC_CV_CONST_HANDLER.

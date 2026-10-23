@@ -1,0 +1,1 @@
+PHP 8.5.4 (CLI, Ubuntu 24.04 arm64, built from source). The same path is present in any build where var_destroy() frees the back-reference extension chunks before walking the destructor chain and where i_zval_ptr_dtor() runs without holding BG(serialize_lock).

@@ -1,0 +1,13 @@
+{
+  "record": "R55",
+  "label": "[Issue #24488](https://github.com/php/php-src/issues/24488)",
+  "fetched_at": "2026-10-23T13:18:19Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/24488",
+      "blocks": 12,
+      "kind": "issue",
+      "title": "8.4.27 / 8.5.12 regression: GC double-frees the SimpleXMLElement properties table (`zend_mm_heap corrupted`), introduced by the GH-24050 fix"
+    }
+  ]
+}

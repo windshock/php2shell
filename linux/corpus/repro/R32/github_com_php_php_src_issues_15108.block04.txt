@@ -1,0 +1,3 @@
+Assertion failed: (p->refcount > 0), function zend_gc_delref, file zend_types.h, line 1342.
+
+Process finished with exit code 134 (interrupted by signal 6:SIGABRT)

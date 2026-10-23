@@ -1,0 +1,6 @@
+ 		if (!newstr) {
++			/* An earlier growth may have moved the buffer. */
++			buf->out = *out;
++			buf->limit = *limit;
+ 			return FAILURE;
+ 		}

@@ -1,0 +1,1 @@
+This has nothing to do with FPM but the fact that the linked libraries are not available. Please configure correctly location of libxml2 and OpenSSL (libcrypto) and possibly some other libs.

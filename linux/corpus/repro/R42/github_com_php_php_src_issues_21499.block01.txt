@@ -1,0 +1,1 @@
+USE_ZEND_ALLOC=0 ./sapi/cli/php poc.php

@@ -1,0 +1,3 @@
+Thanks for reporting this issue.
+
+It seems to me the avoid-double-free.patch fixes the bug.

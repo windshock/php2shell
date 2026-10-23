@@ -1,0 +1,13 @@
+{
+  "record": "R24",
+  "label": "[Issue #10169](https://github.com/php/php-src/issues/10169)",
+  "fetched_at": "2026-10-23T13:18:06Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/10169",
+      "blocks": 4,
+      "kind": "issue",
+      "title": "Heap UAF at ZEND_ASSIGN_OBJ_SPEC_CV_CONST_OP_DATA_VAR_HANDLER"
+    }
+  ]
+}

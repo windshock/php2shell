@@ -1,0 +1,106 @@
+=================================================================
+==1323267==ERROR: AddressSanitizer: heap-use-after-free on address 0x60600002b1c0 at pc 0x55f45f353d29 bp 0x7ffcabd59090 sp 0x7ffcabd59088
+READ of size 4 at 0x60600002b1c0 thread T0
+    #0 0x55f45f353d28 in zend_gc_delref /tmp/php-asan/Zend/zend_types.h:1346:2
+    #1 0x55f45f354e5b in zend_objects_store_del /tmp/php-asan/Zend/zend_objects_API.c:180:4
+    #2 0x55f45f3bbb66 in rc_dtor_func /tmp/php-asan/Zend/zend_variables.c:57:2
+    #3 0x55f45f3bbc54 in i_zval_ptr_dtor /tmp/php-asan/Zend/zend_variables.h:45:4
+    #4 0x55f45f3bbba4 in zval_ptr_dtor /tmp/php-asan/Zend/zend_variables.c:84:2
+    #5 0x55f45e829bb4 in zim_SplDoublyLinkedList_offsetSet /tmp/php-asan/ext/spl/spl_dllist.c:729:4
+    #6 0x55f45ef81dc2 in zend_call_function /tmp/php-asan/Zend/zend_execute_API.c:1009:4
+    #7 0x55f45ef83ba2 in zend_call_known_function /tmp/php-asan/Zend/zend_execute_API.c:1090:23
+    #8 0x55f45ef8430a in zend_call_known_instance_method /tmp/php-asan/Zend/zend_API.h:860:2
+    #9 0x55f45ef8420f in zend_call_known_instance_method_with_2_params /tmp/php-asan/Zend/zend_execute_API.c:1110:2
+    #10 0x55f45f3457c2 in zend_std_write_dimension /tmp/php-asan/Zend/zend_object_handlers.c:1275:3
+    #11 0x55f45f1eba12 in zend_assign_to_object_dim /tmp/php-asan/Zend/zend_execute.c:1575:2
+    #12 0x55f45eff931e in ZEND_ASSIGN_DIM_SPEC_CV_CONST_OP_DATA_CONST_HANDLER /tmp/php-asan/Zend/zend_vm_execute.h:44009:4
+    #13 0x55f45efa602d in execute_ex /tmp/php-asan/Zend/zend_vm_execute.h:58565:7
+    #14 0x55f45efa6857 in zend_execute /tmp/php-asan/Zend/zend_vm_execute.h:64217:2
+    #15 0x55f45f3da9d0 in zend_execute_script /tmp/php-asan/Zend/zend.c:1928:3
+    #16 0x55f45ebf961b in php_execute_script_ex /tmp/php-asan/main/main.c:2574:13
+    #17 0x55f45ebf9b18 in php_execute_script /tmp/php-asan/main/main.c:2614:9
+    #18 0x55f45f3e2479 in do_cli /tmp/php-asan/sapi/cli/php_cli.c:935:5
+    #19 0x55f45f3df49c in main /tmp/php-asan/sapi/cli/php_cli.c:1310:18
+    #20 0x7ff7b6229d8f  (/lib/x86_64-linux-gnu/libc.so.6+0x29d8f) (BuildId: 490fef8403240c91833978d494d39e537409b92e)
+    #21 0x7ff7b6229e3f in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x29e3f) (BuildId: 490fef8403240c91833978d494d39e537409b92e)
+    #22 0x55f45de02dc4 in _start (/workspaces/TriFuzz/targets/php-asan/bin/php+0x402dc4)
+
+0x60600002b1c0 is located 0 bytes inside of 56-byte region [0x60600002b1c0,0x60600002b1f8)
+freed by thread T0 here:
+    #0 0x55f45de876e2 in free /opt/llvm-15-build/llvm-15.x/final/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:52:3
+    #1 0x55f45ee36103 in __zend_free /tmp/php-asan/Zend/zend_alloc.c:3308:2
+    #2 0x55f45ee39fd4 in _efree /tmp/php-asan/Zend/zend_alloc.c:2747:3
+    #3 0x55f45f35530a in zend_objects_store_del /tmp/php-asan/Zend/zend_objects_API.c:198:3
+    #4 0x55f45f357456 in zend_object_release /tmp/php-asan/Zend/zend_objects_API.h:77:3
+    #5 0x55f45f35722f in zend_objects_destroy_object /tmp/php-asan/Zend/zend_objects.c:204:3
+    #6 0x55f45f354e52 in zend_objects_store_del /tmp/php-asan/Zend/zend_objects_API.c:179:4
+    #7 0x55f45f3bbb66 in rc_dtor_func /tmp/php-asan/Zend/zend_variables.c:57:2
+    #8 0x55f45f3bbc54 in i_zval_ptr_dtor /tmp/php-asan/Zend/zend_variables.h:45:4
+    #9 0x55f45f3bbba4 in zval_ptr_dtor /tmp/php-asan/Zend/zend_variables.c:84:2
+    #10 0x55f45e829bb4 in zim_SplDoublyLinkedList_offsetSet /tmp/php-asan/ext/spl/spl_dllist.c:729:4
+    #11 0x55f45ef81dc2 in zend_call_function /tmp/php-asan/Zend/zend_execute_API.c:1009:4
+    #12 0x55f45ef83ba2 in zend_call_known_function /tmp/php-asan/Zend/zend_execute_API.c:1090:23
+    #13 0x55f45ef8430a in zend_call_known_instance_method /tmp/php-asan/Zend/zend_API.h:860:2
+    #14 0x55f45ef8420f in zend_call_known_instance_method_with_2_params /tmp/php-asan/Zend/zend_execute_API.c:1110:2
+    #15 0x55f45f3457c2 in zend_std_write_dimension /tmp/php-asan/Zend/zend_object_handlers.c:1275:3
+    #16 0x55f45f1eba12 in zend_assign_to_object_dim /tmp/php-asan/Zend/zend_execute.c:1575:2
+    #17 0x55f45eff931e in ZEND_ASSIGN_DIM_SPEC_CV_CONST_OP_DATA_CONST_HANDLER /tmp/php-asan/Zend/zend_vm_execute.h:44009:4
+    #18 0x55f45efa602d in execute_ex /tmp/php-asan/Zend/zend_vm_execute.h:58565:7
+    #19 0x55f45efa6857 in zend_execute /tmp/php-asan/Zend/zend_vm_execute.h:64217:2
+    #20 0x55f45f3da9d0 in zend_execute_script /tmp/php-asan/Zend/zend.c:1928:3
+    #21 0x55f45ebf961b in php_execute_script_ex /tmp/php-asan/main/main.c:2574:13
+    #22 0x55f45ebf9b18 in php_execute_script /tmp/php-asan/main/main.c:2614:9
+    #23 0x55f45f3e2479 in do_cli /tmp/php-asan/sapi/cli/php_cli.c:935:5
+    #24 0x55f45f3df49c in main /tmp/php-asan/sapi/cli/php_cli.c:1310:18
+    #25 0x7ff7b6229d8f  (/lib/x86_64-linux-gnu/libc.so.6+0x29d8f) (BuildId: 490fef8403240c91833978d494d39e537409b92e)
+
+previously allocated by thread T0 here:
+    #0 0x55f45de8798e in malloc /opt/llvm-15-build/llvm-15.x/final/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+    #1 0x55f45ee3a543 in __zend_malloc /tmp/php-asan/Zend/zend_alloc.c:3280:14
+    #2 0x55f45ee39ed0 in _emalloc /tmp/php-asan/Zend/zend_alloc.c:2737:10
+    #3 0x55f45f357513 in zend_objects_new /tmp/php-asan/Zend/zend_objects.c:210:24
+    #4 0x55f45ee5418d in _object_and_properties_init /tmp/php-asan/Zend/zend_API.c:1823:22
+    #5 0x55f45ee54390 in object_init_ex /tmp/php-asan/Zend/zend_API.c:1846:9
+    #6 0x55f45f0a3b28 in ZEND_NEW_SPEC_CONST_UNUSED_HANDLER /tmp/php-asan/Zend/zend_vm_execute.h:10923:6
+    #7 0x55f45efa602d in execute_ex /tmp/php-asan/Zend/zend_vm_execute.h:58565:7
+    #8 0x55f45efa6857 in zend_execute /tmp/php-asan/Zend/zend_vm_execute.h:64217:2
+    #9 0x55f45f3da9d0 in zend_execute_script /tmp/php-asan/Zend/zend.c:1928:3
+    #10 0x55f45ebf961b in php_execute_script_ex /tmp/php-asan/main/main.c:2574:13
+    #11 0x55f45ebf9b18 in php_execute_script /tmp/php-asan/main/main.c:2614:9
+    #12 0x55f45f3e2479 in do_cli /tmp/php-asan/sapi/cli/php_cli.c:935:5
+    #13 0x55f45f3df49c in main /tmp/php-asan/sapi/cli/php_cli.c:1310:18
+    #14 0x7ff7b6229d8f  (/lib/x86_64-linux-gnu/libc.so.6+0x29d8f) (BuildId: 490fef8403240c91833978d494d39e537409b92e)
+
+SUMMARY: AddressSanitizer: heap-use-after-free /tmp/php-asan/Zend/zend_types.h:1346:2 in zend_gc_delref
+Shadow bytes around the buggy address:
+  0x0c0c7fffd5e0: fa fa fa fa 00 00 00 00 00 00 00 fa fa fa fa fa
+  0x0c0c7fffd5f0: 00 00 00 00 00 00 00 fa fa fa fa fa 00 00 00 00
+  0x0c0c7fffd600: 00 00 00 00 fa fa fa fa 00 00 00 00 00 00 00 fa
+  0x0c0c7fffd610: fa fa fa fa 00 00 00 00 00 00 00 fa fa fa fa fa
+  0x0c0c7fffd620: 00 00 00 00 00 00 00 00 fa fa fa fa fd fd fd fd
+=>0x0c0c7fffd630: fd fd fd fd fa fa fa fa[fd]fd fd fd fd fd fd fa
+  0x0c0c7fffd640: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c0c7fffd650: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c0c7fffd660: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c0c7fffd670: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c0c7fffd680: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==1323267==ABORTING

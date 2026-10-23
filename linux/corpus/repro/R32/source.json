@@ -1,0 +1,13 @@
+{
+  "record": "R32",
+  "label": "[Issue #15108](https://github.com/php/php-src/issues/15108)",
+  "fetched_at": "2026-10-23T13:18:09Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/15108",
+      "blocks": 7,
+      "kind": "issue",
+      "title": "Segfault / Assertion failed: (p->refcount > 0), function zend_gc_delref, file zend_types.h, line 1342"
+    }
+  ]
+}

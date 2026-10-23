@@ -1,0 +1,2 @@
+Indeed, PHP-7.2 as well as master have been affected (but not
+earlier version branches), and both have been fixed.

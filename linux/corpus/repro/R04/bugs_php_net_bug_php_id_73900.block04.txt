@@ -1,0 +1,1 @@
+Here is a patch against master which fixes the issue: https://gist.github.com/nikic/79b9b55d325373d4b39903a82027064e

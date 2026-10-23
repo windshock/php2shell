@@ -1,0 +1,13 @@
+{
+  "record": "R16",
+  "label": "[bugs #78793 / CVE-2019-11050](https://bugs.php.net/bug.php?id=78793)",
+  "fetched_at": "2026-10-23T13:18:03Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=78793",
+      "blocks": 7,
+      "kind": "bug",
+      "title": "PHP :: Sec Bug #78793 :: Use-after-free in exif parsing under memory sanitizer"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "record": "R13",
+  "label": "[bugs #77843](https://bugs.php.net/bug.php?id=77843)",
+  "fetched_at": "2026-10-23T13:18:01Z",
+  "sources": [
+    {
+      "url": "https://bugs.php.net/bug.php?id=77843",
+      "blocks": 4,
+      "kind": "bug",
+      "title": "PHP :: Bug #77843 :: Use after free with json serializer"
+    }
+  ]
+}

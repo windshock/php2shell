@@ -1,0 +1,98 @@
+Description:
+------------
+Reproducible crash on every execution. The script is too big and I cant yet isolate a small reproducible example but I did narrow down a little change in the code that prevents the crash. Just assigning the value of a string variable to something (not even using this new var at all) goes around the problem:
+-------
+$object->overloaded_property = $some_string;//produces a crash
+-------
+$something = $some_string;//no longer crashes
+$object->overloaded_property = $some_string;
+-------
+//and again a crash if $something is unset
+$something = $some_string;
+unset($something);//this triggers the crash again
+$object->overloaded_property = $some_string;
+------
+
+Maybe it has to do with the refcount. Other modifications of the code resulted in crashes in different places. I have given below the original bt (crash in PDOStatement->fetchAll()) but after modifications I got a crash in the file() function. 
+
+PHP is compiled with:
+'./configure' '--prefix=/web/php7.2' '--with-apxs2=/web/apache2.4-php7.2/bin/apxs' '--enable-bcmath' '--enable-calendar' '--enable-dbase' '--enable-exif' '--enable-ftp' '--enable-libxml' '--enable-mbstring' '--enable-pdo' '--enable-soap' '--enable-sockets' '--enable-zip' '--with-bz2' '--with-curl' '--with-gd' '--with-mcrypt' '--with-mhash' '--with-mime-magic' '--with-mysql=mysqlnd' '--with-openssl' '--with-pdo-sqlite=shared' '--with-pgsql' '--with-sqlite=shared' '--with-tidy' '--with-xsl' '--with-zlib' '--with-zlib-dir' '--with-pdo-mysql=mysqlnd' '--with-pdo-pgsql' '--with-jpeg-dir' '--with-png-dir' '--with-xpm-dir' '--with-ttf' '--with-freetype-dir' '--with-t1lib' '--enable-gd-native-ttf' '--with-mysqli=mysqlnd' '--with-imap-ssl' '--with-kerberos' '--with-gettext' '--enable-sysvsem' '--enable-sysvshm' '--enable-sysvmsg' '--enable-pcntl' '--enable-opcache' '--enable-debug' 
+
+No opcache or xdebug enabled. Redis is the only PECL extension used by the code but I modified it to remove the need for it and the crashes are reproducible.
+
+Test script:
+---------------
+I dont have a short one yet. I post this in the hope that someone may give me a hint what else to test, look for or trace.
+
+Actual result:
+--------------
+First segfault without any code modifications:
+
+Program received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 0x7fffd47e8700 (LWP 5004)]
+0x00007ffff2b796da in zend_mm_alloc_small (heap=0x7fffd3200040, size=232, bin_num=15, __zend_filename=0x7ffff341fa18 "/web/php-7.2.3/Zend/zend_string.h", __zend_lineno=134, __zend_orig_filename=0x0, __zend_orig_lineno=0)
+    at /web/php-7.2.3/Zend/zend_alloc.c:1273
+1273                    heap->free_slot[bin_num] = p->next_free_slot;
+Missing separate debuginfos, use: debuginfo-install libtidy-0.99.0-31.20091203.el7.x86_64
+(gdb) bt
+#0  0x00007ffff2b796da in zend_mm_alloc_small (heap=0x7fffd3200040, size=232, bin_num=15, __zend_filename=0x7ffff341fa18 "/web/php-7.2.3/Zend/zend_string.h", __zend_lineno=134, __zend_orig_filename=0x0, __zend_orig_lineno=0)
+    at /web/php-7.2.3/Zend/zend_alloc.c:1273
+#1  0x00007ffff2b7996d in zend_mm_alloc_heap (heap=0x7fffd3200040, size=232, __zend_filename=0x7ffff341fa18 "/web/php-7.2.3/Zend/zend_string.h", __zend_lineno=134, __zend_orig_filename=0x0, __zend_orig_lineno=0)
+    at /web/php-7.2.3/Zend/zend_alloc.c:1344
+#2  0x00007ffff2b7c44d in _emalloc (size=200, __zend_filename=0x7ffff341fa18 "/web/php-7.2.3/Zend/zend_string.h", __zend_lineno=134, __zend_orig_filename=0x0, __zend_orig_lineno=0) at /web/php-7.2.3/Zend/zend_alloc.c:2433
+#3  0x00007ffff2af218a in zend_string_alloc (len=172, persistent=0) at /web/php-7.2.3/Zend/zend_string.h:134
+#4  0x00007ffff2af21f3 in zend_string_init (
+    str=0x7fffd18de779 "KcGAXUg7vPDIT5DN7eu1wkT7eBz79ilDqpZfFhjgGruEl0hMPb+HhqJ70JxckyokN1ntznk98g6ZIP1fYB+b3lhh3E7w25mmwVhcM947/jFz4U437B95yPw/5Wv7wbsl6iCRLKmIOxH1agonv+pHrSa0nahmHuMt5p/kzvOv71E=\025XXXXXXXXXXXXXXXXXXXXX", len=172,
+    persistent=0) at /web/php-7.2.3/Zend/zend_string.h:170
+#5  0x00007ffff2af5193 in ps_fetch_string (zv=0x7fffd264f7a8, field=0x7fffa1dd0488, pack_len=0, row=0x7fffd47e5c20) at /web/php-7.2.3/ext/mysqlnd/mysqlnd_ps_codec.c:347
+#6  0x00007ffff2a7fa13 in php_mysqlnd_rowp_read_binary_protocol (row_buffer=0x7fffd212cb08, fields=0x7fffd264f728, field_count=82, fields_metadata=0x7fffa1dd0008, as_int_or_float=0 '\000', stats=0x7fffd317de10)
+    at /web/php-7.2.3/ext/mysqlnd/mysqlnd_wireprotocol.c:1581
+#7  0x00007ffff2adeb5b in mysqlnd_stmt_fetch_row_buffered (result=0x7fffa1d15e88, param=0x7fffa1d749a8, flags=0, fetched_anything=0x7fffd47e5f2f "") at /web/php-7.2.3/ext/mysqlnd/mysqlnd_ps.c:784
+#8  0x00007ffff2ab5b85 in mysqlnd_mysqlnd_res_fetch_row_pub (result=0x7fffa1d15e88, param=0x7fffa1d749a8, flags=0, fetched_anything=0x7fffd47e5f2f "") at /web/php-7.2.3/ext/mysqlnd/mysqlnd_result.c:1275
+#9  0x00007ffff2ae40c1 in mysqlnd_mysqlnd_stmt_fetch_pub (s=0x7fffa1d749a8, fetched_anything=0x7fffd47e5f2f "") at /web/php-7.2.3/ext/mysqlnd/mysqlnd_ps.c:1234
+#10 0x00007ffff2803abe in pdo_mysql_stmt_fetch (stmt=0x7fffa1db2700, ori=PDO_FETCH_ORI_NEXT, offset=0) at /web/php-7.2.3/ext/pdo_mysql/mysql_statement.c:623
+#11 0x00007ffff27f1ec6 in do_fetch_common (stmt=0x7fffa1db2700, ori=PDO_FETCH_ORI_NEXT, offset=0, do_bind=1) at /web/php-7.2.3/ext/pdo/pdo_stmt.c:671
+#12 0x00007ffff27f254e in do_fetch (stmt=0x7fffa1db2700, do_bind=1, return_value=0x7fffd47e62a0, how=PDO_FETCH_ASSOC, ori=PDO_FETCH_ORI_NEXT, offset=0, return_all=0x0) at /web/php-7.2.3/ext/pdo/pdo_stmt.c:828
+#13 0x00007ffff27f55d2 in zim_PDOStatement_fetchAll (execute_data=0x7fffd322c010, return_value=0x7fffd322be50) at /web/php-7.2.3/ext/pdo/pdo_stmt.c:1505
+#14 0x00007ffff2c2b799 in ZEND_DO_FCALL_SPEC_RETVAL_USED_HANDLER () at /web/php-7.2.3/Zend/zend_vm_execute.h:1032
+#15 0x00007ffff2cb245c in execute_ex (ex=0x7fffd32249b0) at /web/php-7.2.3/Zend/zend_vm_execute.h:59752
+#16 0x00007ffff2ba3a74 in zend_call_function (fci=0x7fffd47e65c0, fci_cache=0x7fffd47e6590) at /web/php-7.2.3/Zend/zend_execute_API.c:819
+#17 0x00007ffff29604aa in zif_call_user_func_array (execute_data=0x7fffd3224940, return_value=0x7fffd47e6690) at /web/php-7.2.3/ext/standard/basic_functions.c:4905
+#18 0x00007ffff2c2a4b3 in ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_UNUSED_HANDLER () at /web/php-7.2.3/Zend/zend_vm_execute.h:738
+#19 0x00007ffff2cb2435 in execute_ex (ex=0x7fffd3221030) at /web/php-7.2.3/Zend/zend_vm_execute.h:59743
+#20 0x00007ffff2cb78fe in zend_execute (op_array=0x7fffd3278100, return_value=0x0) at /web/php-7.2.3/Zend/zend_vm_execute.h:63760
+#21 0x00007ffff2bc0254 in zend_execute_scripts (type=8, retval=0x0, file_count=3) at /web/php-7.2.3/Zend/zend.c:1496
+#22 0x00007ffff2b00eae in php_execute_script (primary_file=0x7fffd47e7a90) at /web/php-7.2.3/main/main.c:2590
+#23 0x00007ffff2cba763 in php_handler (r=0x7fffcc014c50) at /web/php-7.2.3/sapi/apache2handler/sapi_apache2.c:701
+#24 0x0000000000452680 in ap_run_handler (r=r@entry=0x7fffcc014c50) at config.c:170
+#25 0x0000000000452bc9 in ap_invoke_handler (r=r@entry=0x7fffcc014c50) at config.c:434
+#26 0x0000000000466d6c in ap_internal_redirect (new_uri=<optimized out>, r=<optimized out>) at http_request.c:765
+#27 0x00007ffff385ce5c in handler_redirect (r=0x7fffcc002970) at mod_rewrite.c:5254
+#28 0x0000000000452680 in ap_run_handler (r=r@entry=0x7fffcc002970) at config.c:170
+#29 0x0000000000452bc9 in ap_invoke_handler (r=r@entry=0x7fffcc002970) at config.c:434
+#30 0x00000000004679ba in ap_process_async_request (r=r@entry=0x7fffcc002970) at http_request.c:436
+#31 0x0000000000463fb1 in ap_process_http_async_connection (c=0x7fffe0039600) at http_core.c:154
+#32 ap_process_http_connection (c=0x7fffe0039600) at http_core.c:248
+#33 0x000000000045c090 in ap_run_process_connection (c=c@entry=0x7fffe0039600) at connection.c:42
+#34 0x000000000046fcdc in process_socket (thd=thd@entry=0x6d3e38, p=<optimized out>, sock=<optimized out>, cs=<optimized out>, my_child_num=my_child_num@entry=0, my_thread_num=my_thread_num@entry=24) at event.c:1021
+#35 0x0000000000470709 in worker_thread (thd=0x6d3e38, dummy=<optimized out>) at event.c:2014
+#36 0x00007ffff6c97dc5 in start_thread (arg=0x7fffd47e8700) at pthread_create.c:308
+#37 0x00007ffff67c0ced in clone () at ../sysdeps/unix/sysv/linux/x86_64/clone.S:113
+
+At frame 4 I just replaced with XXX some sensitive data in the string.
+
+Here is also the valgrind output:
+https://pastebin.com/DW32bATf
+
+The code runs correctly without any modifications when running with valgrind and:
+USE_ZEND_ALLOC=0
+ZEND_DONT_UNLOAD_MODULES=1
+
+So I presume is an issue with the zend memory manager.
+
+And here is another BT of a crash (in the file() function, the provided path is a valid and readable one) I got after some modifications:
+https://pastebin.com/0Q7dA1MV
+
+A bug that could be related to this one is:
+https://bugs.php.net/bug.php?id=69326
+

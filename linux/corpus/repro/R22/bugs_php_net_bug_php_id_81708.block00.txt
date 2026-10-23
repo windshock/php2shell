@@ -1,0 +1,51 @@
+Description:
+------------
+NGINX + php-fpm (versions tested 7.4.27, 8.0.15): 
+1. place files from URL in webserver directory
+2. Requires PostgreSQL valid (nonce) connection string (edit B.php)
+3. make request (curl "http://127.0.0.1/A.php")
+4. obtain HTTP 502 in client and php-fpm process on server
+
+in A.php change xml attribute val to "+11."  - all if fine. no crash.
+
+
+this PoC is extracted (stripped-down) from large code-base.
+
+Test script:
+---------------
+https://github.com/MrdUkk/php-sigsegv
+
+Expected result:
+----------------
+expected result is seening
+PHP Fatal error:  Uncaught Error: Class "APIException" not found in A.php:27
+
+
+Actual result:
+--------------
+HTTP 502 and php-fpm server process crashed
+
+Program received signal SIGSEGV, Segmentation fault.
+0x000055ba505e7295 in _emalloc ()
+(gdb) bt
+#0  0x000055ba505e7295 in _emalloc ()
+#1  0x000055ba505e810f in _ecalloc ()
+#2  0x000055ba504a4977 in timelib_get_time_zone_info ()
+#3  0x000055ba504a6a7f in timelib_unixtime2local ()
+#4  0x000055ba50480c41 in php_format_date ()
+#5  0x000055ba504572bc in php_log_err_with_severity ()
+#6  0x000055ba5045771a in php_error_cb ()
+#7  0x000055ba5045c3aa in zend_error_va_list ()
+#8  0x000055ba5045c991 in zend_error ()
+#9  0x000055ba5045833b in php_verror ()
+#10 0x000055ba5045845c in php_error_docref ()
+#11 0x00007f641246afd4 in pdo_raise_impl_error.cold () from target:/usr/lib64/php/modules/pdo.so
+#12 0x00007f6412471e72 in zim_PDOStatement_bindValue () from target:/usr/lib64/php/modules/pdo.so
+#13 0x000055ba50695a50 in execute_ex ()
+#14 0x000055ba50696861 in zend_execute ()
+#15 0x000055ba5060d2db in zend_execute_scripts ()
+#16 0x000055ba505aa488 in php_execute_script ()
+#17 0x000055ba50476af9 in main ()
+(gdb)
+
+

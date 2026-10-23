@@ -1,0 +1,2 @@
+Stas - the reverse is actually true :)
+(if it's related to unserialize, then it's not a security issue!)

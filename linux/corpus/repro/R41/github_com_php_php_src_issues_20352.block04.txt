@@ -1,0 +1,4 @@
+PHP 8.6.0-dev (cli) (built: Nov  1 2025 16:03:38) (NTS DEBUG)
+Copyright (c) The PHP Group
+Zend Engine v4.6.0-dev, Copyright (c) Zend Technologies
+    with Zend OPcache v8.6.0-dev, Copyright (c), by Zend Technologies

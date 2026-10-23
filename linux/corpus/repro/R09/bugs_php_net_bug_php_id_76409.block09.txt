@@ -1,0 +1,3 @@
+The fix has been committed to PHP-7.2 and master (older branches
+are not affected); it has missed PHP 7.2.7, though, since it has
+not been regarded as security fix.

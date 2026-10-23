@@ -1,0 +1,13 @@
+{
+  "record": "R51",
+  "label": "[Issue #24455](https://github.com/php/php-src/issues/24455)",
+  "fetched_at": "2026-10-23T13:18:17Z",
+  "sources": [
+    {
+      "url": "https://github.com/php/php-src/issues/24455",
+      "blocks": 4,
+      "kind": "issue",
+      "title": "Lazy object reset with object destructor can lead to use-after-free"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+Why is there no CVE attached to this?
+disable_functions is a complete waste of time until this is patched.
