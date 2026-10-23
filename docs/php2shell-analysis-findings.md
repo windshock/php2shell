@@ -1421,3 +1421,50 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 1. 이 10개 표면에서는 **모든 주입 지점의 실패가 지연 OOM fatal로 끝났다.** fallible NULL을 받고 조용히 계속한 경우(중간 정상 완료)도 0이다. 8.4.27의 fallible 할당 + `ZEND_HAS_OOM` 지연 오류가 할당 실패를 요청 종료로 바꾼다.
 2. 따라서 계획 §13.5 Phase 2(prepare → validate → commit)는 **이 범위에서 공식 수정과 중복된다.** 측정할 추가 효과가 없으므로 구현하지 않는다(No-Go, 근거: 위 표). 300 이후는 표본 추출(1/7)이라 그 구간의 단일 지점은 시험되지 않았을 수 있다.
 3. R46(정리 루프 중 bailout → 이중 정리)은 할당 실패가 아니라 **소멸자 bailout의 원자성** 문제라 이 분석의 대상이 아니다. 이 부류의 보호는 Phase 3(격리)에서 다룬다. R46은 원인과 수정 PR 접근을 이미 알고 있는 사례라, 어떤 설계로도 독립적인 성공 근거가 되기 어렵다(Phase 0 §3). 이 한계를 설계 문서에 먼저 적는다.
+
+### 11.11 CoreGuard Phase 1·3, 최종 C 측정, hold-out R46·R51 1회 평가
+
+**구현(원본 소스 변경 0, 실험 사본 + 패치):**
+- Phase 3 격리(`docs/coreguard/phase3-design.md`, 패치 0002): 사용자 소멸자 안에서 bailout이 나면 `poisoned`. observe는 기록만 한다. enforce는 더 이상 정리하지 않고 `_exit(70)`.
+- Phase 1 잔류 탐지(`docs/coreguard/phase1-design.md`, 패치 0003): `php_basic_early_rinit()` 진입 시 BG(serialize/unserialize) 잔류를 기록하는 observe 전용 가드다. hold-out이 없어 성공은 주장하지 않는다.
+
+**최종 C(패치 0001~0003) 측정** — 커밋된 드라이버 `linux/coreguard/measure-c.sh`(`2665b8e`), 증적 `evidence/coreguard-measure-20261023T225209`:
+
+| 항목 | 결과 |
+|---|---|
+| 개발 테스트 | Phase 1 4/4(gdb로 잔류를 주입한 양성 대조 포함), Phase 2b 30/30, Phase 3 38/38 |
+| 회귀 대조: 8.4.27 수명주기 탐색 OFF + 결함 주입, observe, 600초 | 102 실행 모두 `executed`, 발견 0, **가드 이벤트 0**(잔류·GC·소멸자) |
+| PHPT observe | 회귀 0. 이벤트: Phase 2b 22, Phase 3 2, Phase 1 0 |
+| PHPT enforce | 회귀 19건, 목록은 Phase 2b 단독(§11.9)과 같다. Phase 3 enforce로 늘어난 회귀는 없다 |
+| 성능(같은 실행 안의 B 대비) | C disabled·observe·enforce 모두 B의 반복 간 변동 범위 안이다(health 7.4k~9.4k, B 7.7k~8.4k). FPM 워커 종료 0. 반복 2개(observe health 1회, B upload 1회)는 ab 출력에서 req/s를 읽지 못해 `degraded`로 표시됐다. 실패 요청·2xx 아닌 응답은 0이다(원인 미상, 이후 ab 출력을 저장하도록 수정함) |
+
+- 앞선 v3 측정(패치 0001+0002, §11.9 이후)은 스크래치 래퍼로 커밋된 스크립트를 순서대로 부른 것이다. 모드가 요약에 기록되지 않아 R12 기준으로 **인용하지 않는다.** 위 최종 측정이 그 측정을 대체한다.
+
+**hold-out 1회 평가**(사전 등록 v1.1, `holdout-eval.py --cases R46 R51`, 증적 `evidence/coreguard-holdout-20261023T231409`, `citable: true`):
+
+| 사례 | 모드 | 판정(3회) | 관측 |
+|---|---|---|---|
+| R46 실패 원자성 | B | harm 3/3 | ASAN SEGV `php_var_serialize_intern ← ps_srlzr_encode_php` |
+| | disabled | `not_protected` ×3 | B와 같음 |
+| | observe | `detected_only` ×3 | 이벤트 뒤 같은 SEGV |
+| | enforce | `worker_contained` ×3 | 이벤트 뒤 rc 70, **세션 인코더 진입 전 종료, ASAN 0** |
+| R51 재진입 | B | harm 3/3 | `zend_mm_panic ← zend_mm_get_next_free_slot` |
+| | disabled·observe·enforce | `not_protected` ×3 | 이벤트 없음. bailout 없이 일어나는 재진입이라 가드 대상이 아니다(설계 §5 예상과 같음) |
+
+### 11.12 CoreGuard Phase 4 — 할당기 비교 (release 빌드, hold-out 미사용)
+
+`linux/coreguard/phase4-allocators.py`(`679afa1`), 증적 `evidence/coreguard-p4-allocators-20261023T231433`, 구성마다 10회:
+
+| 사례(빌드) | ZendMM | glibc | Scudo | Scudo + GWP-ASan(rate 1) |
+|---|---|---|---|---|
+| R55 SimpleXML GC 이중 해제(8.4.27-normalext) | 검출 10(`zend_mm_heap corrupted`) | 검출 9(`free()`), 미검출 SEGV 1 | 검출 10(`Scudo ERROR`) | 검출 10 |
+| R41 출력 핸들러 재진입(8.4.4-normal) | 조용히 지나감 6, 검출 4 | 미검출 SEGV 10 | 미검출 SEGV 10 | 미검출 SEGV 10 |
+| R42 raw 버킷 포인터(8.4.4-normal) | 조용히 지나감 10 | 조용히 지나감 10 | 조용히 지나감 10 | 조용히 지나감 10 |
+| `bench.php` Total(s) | 0.43 | 0.44 | 11.4 | 11.5 |
+
+**해석:**
+1. **이중 해제(R55)는** 세 할당기가 모두 결정적으로 잡는다. ZendMM도 힙 검사로 잡는다.
+2. **잘못된 접근이 할당기 경계를 넘지 않는 경우(R41·R42)는** 어느 할당기도 보고하지 못한다. R42는 release 빌드에서 **완전히 조용하다**(디버그 빌드는 assertion으로 잡음). R41은 ZendMM에서 비결정적이다.
+3. GWP-ASan(rate 1, 동시 512개)은 이 사례들에서 Scudo 기본값보다 더 잡은 것이 없다. 샘플링 검출은 보장이 아니다.
+4. Scudo 기본 옵션은 이 호스트에서 `bench.php`가 약 26배 느렸다. 옵션을 조정하지 않은 측정이므로 Scudo의 일반 성능 평가로 쓰지 않는다.
+5. 결론: 할당기 교체는 **이중 해제류에는 검출을 주지만, 엔진 논리 수준의 상태 오류(R41·R42·R46·R51 부류)에는 보장을 주지 않는다.** CoreGuard의 불변조건 가드와 대체 관계가 아니다. 계획대로 낮은 우선순위로 두고 HW(MTE·CHERI)는 장기 과제로 남긴다.
