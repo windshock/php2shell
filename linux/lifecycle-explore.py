@@ -618,10 +618,15 @@ def send(action, step, idx, ctx):
     try:
         if action == 'fused':
             url = 'http://127.0.0.1:%d/fused?p=%d&step=%d' % (PORT, step['p'], idx)
+            # Read the whole body: closing after the status line makes the
+            # program's next output write fail, and php_handle_aborted_connection
+            # then bails out and cuts the program short (calibration, findings 11.5).
             try:
                 with ctx['opener'].open(url, timeout=20) as res:
+                    res.read()
                     return 's%d' % res.status
             except urllib.error.HTTPError as exc:
+                exc.read()
                 return 's%d' % exc.code
         if action in ('health', 'session'):
             try:
