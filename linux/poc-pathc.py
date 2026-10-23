@@ -40,6 +40,8 @@ from probe import Lab, multipart, worker_pid  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 BASE = Path('/home/phplab/php-lab')
+UNSERIALIZE_LINE = next(i for i, line in enumerate(
+    (REPO / 'web/index.php').read_text().splitlines(), 1) if '= unserialize(' in line)
 HTTP_PORT, FPM_PORT = 18085, 19085
 SESSION_FIELD = 'PHPSESSID'
 PROGRESS_FIELD = 'PHP_SESSION_UPLOAD_PROGRESS'
@@ -142,9 +144,13 @@ def main():
             # Issue #1: the producer verdict must attribute the fatal to the
             # /unserialize endpoint (web/index.php, the only userland file in
             # this lab that can fatal), not just to any OOM in the request.
-            record['fatal_in_unserialize'] = any(
-                'Allowed memory size' in line and 'index.php' in line
-                for line in log_text.splitlines())
+            # Issue #5-4: and on the unserialize() line itself - an OOM one
+            # line earlier (file_get_contents of php://input) leaves no
+            # residue and must not count as the producer.
+            fatal = re.search(r'Allowed memory size[^\n]* in \S*index\.php on line (\d+)',
+                              log_text)
+            record['fatal_line'] = int(fatal.group(1)) if fatal else None
+            record['fatal_in_unserialize'] = record['fatal_line'] == UNSERIALIZE_LINE
             record['worker_pid_after_a'] = worker_pid(lab.out)
             record['worker_survived_a'] = (record['worker_pid_after_a']
                                            == record['worker_pid_before'])

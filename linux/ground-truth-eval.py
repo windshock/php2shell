@@ -33,6 +33,17 @@ P15_INPUT = dict(parts=1000, nest=8, seg_pad=300, memory_limit='32M')
 P17_LIMIT_BYTES = 16 * 1024 * 1024
 
 
+# Inferred from the 8.4.27 source and the CLI triage (findings §10.11/§13);
+# never reported as verified by this harness.
+INFERRED = {
+    'P15_path_a': 'multipart parser stops early under ZEND_HAS_OOM (delayed soft OOM)',
+    'P16_path_b': 'producer session encode unwinds and destroys its context '
+                  '(fallible alloc + delayed OOM)',
+    'P17_path_c': 'producer unserialize unwinds and destroys its context '
+                  '(fallible alloc + delayed OOM)',
+}
+
+
 class Harness(Exception):
     """Evidence cannot be attributed to this run: harness failure."""
 
@@ -198,6 +209,15 @@ def evaluate(args):
                 problems.append('%s: runner exit %d, expected %d for %s'
                                 % (name, rc, ok_rc, expect))
             r, p = fn(summary, expect)
+            for row in r:
+                # Issue #5-4: keep what was observed apart from what is
+                # inferred from the patch; this harness has no instrumentation,
+                # so nothing here is a verified block point (event-backed
+                # verification: differential-triage.py, CLI).
+                if 'block_point' in row:
+                    row['observed_outcome'] = row['block_point']
+                    row['inferred_block_mechanism'] = INFERRED.get(row['path'], 'unknown')
+                    row['verified_block_point'] = None
             rows.extend(r)
             problems.extend(p)
         except Harness as exc:
@@ -276,6 +296,23 @@ def run_self_test():
     def no_producer(a, b, c):
         c['runs'][0]['fatal_in_unserialize'] = False
     case('fixed: P17 producer did not fatal', '8.4.27', no_producer, ok_rcs('8.4.27'), 2)
+
+    def oom_other_site(a, b, c):
+        c['runs'][0]['fatal_in_unserialize'] = False   # OOM at the read, line 30
+        c['runs'][0]['fatal_line'] = 30
+    case('vulnerable: P17 OOM at a different site', '8.4.4', oom_other_site,
+         ok_rcs('8.4.4'), 2)
+
+    def normal_instead_of_producer(a, b, c):
+        b['entries'][0]['record'].update(oom_logged=False, request_a_status=200, asan=None,
+                                         result='no_oom_triggered')
+    case('vulnerable: normal request instead of P16 producer', '8.4.4',
+         normal_instead_of_producer, ok_rcs('8.4.4'), 2)
+
+    def p17_consumer_missing(a, b, c):
+        c['runs'][0].update(request_b_status=None, asan=None, result='no_uaf_observed')
+    case('fixed: P17 consumer not reached', '8.4.27', p17_consumer_missing,
+         ok_rcs('8.4.27'), 2)
 
     def wrong_limit(a, b, c):
         c['runs'][0]['oom_limit_bytes'] = 8 * 1024 * 1024
