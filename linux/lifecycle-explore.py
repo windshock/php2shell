@@ -856,9 +856,13 @@ def observe(result, seq):
                             and not ev.get('in_shutdown') for ev in evs)
         if oom_protected:
             keys.add('G:%s|oom_while_gc_protected' % step['a'])
-        if step['failure_sites'] and step['response'].startswith('s2') and step.get('alive_after'):
-            # Error recovery: a fatal/exception path that still completed the
-            # request (caught bailout, handler, delayed OOM).
+        # Error recovery: a fatal/exception path after which execution went
+        # on (caught bailout, handler, delayed OOM). For fused programs the
+        # program must also have returned normally: a terminating fatal under
+        # HTTP 200 is not recovery (state v1 over-rewarded it, findings 11.6).
+        recovered = step['failure_sites'] and step['response'].startswith('s2') \
+            and step.get('alive_after') and (step['a'] != 'fused' or step.get('completed'))
+        if recovered:
             keys.add('R:%s|%s' % (step['a'], gc))
         if attributed:
             keys.add('A:' + asan['sig'])
@@ -1254,6 +1258,12 @@ def self_test():
     check('protected GC at shutdown -> G and R keys',
           'G:fused|gc_protected' in keys_g and 'R:fused|gc_protected' in keys_g
           and steps_g[0]['gc_at_shutdown'] == 'gc_protected')
+    keys_t, _, _ = observe(dict(steps=[dict(i=0, a='fused', response='s200',
+                                            failure_sites=['x@f:1'], alive_after=True,
+                                            asan=None, completed=False)],
+                                states=[], worker_pid=1), dict(steps=[{'a': 'fused', 'p': 0}]))
+    check('terminating fatal under 200 in a fused program -> no R key',
+          not any(k.startswith('R:') for k in keys_t))
     check('state gain weights G/R over T',
           feedback_gain('state', dict(new_keys=['G:x', 'T:y'])) == 5
           and feedback_gain('state', dict(new_keys=['S:ps_id=carried'])) == 3)

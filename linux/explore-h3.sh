@@ -8,7 +8,7 @@
 # Both modes use the same pool, budget, seeds and opcache setting.
 # Any memory error whose signature matches no known record is a potential
 # new finding: it stays in the local evidence tree (plan §11.2 D1).
-# Usage: explore-h3.sh [budget_s] [pool_count] [seeds...]   (MODES="off state")
+# Usage: explore-h3.sh [budget_s] [pool_count] [seeds...]   (MODES="off state", POOL=dir)
 set -u
 cd /mnt/c/Users/user/Downloads/php
 budget=${1:-600}
@@ -19,8 +19,14 @@ modes=${MODES:-off state}
 stamp=$(date -u +%Y%m%dT%H%M%S)
 root=/home/phplab/php-lab/evidence/explore-h3-$stamp-8.4.27
 mkdir -p "$root"
-python3 linux/fused-pool.py --out "$root/pool" --count "$count" --seed 11 --version 8.4.27 \
-  > "$root/pool.log" 2>&1 || { echo "pool generation failed"; exit 1; }
+if [ -n "${POOL:-}" ]; then
+  # reuse an existing pool (same programs as an earlier batch)
+  cp -r "$POOL" "$root/pool"
+  echo "pool reused from $POOL" > "$root/pool.log"
+else
+  python3 linux/fused-pool.py --out "$root/pool" --count "$count" --seed 11 --version 8.4.27 \
+    > "$root/pool.log" 2>&1 || { echo "pool generation failed"; exit 1; }
+fi
 runs=()
 for s in $seeds; do
   for m in $modes; do
