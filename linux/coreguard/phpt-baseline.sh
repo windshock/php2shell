@@ -44,5 +44,8 @@ PY
 # per-test results (and the B comparison when PHPT_BASELINE=<B run dir>)
 python3 /mnt/c/Users/user/Downloads/php/linux/coreguard/phpt-parse.py "$run" \
   ${PHPT_BASELINE:+--compare "$PHPT_BASELINE"}
-# the archive copy is only scratch for run-tests; keep logs and results
+# the archive copy is only scratch for run-tests; keep logs, results and the
+# .diff/.out files of failed tests
+( cd "$run/src" && find . \( -name '*.diff' -o -name '*.out' \) -print0 \
+    | tar --null -cf "$run/failed-outputs.tar" -T - ) 2>/dev/null || true
 rm -rf "$run/src"
