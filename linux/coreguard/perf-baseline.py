@@ -202,6 +202,9 @@ def main():
             results['bench'].append(dict(rc=res.returncode, wall_s=round(time.time() - t0, 3),
                                          total_s=float(total.group(1)) if total else None,
                                          opcache=False))
+    # availability: worker exits seen by the fpm master (restart rate)
+    fpm_log = (run / 'fpm.log').read_text(errors='replace') if (run / 'fpm.log').exists() else ''
+    results['fpm_worker_exits'] = len(re.findall(r'exited (?:with code|on signal)', fpm_log))
     # The session workload leaves one file per request (~15k per run): keep
     # them as one archive so evidence sync does not copy them one by one.
     sess = run / 'sessions'
