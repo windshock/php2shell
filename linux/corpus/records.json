@@ -1,0 +1,1976 @@
+{
+  "scope": "#4 H1 corpus verification (status of primary sources at fetch time; not a vulnerability determination)",
+  "source": "docs/corpus/php-memory-safety-2016-2026.md",
+  "fetched_at": "2026-10-23T09:45:57Z",
+  "records": [
+    {
+      "id": "R01",
+      "first_seen": "2016-07",
+      "label": "[bugs #72530](https://bugs.php.net/bug.php?id=72530)",
+      "links": [
+        {
+          "text": "bugs #72530",
+          "url": "https://bugs.php.net/bug.php?id=72530"
+        }
+      ],
+      "pattern": "GC 중 destructor가 객체 참조를 새로 외부 노출시켜 refcount 모델이 놓친 UAF. 조기 종결 후 재개",
+      "stated_status": "2019-08 수정 기록, 현재 Closed",
+      "link_type": "GC·destructor·지연 수리",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=72530",
+          "source": "bugs.php.net",
+          "id": 72530,
+          "status": "Closed",
+          "submitted": "2016-07-01 16:26 UTC",
+          "php_version": "5.6.29",
+          "package": "*General Issues",
+          "title": "PHP :: Bug #72530 :: Use After Free in GC with Certain Destructors"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R02",
+      "first_seen": "2016-09",
+      "label": "[bugs #73092 / CVE-2016-7479](https://bugs.php.net/bug.php?id=73092)",
+      "links": [
+        {
+          "text": "bugs #73092 / CVE-2016-7479",
+          "url": "https://bugs.php.net/bug.php?id=73092"
+        }
+      ],
+      "pattern": "`unserialize()` 중 객체 프로퍼티 HashTable 재할당이 기존 포인터를 무효화",
+      "stated_status": "Closed",
+      "link_type": "해시 버킷 포인터·역직렬화",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=73092",
+          "source": "bugs.php.net",
+          "id": 73092,
+          "status": "Closed",
+          "submitted": "2016-09-15 15:24 UTC",
+          "php_version": "7.1.0RC1",
+          "package": "*General Issues",
+          "title": "PHP :: Sec Bug #73092 :: Unserialize use-after-free when resizing object&#039;s properties hash table"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R03",
+      "first_seen": "2016-09",
+      "label": "[bugs #73147](https://bugs.php.net/bug.php?id=73147)",
+      "links": [
+        {
+          "text": "bugs #73147",
+          "url": "https://bugs.php.net/bug.php?id=73147"
+        }
+      ],
+      "pattern": "`unserialize()`/`__wakeup()` 중 참조·객체 수명 충돌, 개발자가 일반 해결의 난이도 언급",
+      "stated_status": "수정",
+      "link_type": "재진입·역직렬화",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=73147",
+          "source": "bugs.php.net",
+          "id": 73147,
+          "status": "Closed",
+          "submitted": "2016-09-23 13:22 UTC",
+          "php_version": "5.6.26",
+          "package": "*General Issues",
+          "title": "PHP :: Sec Bug #73147 :: Use After Free in unserialize()"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R04",
+      "first_seen": "2017-01",
+      "label": "[bugs #73900](https://bugs.php.net/bug.php?id=73900)",
+      "links": [
+        {
+          "text": "bugs #73900",
+          "url": "https://bugs.php.net/bug.php?id=73900"
+        }
+      ],
+      "pattern": "`SplFixedArray` 역직렬화 및 참조 조작으로 UAF/메모리 노출 재현",
+      "stated_status": "2017-04 Closed",
+      "link_type": "입력 파싱·객체 레퍼런스",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=73900",
+          "source": "bugs.php.net",
+          "id": 73900,
+          "status": "Closed",
+          "submitted": "2017-01-09 21:42 UTC",
+          "php_version": "7.*",
+          "package": "SPL related",
+          "title": "PHP :: Bug #73900 :: Use After Free in unserialize() SplFixedArray"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R05",
+      "first_seen": "2017-02",
+      "label": "[bugs #74101 / CVE-2017-12934](https://bugs.php.net/bug.php?id=74101)",
+      "links": [
+        {
+          "text": "bugs #74101 / CVE-2017-12934",
+          "url": "https://bugs.php.net/bug.php?id=74101"
+        }
+      ],
+      "pattern": "AFL/ASan 기반 `unserialize()` UAF 확인",
+      "stated_status": "2017-08 수정/Closed",
+      "link_type": "퍼징·역직렬화",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=74101",
+          "source": "bugs.php.net",
+          "id": 74101,
+          "status": "Closed",
+          "submitted": "2017-02-15 10:53 UTC",
+          "php_version": "7.1.2RC1",
+          "package": "*Data Exchange functions",
+          "title": "PHP :: Sec Bug #74101 :: Unserialize Heap Use-After-Free (READ: 1) in zval_get_type"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R06",
+      "first_seen": "2017-05",
+      "label": "[bugs #74614](https://bugs.php.net/bug.php?id=74614)",
+      "links": [
+        {
+          "text": "bugs #74614",
+          "url": "https://bugs.php.net/bug.php?id=74614"
+        }
+      ],
+      "pattern": "유사 `unserialize()` UAF 중복 문제",
+      "stated_status": "2017-07 수정/중복 처리",
+      "link_type": "중복·회귀 분석",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=74614",
+          "source": "bugs.php.net",
+          "id": 74614,
+          "status": "Closed",
+          "submitted": "2017-05-18 15:22 UTC",
+          "php_version": "7.0.20",
+          "package": "*General Issues",
+          "title": "PHP :: Sec Bug #74614 :: Use-after-free in PHP7&#039;s unserialize()"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R07",
+      "first_seen": "2018-03",
+      "label": "[bugs #76047](https://bugs.php.net/bug.php?id=76047)",
+      "links": [
+        {
+          "text": "bugs #76047",
+          "url": "https://bugs.php.net/bug.php?id=76047"
+        }
+      ],
+      "pattern": "소멸 객체의 backtrace 인수 참조 UAF",
+      "stated_status": "2020-01 Closed",
+      "link_type": "exception·객체 수명",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=76047",
+          "source": "bugs.php.net",
+          "id": 76047,
+          "status": "Closed",
+          "submitted": "2018-03-04 09:50 UTC",
+          "php_version": "7.2.3",
+          "package": "Reproducible crash",
+          "title": "PHP :: Bug #76047 :: Use-after-free when accessing already destructed backtrace arguments"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R08",
+      "first_seen": "2018-03",
+      "label": "[bugs #76167](https://bugs.php.net/bug.php?id=76167)",
+      "links": [
+        {
+          "text": "bugs #76167",
+          "url": "https://bugs.php.net/bug.php?id=76167"
+        }
+      ],
+      "pattern": "`mbstring`의 RINIT/RSHUTDOWN 비대칭으로 **이전 요청의 포인터를 다음 요청에서 재사용/해제**",
+      "stated_status": "2021-10 수정/Closed, [PR #7604](https://github.com/php/php-src/pull/7604)",
+      "link_type": "**요청 간 잔존 포인터**",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=76167",
+          "source": "bugs.php.net",
+          "id": 76167,
+          "status": "Closed",
+          "submitted": "2018-03-30 11:25 UTC",
+          "php_version": "5.6.35",
+          "package": "mbstring related",
+          "title": "PHP :: Bug #76167 :: mbstring may use/efree() pointer from some previous request"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R09",
+      "first_seen": "2018-06",
+      "label": "[bugs #76409 / CVE-2018-12882](https://bugs.php.net/bug.php?id=76409)",
+      "links": [
+        {
+          "text": "bugs #76409 / CVE-2018-12882",
+          "url": "https://bugs.php.net/bug.php?id=76409"
+        }
+      ],
+      "pattern": "EXIF 입력 처리의 `_php_stream_free()` UAF",
+      "stated_status": "2018-06 수정/Closed",
+      "link_type": "외부 입력·스트림 수명",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=76409",
+          "source": "bugs.php.net",
+          "id": 76409,
+          "status": "Closed",
+          "submitted": "2018-06-03 00:11 UTC",
+          "php_version": "7.2Git-2018-06-02 (Git)",
+          "package": "EXIF related",
+          "title": "PHP :: Sec Bug #76409 :: heap use after free in _php_stream_free"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R10",
+      "first_seen": "2018-09",
+      "label": "[bugs #76846](https://bugs.php.net/bug.php?id=76846)",
+      "links": [
+        {
+          "text": "bugs #76846",
+          "url": "https://bugs.php.net/bug.php?id=76846"
+        }
+      ],
+      "pattern": "OOM bailout 중 object-store 재할당 실패, 크기 메타데이터 선변경 후 shutdown에서 경계 밖 쓰기 가능",
+      "stated_status": "2018-09 수정/Closed",
+      "link_type": "**OOM·부분 상태·shutdown**",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=76846",
+          "source": "bugs.php.net",
+          "id": 76846,
+          "status": "Closed",
+          "submitted": "2018-09-06 09:09 UTC",
+          "php_version": "7.2.9",
+          "package": "Scripting Engine problem",
+          "title": "PHP :: Bug #76846 :: Segfault in shutdown function after memory limit error"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R11",
+      "first_seen": "2018-11",
+      "label": "[bugs #77185](https://bugs.php.net/bug.php?id=77185)",
+      "links": [
+        {
+          "text": "bugs #77185",
+          "url": "https://bugs.php.net/bug.php?id=77185"
+        }
+      ],
+      "pattern": "FPM master의 이벤트 처리 중 UAF",
+      "stated_status": "2019-07 Closed",
+      "link_type": "SAPI·worker 생명주기",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=77185",
+          "source": "bugs.php.net",
+          "id": 77185,
+          "status": "Closed",
+          "submitted": "2018-11-22 04:35 UTC",
+          "php_version": "master-Git-2018-11-22 (Git)",
+          "package": "Reproducible crash",
+          "title": "PHP :: Bug #77185 :: Use-after-free in FPM master event handling"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R12",
+      "first_seen": "2018-12",
+      "label": "[bugs #77249](https://bugs.php.net/bug.php?id=77249)",
+      "links": [
+        {
+          "text": "bugs #77249",
+          "url": "https://bugs.php.net/bug.php?id=77249"
+        }
+      ],
+      "pattern": "`xmlrpc_decode()` malformed 입력의 ASan UAF",
+      "stated_status": "Duplicate",
+      "link_type": "외부 파서·중복",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=77249",
+          "source": "bugs.php.net",
+          "id": 77249,
+          "status": "Duplicate",
+          "submitted": "2018-12-06 10:00 UTC",
+          "php_version": "7.2.12",
+          "package": "XMLRPC-EPI related",
+          "title": "PHP :: Sec Bug #77249 :: Use after free in xmlrpc_decode()"
+        }
+      ],
+      "record_type": "duplicate",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R13",
+      "first_seen": "2019-04",
+      "label": "[bugs #77843](https://bugs.php.net/bug.php?id=77843)",
+      "links": [
+        {
+          "text": "bugs #77843",
+          "url": "https://bugs.php.net/bug.php?id=77843"
+        }
+      ],
+      "pattern": "JSON serializer 관련 UAF",
+      "stated_status": "Closed",
+      "link_type": "직렬화·취약점 연계",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=77843",
+          "source": "bugs.php.net",
+          "id": 77843,
+          "status": "Closed",
+          "submitted": "2019-04-04 06:59 UTC",
+          "php_version": "7.3.3",
+          "package": "JSON related",
+          "title": "PHP :: Bug #77843 :: Use after free with json serializer"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R14",
+      "first_seen": "2019-08",
+      "label": "[bugs #78379](https://bugs.php.net/bug.php?id=78379)",
+      "links": [
+        {
+          "text": "bugs #78379",
+          "url": "https://bugs.php.net/bug.php?id=78379"
+        }
+      ],
+      "pattern": "객체 변환 시 GC와 참조 관리 충돌로 UAF",
+      "stated_status": "2021-07 Closed",
+      "link_type": "GC·캐스팅",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=78379",
+          "source": "bugs.php.net",
+          "id": 78379,
+          "status": "Closed",
+          "submitted": "2019-08-06 05:34 UTC",
+          "php_version": "7.2Git-2019-08-06 (Git)",
+          "package": "Reproducible crash",
+          "title": "PHP :: Bug #78379 :: Cast to object confuses GC, causes crash"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R15",
+      "first_seen": "2019-11",
+      "label": "[bugs #78876](https://bugs.php.net/bug.php?id=78876)",
+      "links": [
+        {
+          "text": "bugs #78876",
+          "url": "https://bugs.php.net/bug.php?id=78876"
+        }
+      ],
+      "pattern": "multipart 입력에서 OOM 시 임시파일 정리 생략 → 디스크 DoS",
+      "stated_status": "2020-05 수정/Closed",
+      "link_type": "**외부 입력·OOM·cleanup**",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=78876",
+          "source": "bugs.php.net",
+          "id": 78876,
+          "status": "Closed",
+          "submitted": "2019-11-28 11:07 UTC",
+          "php_version": "7.2.25",
+          "package": "*Web Server problem",
+          "title": "PHP :: Sec Bug #78876 :: Long variables in multipart/form-data cause OOM and temp files are not cleaned"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R16",
+      "first_seen": "2019-11",
+      "label": "[bugs #78793 / CVE-2019-11050](https://bugs.php.net/bug.php?id=78793)",
+      "links": [
+        {
+          "text": "bugs #78793 / CVE-2019-11050",
+          "url": "https://bugs.php.net/bug.php?id=78793"
+        }
+      ],
+      "pattern": "EXIF 입력 파서 UAF",
+      "stated_status": "2019-12 Closed",
+      "link_type": "파일 입력·UAF",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=78793",
+          "source": "bugs.php.net",
+          "id": 78793,
+          "status": "Closed",
+          "submitted": "2019-11-07 21:13 UTC",
+          "php_version": "master-Git-2019-11-07 (Git)",
+          "package": "EXIF related",
+          "title": "PHP :: Sec Bug #78793 :: Use-after-free in exif parsing under memory sanitizer"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R17",
+      "first_seen": "2019-12",
+      "label": "[bugs #79029](https://bugs.php.net/bug.php?id=79029)",
+      "links": [
+        {
+          "text": "bugs #79029",
+          "url": "https://bugs.php.net/bug.php?id=79029"
+        }
+      ],
+      "pattern": "XMLReader/XMLWriter 스트림 공유 중 이중 해제/UAF",
+      "stated_status": "Closed",
+      "link_type": "소유권·double-free",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=79029",
+          "source": "bugs.php.net",
+          "id": 79029,
+          "status": "Closed",
+          "submitted": "2019-12-25 03:16 UTC",
+          "php_version": "7.4.1",
+          "package": "XML Writer",
+          "title": "PHP :: Bug #79029 :: Use After Free&#039;s in XMLReader / XMLWriter"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R18",
+      "first_seen": "2020-06",
+      "label": "[bugs #79760](https://bugs.php.net/bug.php?id=79760)",
+      "links": [
+        {
+          "text": "bugs #79760",
+          "url": "https://bugs.php.net/bug.php?id=79760"
+        }
+      ],
+      "pattern": "**GC가 refcount를 줄인 후 `get_gc`가 OOM을 일으키면 `zend_bailout` 뒤 정리 불일치**. PHP 코어 개발자가 직접 원인과 수정 난이도 명시",
+      "stated_status": "**기존 트래커 Open**, 최신 HEAD 재현 별도 검증 필요",
+      "link_type": "**최우선 OOM/GC 설계 이슈**",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=79760",
+          "source": "bugs.php.net",
+          "id": 79760,
+          "status": "Open",
+          "submitted": "2020-06-30 10:48 UTC",
+          "php_version": "8.0Git-2020-06-30 (Git)",
+          "package": "Scripting Engine problem",
+          "title": "PHP :: Bug #79760 :: Potential use after free if memory limit hit during GC"
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R19",
+      "first_seen": "2020-07",
+      "label": "[bugs #79784](https://bugs.php.net/bug.php?id=79784)",
+      "links": [
+        {
+          "text": "bugs #79784",
+          "url": "https://bugs.php.net/bug.php?id=79784"
+        }
+      ],
+      "pattern": "경고를 통한 값 변경 후 기존 포인터를 참조하는 UAF",
+      "stated_status": "수정",
+      "link_type": "에러 핸들러·재진입",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=79784",
+          "source": "bugs.php.net",
+          "id": 79784,
+          "status": "Closed",
+          "submitted": "2020-07-04 04:35 UTC",
+          "php_version": "8.0Git-2020-07-04 (Git)",
+          "package": "Scripting Engine problem",
+          "title": "PHP :: Bug #79784 :: Use after free if changing array during undef var during array write fetch"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R20",
+      "first_seen": "2021-03",
+      "label": "[bugs #80894](https://bugs.php.net/bug.php?id=80894)",
+      "links": [
+        {
+          "text": "bugs #80894",
+          "url": "https://bugs.php.net/bug.php?id=80894"
+        }
+      ],
+      "pattern": "PHP 7.3 `__debugInfo()`→GC 이중 해제. 7.4+ 비영향, 7.3 지원 정책 때문에 수정하지 않음",
+      "stated_status": "**Wont fix** (영향 버전 제한)",
+      "link_type": "유지보수 정책 판단",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=80894",
+          "source": "bugs.php.net",
+          "id": 80894,
+          "status": "Wont fix",
+          "submitted": "2021-03-22 11:28 UTC",
+          "php_version": "7.3Git-2021-03-22 (Git)",
+          "package": "Reproducible crash",
+          "title": "PHP :: Bug #80894 :: GC-related crash after using __debugInfo()"
+        }
+      ],
+      "record_type": "wontfix",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R21",
+      "first_seen": "2021-04",
+      "label": "[PR #6903](https://github.com/php/php-src/pull/6903)",
+      "links": [
+        {
+          "text": "PR #6903",
+          "url": "https://github.com/php/php-src/pull/6903"
+        }
+      ],
+      "pattern": "opcode 수행 중 warning callback 지연으로 재진입 UAF 방어 시도. 간접 참조 때문에 완전한 해결 아님",
+      "stated_status": "미병합",
+      "link_type": "**엔진 설계 변경 미완**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/pull/6903",
+          "source": "github",
+          "kind": "pr",
+          "number": 6903,
+          "title": "Delay notice emission until end of opcode",
+          "state": "closed",
+          "state_reason": null,
+          "created_at": "2021-04-23T12:39:00Z",
+          "closed_at": "2023-10-09T16:41:45Z",
+          "labels": [
+            "Category: Engine"
+          ],
+          "merged": false,
+          "merged_at": null,
+          "draft": true
+        }
+      ],
+      "record_type": "unmerged_design",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R22",
+      "first_seen": "2022-01",
+      "label": "[bugs #81708 / CVE-2021-21708](https://bugs.php.net/bug.php?id=81708)",
+      "links": [
+        {
+          "text": "bugs #81708 / CVE-2021-21708",
+          "url": "https://bugs.php.net/bug.php?id=81708"
+        }
+      ],
+      "pattern": "`FILTER_VALIDATE_FLOAT` 처리 UAF. 웹 요청 상황에서 관찰된 이슈",
+      "stated_status": "2022-02 수정",
+      "link_type": "함수 단위 메모리 안전성",
+      "verified_sources": [
+        {
+          "url": "https://bugs.php.net/bug.php?id=81708",
+          "source": "bugs.php.net",
+          "id": 81708,
+          "status": "Closed",
+          "submitted": "2022-01-30 09:00 UTC",
+          "php_version": "8.0.15",
+          "package": "Filter related",
+          "title": "PHP :: Sec Bug #81708 :: UAF due to php_filter_float() failing for ints"
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R23",
+      "first_seen": "2022-11",
+      "label": "[Issue #10026](https://github.com/php/php-src/issues/10026), [PR #10283](https://github.com/php/php-src/pull/10283), [PR #24338](https://github.com/php/php-src/pull/24338)",
+      "links": [
+        {
+          "text": "Issue #10026",
+          "url": "https://github.com/php/php-src/issues/10026"
+        },
+        {
+          "text": "PR #10283",
+          "url": "https://github.com/php/php-src/pull/10283"
+        },
+        {
+          "text": "PR #24338",
+          "url": "https://github.com/php/php-src/pull/24338"
+        }
+      ],
+      "pattern": "SOAP 실패를 `SoapFault`로 회복시켰지만 `zend_bailout()` 후 `gc_protect(1)`가 남아 이후 모든 GC가 중단. 2026-10 개발자들이 실제 OOM에서는 GC 보호를 함부로 풀 수 없다고 논의",
+      "stated_status": "**Issue Open / Verified**; PR 두 건은 **미병합 종료**",
+      "link_type": "**부분적 오류 복구·장기 미해결·설계 대립**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/10026",
+          "source": "github",
+          "kind": "issue",
+          "number": 10026,
+          "title": "Garbage collection stops after exception in SoapClient",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2022-11-30T17:29:27Z",
+          "closed_at": null,
+          "labels": [
+            "Bug",
+            "Extension: soap",
+            "Status: Verified"
+          ]
+        },
+        {
+          "url": "https://github.com/php/php-src/pull/10283",
+          "source": "github",
+          "kind": "pr",
+          "number": 10283,
+          "title": "Fix GH-10026: Garbage collection stops after exception in SoapClient",
+          "state": "closed",
+          "state_reason": null,
+          "created_at": "2023-01-10T21:38:43Z",
+          "closed_at": "2026-10-18T09:32:32Z",
+          "labels": [
+            "Extension: oci8",
+            "Extension: pdo_oci",
+            "Extension: phar",
+            "Extension: soap",
+            "SAPI: fuzzer",
+            "SAPI: phpdbg"
+          ],
+          "merged": false,
+          "merged_at": null,
+          "draft": false
+        },
+        {
+          "url": "https://github.com/php/php-src/pull/24338",
+          "source": "github",
+          "kind": "pr",
+          "number": 24338,
+          "title": "Fix GH-10026: Garbage collection stops after exception in SoapClient",
+          "state": "closed",
+          "state_reason": null,
+          "created_at": "2026-10-15T02:17:38Z",
+          "closed_at": "2026-10-15T20:06:56Z",
+          "labels": [
+            "Category: Engine",
+            "Extension: soap",
+            "ABI break"
+          ],
+          "merged": false,
+          "merged_at": null,
+          "draft": false
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R24",
+      "first_seen": "2022-12",
+      "label": "[Issue #10169](https://github.com/php/php-src/issues/10169)",
+      "links": [
+        {
+          "text": "Issue #10169",
+          "url": "https://github.com/php/php-src/issues/10169"
+        }
+      ],
+      "pattern": "`ZEND_ASSIGN_OBJ` 계열 heap UAF 보고",
+      "stated_status": "상태·재현 최신 확인 필요",
+      "link_type": "VM opcode·재진입",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/10169",
+          "source": "github",
+          "kind": "issue",
+          "number": 10169,
+          "title": "Heap UAF at ZEND_ASSIGN_OBJ_SPEC_CV_CONST_OP_DATA_VAR_HANDLER",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2022-12-26T21:42:52Z",
+          "closed_at": "2023-02-02T19:05:10Z",
+          "labels": [
+            "Bug",
+            "Category: Engine",
+            "Status: Verified"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R25",
+      "first_seen": "2023-02",
+      "label": "[Issue #10709](https://github.com/php/php-src/issues/10709)",
+      "links": [
+        {
+          "text": "Issue #10709",
+          "url": "https://github.com/php/php-src/issues/10709"
+        }
+      ],
+      "pattern": "class constant AST 평가와 autoload 재귀 과정 UAF 보고",
+      "stated_status": "Closed",
+      "link_type": "autoload·재귀",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/10709",
+          "source": "github",
+          "kind": "issue",
+          "number": 10709,
+          "title": "Recursion in class constant AST evaluation",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2023-02-26T13:23:59Z",
+          "closed_at": "2023-03-06T14:04:09Z",
+          "labels": [
+            "Bug",
+            "Status: Needs Triage"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R26",
+      "first_seen": "2023-08",
+      "label": "[Issue #12073](https://github.com/php/php-src/issues/12073)",
+      "links": [
+        {
+          "text": "Issue #12073",
+          "url": "https://github.com/php/php-src/issues/12073"
+        }
+      ],
+      "pattern": "OOM 중 closure 객체 **부분 초기화** 후 shutdown에서 크래시, 실제 MediaWiki/FPM에서 관찰",
+      "stated_status": "**2023-09-04 수정/Closed**",
+      "link_type": "**OOM·부분 초기화·shutdown**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/12073",
+          "source": "github",
+          "kind": "issue",
+          "number": 12073,
+          "title": "Segmentation fault during request shutdown when memory limit is exceeded during closure initialization",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2023-08-29T13:16:47Z",
+          "closed_at": "2023-09-04T13:40:40Z",
+          "labels": [
+            "Bug",
+            "Status: Needs Triage"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R27",
+      "first_seen": "2023-10",
+      "label": "[Issue #12468](https://github.com/php/php-src/issues/12468)",
+      "links": [
+        {
+          "text": "Issue #12468",
+          "url": "https://github.com/php/php-src/issues/12468"
+        }
+      ],
+      "pattern": "문서 주석 `doc_comment` 참조 카운트 오류, shutdown UAF",
+      "stated_status": "Closed",
+      "link_type": "refcount·shutdown",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/12468",
+          "source": "github",
+          "kind": "issue",
+          "number": 12468,
+          "title": "Use after free because of incorrect prop_info->doc_comment reference counting (without opcache only)",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2023-10-18T17:34:01Z",
+          "closed_at": "2023-10-19T13:23:44Z",
+          "labels": [
+            "Bug",
+            "Status: Needs Triage"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R28",
+      "first_seen": "2023-11",
+      "label": "[PR #12805](https://github.com/php/php-src/pull/12805)",
+      "links": [
+        {
+          "text": "PR #12805",
+          "url": "https://github.com/php/php-src/pull/12805"
+        }
+      ],
+      "pattern": "경고/에러 콜백 지연 설계의 재시도, JIT/VM의 실행 재개와 레지스터 보존 문제",
+      "stated_status": "**Draft, Open**",
+      "link_type": "**구조적 해결 미완**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/pull/12805",
+          "source": "github",
+          "kind": "pr",
+          "number": 12805,
+          "title": "Delayed notice again",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2023-11-28T00:51:36Z",
+          "closed_at": null,
+          "labels": [
+            "Category: Engine",
+            "Extension: opcache"
+          ],
+          "merged": false,
+          "merged_at": null,
+          "draft": true
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R29",
+      "first_seen": "2024-04",
+      "label": "[Issue #14083](https://github.com/php/php-src/issues/14083)",
+      "links": [
+        {
+          "text": "Issue #14083",
+          "url": "https://github.com/php/php-src/issues/14083"
+        }
+      ],
+      "pattern": "Zend heap 메타데이터/프리리스트 보호, guard page, 분리 heap 등 hardened allocator 과제",
+      "stated_status": "**Open, 설계 목록**",
+      "link_type": "exploit mitigation",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/14083",
+          "source": "github",
+          "kind": "issue",
+          "number": 14083,
+          "title": "Heap hardening",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2024-04-30T12:48:03Z",
+          "closed_at": null,
+          "labels": [
+            "Feature",
+            "Status: Needs Triage"
+          ]
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R30",
+      "first_seen": "2024-04",
+      "label": "[PR #13943](https://github.com/php/php-src/pull/13943)",
+      "links": [
+        {
+          "text": "PR #13943",
+          "url": "https://github.com/php/php-src/pull/13943"
+        }
+      ],
+      "pattern": "Zend heap 무결성 보호",
+      "stated_status": "**Merged**",
+      "link_type": "**실제 적용된 방어**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/pull/13943",
+          "source": "github",
+          "kind": "pr",
+          "number": 13943,
+          "title": "Add two checks for zend_mm_heap's integrity",
+          "state": "closed",
+          "state_reason": null,
+          "created_at": "2024-04-11T15:02:42Z",
+          "closed_at": "2024-04-23T09:50:24Z",
+          "labels": [
+            "Category: Engine"
+          ],
+          "merged": true,
+          "merged_at": "2024-04-23T09:50:24Z",
+          "draft": false
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R31",
+      "first_seen": "2024-05",
+      "label": "[PR #14304](https://github.com/php/php-src/pull/14304)",
+      "links": [
+        {
+          "text": "PR #14304",
+          "url": "https://github.com/php/php-src/pull/14304"
+        }
+      ],
+      "pattern": "HTTP GET/POST/환경값 메모리를 별도 heap 영역에 분리",
+      "stated_status": "**Open, 미병합**",
+      "link_type": "heap 격리·공격 제약",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/pull/14304",
+          "source": "github",
+          "kind": "pr",
+          "number": 14304,
+          "title": "Remote heap feng shui / heap spraying protection ",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2024-05-23T14:28:27Z",
+          "closed_at": null,
+          "labels": [
+            "Category: Build System",
+            "Category: Engine",
+            "Extension: gd",
+            "Extension: opcache",
+            "Extension: spl",
+            "Extension: standard",
+            "Extension: zend_test",
+            "Extension: random",
+            "ABI break"
+          ],
+          "merged": false,
+          "merged_at": null,
+          "draft": false
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R32",
+      "first_seen": "2024-07",
+      "label": "[Issue #15108](https://github.com/php/php-src/issues/15108)",
+      "links": [
+        {
+          "text": "Issue #15108",
+          "url": "https://github.com/php/php-src/issues/15108"
+        }
+      ],
+      "pattern": "Fiber·Generator 조합에서 GC refcount assertion",
+      "stated_status": "2024-07-30 PR #15158로 수정",
+      "link_type": "Fiber/GC 수명",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/15108",
+          "source": "github",
+          "kind": "issue",
+          "number": 15108,
+          "title": "Segfault / Assertion failed: (p->refcount > 0), function zend_gc_delref, file zend_types.h, line 1342",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2024-07-25T21:29:58Z",
+          "closed_at": "2024-07-30T13:04:13Z",
+          "labels": [
+            "Bug",
+            "Category: Engine",
+            "Status: Verified"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R33",
+      "first_seen": "2024-10",
+      "label": "[Issue #16464](https://github.com/php/php-src/issues/16464)",
+      "links": [
+        {
+          "text": "Issue #16464",
+          "url": "https://github.com/php/php-src/issues/16464"
+        }
+      ],
+      "pattern": "SplDoublyLinkedList destructor 재진입 UAF",
+      "stated_status": "Closed",
+      "link_type": "컨테이너 재진입",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/16464",
+          "source": "github",
+          "kind": "issue",
+          "number": 16464,
+          "title": "Use after free in SplDoublyLinkedList",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2024-10-16T17:19:47Z",
+          "closed_at": "2024-10-16T21:06:05Z",
+          "labels": [
+            "Bug",
+            "Extension: spl",
+            "Status: Verified"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R34",
+      "first_seen": "2024-10",
+      "label": "[Issue #16479](https://github.com/php/php-src/issues/16479)",
+      "links": [
+        {
+          "text": "Issue #16479",
+          "url": "https://github.com/php/php-src/issues/16479"
+        }
+      ],
+      "pattern": "SplObjectStorage destructor 재진입 UAF",
+      "stated_status": "Closed",
+      "link_type": "컨테이너 재진입",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/16479",
+          "source": "github",
+          "kind": "issue",
+          "number": 16479,
+          "title": "Use after free in SplObjectStorage",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2024-10-17T09:50:50Z",
+          "closed_at": "2024-10-17T16:22:04Z",
+          "labels": [
+            "Bug",
+            "Extension: spl",
+            "Status: Verified"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R35",
+      "first_seen": "2024-11",
+      "label": "[Issue #16726](https://github.com/php/php-src/issues/16726)",
+      "links": [
+        {
+          "text": "Issue #16726",
+          "url": "https://github.com/php/php-src/issues/16726"
+        }
+      ],
+      "pattern": "error handler가 수행 중 변수 값을 교체해 opcode가 해제된 메모리를 참조",
+      "stated_status": "**Open / Verified**",
+      "link_type": "**에러 콜백 재진입**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/16726",
+          "source": "github",
+          "kind": "issue",
+          "number": 16726,
+          "title": "Heap Use-After-Free (UAF) Bug in PHP",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2024-11-07T19:39:34Z",
+          "closed_at": null,
+          "labels": [
+            "Bug",
+            "Category: Engine",
+            "Status: Verified"
+          ]
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R36",
+      "first_seen": "2024년 감사 / 2025-04 공개",
+      "label": "[PHP Foundation 결과](https://thephp.foundation/blog/2025/04/10/php-core-security-audit-results/) · [Quarkslab 원본 PDF](https://thephp.foundation/assets/files/24-07-1730-REP-V1.4_temp.pdf)",
+      "links": [
+        {
+          "text": "PHP Foundation 결과",
+          "url": "https://thephp.foundation/blog/2025/04/10/php-core-security-audit-results/"
+        },
+        {
+          "text": "Quarkslab 원본 PDF",
+          "url": "https://thephp.foundation/assets/files/24-07-1730-REP-V1.4_temp.pdf"
+        }
+      ],
+      "pattern": "외부 감사 총 27개 발견사항(그중 보안 관련 17개) 정리. 감사 보고 결함과 이후 파생 인지한 OOM 문제는 구분",
+      "stated_status": "보고서 발행/정리",
+      "link_type": "보안 감사·검증 범위",
+      "verified_sources": [
+        {
+          "url": "https://thephp.foundation/blog/2025/04/10/php-core-security-audit-results/",
+          "source": "web",
+          "http": 200,
+          "reachable": true
+        },
+        {
+          "url": "https://thephp.foundation/assets/files/24-07-1730-REP-V1.4_temp.pdf",
+          "source": "web",
+          "http": 200,
+          "reachable": true
+        }
+      ],
+      "record_type": "design-discussion",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R37",
+      "first_seen": "2025-03",
+      "label": "[GHSA-rwp7-7vc6-8477 / CVE-2024-11235](https://github.com/php/php-src/security/advisories/GHSA-rwp7-7vc6-8477)",
+      "links": [
+        {
+          "text": "GHSA-rwp7-7vc6-8477 / CVE-2024-11235",
+          "url": "https://github.com/php/php-src/security/advisories/GHSA-rwp7-7vc6-8477"
+        }
+      ],
+      "pattern": "`php_request_shutdown()` 과정의 객체 참조 카운트 UAF",
+      "stated_status": "공지 및 수정 완료",
+      "link_type": "shutdown·예외·참조",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/security/advisories/GHSA-rwp7-7vc6-8477",
+          "source": "ghsa",
+          "ghsa": "GHSA-rwp7-7vc6-8477",
+          "state": "published",
+          "cve_id": "CVE-2024-11235",
+          "severity": "medium",
+          "published_at": "2025-03-13T17:44:39Z",
+          "summary": "Reference counting in php_request_shutdown causes Use-After-Free"
+        }
+      ],
+      "record_type": "advisory",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R38",
+      "first_seen": "2025-05",
+      "label": "[Issue #18640](https://github.com/php/php-src/issues/18640)",
+      "links": [
+        {
+          "text": "Issue #18640",
+          "url": "https://github.com/php/php-src/issues/18640"
+        }
+      ],
+      "pattern": "SOAP `soap_check_zval_ref` heap UAF 보고",
+      "stated_status": "별도 종료·패치 버전 확인 필요",
+      "link_type": "SOAP·refcount",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/18640",
+          "source": "github",
+          "kind": "issue",
+          "number": 18640,
+          "title": "heap-use-after-free ext/soap/php_encoding.c:299:32 in soap_check_zval_ref",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2025-05-24T14:47:35Z",
+          "closed_at": "2025-07-20T17:50:07Z",
+          "labels": [
+            "Bug",
+            "Extension: soap",
+            "Status: Verified"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R39",
+      "first_seen": "2025-08",
+      "label": "[Issue #19484](https://github.com/php/php-src/issues/19484)",
+      "links": [
+        {
+          "text": "Issue #19484",
+          "url": "https://github.com/php/php-src/issues/19484"
+        }
+      ],
+      "pattern": "PostgreSQL 지속 연결에 등록된 콜백이 다음 요청에서 이미 해제된 포인터를 참조할 가능성 보고",
+      "stated_status": "**당일 Closed**; PR 병합 여부/수정 근거 추가 대조 필요",
+      "link_type": "persistent connection·요청 간 상태",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/19484",
+          "source": "github",
+          "kind": "issue",
+          "number": 19484,
+          "title": "pgsql: potential use after free when using persistent connections",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2025-08-15T05:44:04Z",
+          "closed_at": "2025-08-15T07:08:43Z",
+          "labels": [
+            "Bug",
+            "Extension: pgsql",
+            "Status: Needs Triage"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R40",
+      "first_seen": "2025-09",
+      "label": "[Issue #20018](https://github.com/php/php-src/issues/20018)",
+      "links": [
+        {
+          "text": "Issue #20018",
+          "url": "https://github.com/php/php-src/issues/20018"
+        }
+      ],
+      "pattern": "이전 재진입 UAF 버그 11건 및 4개의 해결 시도를 공통 문제로 연결",
+      "stated_status": "**Open**",
+      "link_type": "**문제의 계보**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/20018",
+          "source": "github",
+          "kind": "issue",
+          "number": 20018,
+          "title": "Delaying error handlers",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2025-09-30T16:13:31Z",
+          "closed_at": null,
+          "labels": [
+            "Bug",
+            "Status: Needs Triage"
+          ]
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R41",
+      "first_seen": "2025-11",
+      "label": "[Issue #20352](https://github.com/php/php-src/issues/20352)",
+      "links": [
+        {
+          "text": "Issue #20352",
+          "url": "https://github.com/php/php-src/issues/20352"
+        }
+      ],
+      "pattern": "output-handler 에러 해제 중 `ob_start` 재진입 UAF",
+      "stated_status": "**2025-12-19 수정/Closed**",
+      "link_type": "출력·재진입",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/20352",
+          "source": "github",
+          "kind": "issue",
+          "number": 20352,
+          "title": "UAF in php_output_handler_free via re-entrant ob_start() during error deactivation",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2025-11-01T05:55:22Z",
+          "closed_at": "2025-12-19T18:37:22Z",
+          "labels": [
+            "Bug",
+            "Category: Engine",
+            "Status: Verified"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R42",
+      "first_seen": "2026-03",
+      "label": "[Issue #21499](https://github.com/php/php-src/issues/21499)",
+      "links": [
+        {
+          "text": "Issue #21499",
+          "url": "https://github.com/php/php-src/issues/21499"
+        }
+      ],
+      "pattern": "`RecursiveArrayIterator`가 부모 HashTable 버킷의 raw pointer를 참조 → 부모 해제 후 UAF",
+      "stated_status": "2026-03 수정/Closed",
+      "link_type": "raw pointer·컨테이너 수명",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/21499",
+          "source": "github",
+          "kind": "issue",
+          "number": 21499,
+          "title": "Use-After-Free in RecursiveArrayIterator::getChildren()",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2026-03-23T07:27:49Z",
+          "closed_at": "2026-03-27T18:38:51Z",
+          "labels": [
+            "Bug",
+            "Extension: spl",
+            "Status: Verified"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R43",
+      "first_seen": "2026-05",
+      "label": "[GHSA-85c2-q967-79q5 / CVE-2026-6722](https://github.com/php/php-src/security/advisories/GHSA-85c2-q967-79q5)",
+      "links": [
+        {
+          "text": "GHSA-85c2-q967-79q5 / CVE-2026-6722",
+          "url": "https://github.com/php/php-src/security/advisories/GHSA-85c2-q967-79q5"
+        }
+      ],
+      "pattern": "SOAP 전역 ref_map의 객체 참조 누락으로 stale pointer; 특정 응용의 원격 공격 가능성",
+      "stated_status": "보안 공지/수정",
+      "link_type": "**확장 모듈 전역 상태·RCE**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/security/advisories/GHSA-85c2-q967-79q5",
+          "source": "ghsa",
+          "ghsa": "GHSA-85c2-q967-79q5",
+          "state": "published",
+          "cve_id": "CVE-2026-6722",
+          "severity": "high",
+          "published_at": "2026-05-07T12:56:25Z",
+          "summary": "Use-After-Free in SOAP using Apache map with Remote Code Execution"
+        }
+      ],
+      "record_type": "advisory",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R44",
+      "first_seen": "2026-05",
+      "label": "[GHSA-m33r-qmcv-p97q / CVE-2026-7261](https://github.com/php/php-src/security/advisories/GHSA-m33r-qmcv-p97q)",
+      "links": [
+        {
+          "text": "GHSA-m33r-qmcv-p97q / CVE-2026-7261",
+          "url": "https://github.com/php/php-src/security/advisories/GHSA-m33r-qmcv-p97q"
+        }
+      ],
+      "pattern": "SOAP 지속 헤더의 객체 수명 UAF",
+      "stated_status": "보안 공지/수정",
+      "link_type": "SOAP state·lifecycle",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/security/advisories/GHSA-m33r-qmcv-p97q",
+          "source": "ghsa",
+          "ghsa": "GHSA-m33r-qmcv-p97q",
+          "state": "published",
+          "cve_id": "CVE-2026-7261",
+          "severity": "medium",
+          "published_at": "2026-05-07T12:57:35Z",
+          "summary": "SoapServer session-persisted object use-after-free via SOAP header fault"
+        }
+      ],
+      "record_type": "advisory",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R45",
+      "first_seen": "2026-06",
+      "label": "[Issue #22526](https://github.com/php/php-src/issues/22526)",
+      "links": [
+        {
+          "text": "Issue #22526",
+          "url": "https://github.com/php/php-src/issues/22526"
+        }
+      ],
+      "pattern": "parser/scanner에서 `zend_bailout()`으로 정상 정리 경로를 탈출해 메모리 누수",
+      "stated_status": "**Open / Needs Triage**",
+      "link_type": "OOM·bailout·cleanup",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/22526",
+          "source": "github",
+          "kind": "issue",
+          "number": 22526,
+          "title": "memory leak zend_language_scanner zend_language_parser",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2026-06-30T09:34:28Z",
+          "closed_at": null,
+          "labels": [
+            "Bug",
+            "Category: Engine",
+            "Status: Needs Triage"
+          ]
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R46",
+      "first_seen": "2026-07",
+      "label": "[PR #22710](https://github.com/php/php-src/pull/22710)",
+      "links": [
+        {
+          "text": "PR #22710",
+          "url": "https://github.com/php/php-src/pull/22710"
+        }
+      ],
+      "pattern": "destructor가 `zend_hash_clean()` 중 bailout → 항목 삭제 기록이 남지 않아 shutdown에서 이중 정리/UAF",
+      "stated_status": "**Open PR**, 현재 HEAD 동작 별도 검증",
+      "link_type": "**bailout·destructor·hash lifecycle**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/pull/22710",
+          "source": "github",
+          "kind": "pr",
+          "number": 22710,
+          "title": "Fix use-after-free when a destructor bails out during zend_hash_clean()",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2026-07-12T23:21:07Z",
+          "closed_at": null,
+          "labels": [
+            "Category: Engine",
+            "Extension: session"
+          ],
+          "merged": false,
+          "merged_at": null,
+          "draft": false
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R47",
+      "first_seen": "2026-07",
+      "label": "[Issue #22895](https://github.com/php/php-src/issues/22895)",
+      "links": [
+        {
+          "text": "Issue #22895",
+          "url": "https://github.com/php/php-src/issues/22895"
+        }
+      ],
+      "pattern": "SOAP 직렬화 UAF/ASan 보고",
+      "stated_status": "Closed",
+      "link_type": "SOAP·객체 수명",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/22895",
+          "source": "github",
+          "kind": "issue",
+          "number": 22895,
+          "title": "ext/soap: heap use-after-free while encoding a `MultipleIterator`",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2026-07-27T02:54:52Z",
+          "closed_at": "2026-10-01T18:16:25Z",
+          "labels": [
+            "Bug",
+            "Extension: soap",
+            "Status: Verified"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R48",
+      "first_seen": "2026-09",
+      "label": "[PHP 개발자 토론](https://discourse.thephp.foundation/t/php-dev-categorising-engine-bugs-caused-by-nonsensical-malicious-callback-handlers-as-undefined-behaviour-and-to-not-fix-them/6037)",
+      "links": [
+        {
+          "text": "PHP 개발자 토론",
+          "url": "https://discourse.thephp.foundation/t/php-dev-categorising-engine-bugs-caused-by-nonsensical-malicious-callback-handlers-as-undefined-behaviour-and-to-not-fix-them/6037"
+        }
+      ],
+      "pattern": "악의적/비정상 콜백의 메모리 오류를 UB로 간주하고 수리 대상을 제한할 것인지 토론",
+      "stated_status": "공개 의견교환, 공식 채택 미확인",
+      "link_type": "**보안 책임·정책 판단**",
+      "verified_sources": [
+        {
+          "url": "https://discourse.thephp.foundation/t/php-dev-categorising-engine-bugs-caused-by-nonsensical-malicious-callback-handlers-as-undefined-behaviour-and-to-not-fix-them/6037",
+          "source": "web",
+          "http": 200,
+          "reachable": true
+        }
+      ],
+      "record_type": "design-discussion",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R49",
+      "first_seen": "2026-10-15",
+      "label": "[Issue #24361](https://github.com/php/php-src/issues/24361), [php.bugs 보존본](https://news-web.php.net/php.bugs/253005)",
+      "links": [
+        {
+          "text": "Issue #24361",
+          "url": "https://github.com/php/php-src/issues/24361"
+        },
+        {
+          "text": "php.bugs 보존본",
+          "url": "https://news-web.php.net/php.bugs/253005"
+        }
+      ],
+      "pattern": "`opcache_compile_file()`가 컴파일 오류로 인한 bailout을 잡은 뒤 계속 실행하면서 GC 보호 상태를 복구하지 않아 요청 나머지 구간에서 GC가 비활성화됨. 2022년 #10026의 관련 패턴",
+      "stated_status": "**Open**, 원문에 8.3·8.4·master 재현 기록",
+      "link_type": "**오류 복구 이후 전역 상태 불변식**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/24361",
+          "source": "github",
+          "kind": "issue",
+          "number": 24361,
+          "title": "opcache_compile_file() on a file with a fatal compile error disables the cycle collector for the rest of the request",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2026-10-15T19:18:11Z",
+          "closed_at": null,
+          "labels": []
+        },
+        {
+          "url": "https://news-web.php.net/php.bugs/253005",
+          "source": "web",
+          "http": 200,
+          "reachable": true
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R50",
+      "first_seen": "2026-10-16",
+      "label": "[Issue #24373](https://github.com/php/php-src/issues/24373)",
+      "links": [
+        {
+          "text": "Issue #24373",
+          "url": "https://github.com/php/php-src/issues/24373"
+        }
+      ],
+      "pattern": "`serialize()` 해제 중 destructor의 중첩 `serialize()`가 외부 var_hash를 재사용해 UAF",
+      "stated_status": "**2026-10-22 수정/Closed**",
+      "link_type": "직렬화·재진입·수정 완료 사례",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/24373",
+          "source": "github",
+          "kind": "issue",
+          "number": 24373,
+          "title": "serialize() called from a destructor during var_hash destruction reuses the outer var_hash (wrong back references, use-after-free)",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2026-10-16T13:39:50Z",
+          "closed_at": "2026-10-22T19:28:55Z",
+          "labels": [
+            "Bug",
+            "Extension: standard"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R51",
+      "first_seen": "2026-10-20",
+      "label": "[Issue #24455](https://github.com/php/php-src/issues/24455)",
+      "links": [
+        {
+          "text": "Issue #24455",
+          "url": "https://github.com/php/php-src/issues/24455"
+        }
+      ],
+      "pattern": "lazy object reset와 destructor 재진입 ASan UAF 제보",
+      "stated_status": "**Open / Needs Triage**",
+      "link_type": "객체 수명·재진입",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/24455",
+          "source": "github",
+          "kind": "issue",
+          "number": 24455,
+          "title": "Lazy object reset with object destructor can lead to use-after-free",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2026-10-20T08:16:53Z",
+          "closed_at": null,
+          "labels": [
+            "Bug",
+            "Status: Needs Triage"
+          ]
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R52",
+      "first_seen": "2026-10-21",
+      "label": "[GHSA-w8hw-w9fx-j79w / CVE-2026-109618](https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w)",
+      "links": [
+        {
+          "text": "GHSA-w8hw-w9fx-j79w / CVE-2026-109618",
+          "url": "https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w"
+        }
+      ],
+      "pattern": "PHP OOM bailout 후 손상된 상태가 다음 요청/정리 단계에 사용됨",
+      "stated_status": "**공식 보안 패치 공개**",
+      "link_type": "**핵심 조사 대상**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w",
+          "source": "ghsa",
+          "ghsa": "GHSA-w8hw-w9fx-j79w",
+          "state": "published",
+          "cve_id": "CVE-2026-109618",
+          "severity": "critical",
+          "published_at": "2026-10-21T13:34:25Z",
+          "summary": "RCE via OOM corruption"
+        }
+      ],
+      "record_type": "advisory",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R53",
+      "first_seen": "2026-10-21",
+      "label": "[GHSA-6wmf-4rv5-p3rp / CVE-2026-109619](https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp)",
+      "links": [
+        {
+          "text": "GHSA-6wmf-4rv5-p3rp / CVE-2026-109619",
+          "url": "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp"
+        }
+      ],
+      "pattern": "OOM/요청 간 상태의 메모리 안전성 문제",
+      "stated_status": "**공식 보안 패치 공개**",
+      "link_type": "**핵심 조사 대상**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp",
+          "source": "ghsa",
+          "ghsa": "GHSA-6wmf-4rv5-p3rp",
+          "state": "published",
+          "cve_id": "CVE-2026-109619",
+          "severity": "critical",
+          "published_at": "2026-10-21T13:34:13Z",
+          "summary": "RCE via stale global state"
+        }
+      ],
+      "record_type": "advisory",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R54",
+      "first_seen": "2026-10-21",
+      "label": "[Issue #24481](https://github.com/php/php-src/issues/24481)",
+      "links": [
+        {
+          "text": "Issue #24481",
+          "url": "https://github.com/php/php-src/issues/24481"
+        }
+      ],
+      "pattern": "`unserialize` 재진입 UAF 제보. 작성자의 RCE 표현은 공식 검증 아님; PoC 실행 조건에 PHP 코드 실행이 이미 필요함",
+      "stated_status": "**Open / Needs Triage**",
+      "link_type": "재진입·재현 조건 엄격 검증",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/24481",
+          "source": "github",
+          "kind": "issue",
+          "number": 24481,
+          "title": "Use-after-free in var_destroy() during unserialize() re-entrancy allows __destruct to read a freed var_entries chunk",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2026-10-21T15:16:12Z",
+          "closed_at": null,
+          "labels": [
+            "Bug",
+            "Status: Needs Triage"
+          ]
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R55",
+      "first_seen": "2026-10-21",
+      "label": "[Issue #24488](https://github.com/php/php-src/issues/24488)",
+      "links": [
+        {
+          "text": "Issue #24488",
+          "url": "https://github.com/php/php-src/issues/24488"
+        }
+      ],
+      "pattern": "긴급 릴리스의 SimpleXML/GC 관련 수정 이후 이중 해제 회귀; 별개 코드 베이스에서 영향 확인",
+      "stated_status": "**2026-10-22 수정/Closed**, 후속 릴리스 배포 확인 별도",
+      "link_type": "**패치 회귀·GC 소유권**",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/24488",
+          "source": "github",
+          "kind": "issue",
+          "number": 24488,
+          "title": "8.4.27 / 8.5.12 regression: GC double-frees the SimpleXMLElement properties table (`zend_mm_heap corrupted`), introduced by the GH-24050 fix",
+          "state": "closed",
+          "state_reason": "completed",
+          "created_at": "2026-10-21T17:42:46Z",
+          "closed_at": "2026-10-22T12:30:58Z",
+          "labels": [
+            "Bug",
+            "Extension: simplexml",
+            "Status: Verified"
+          ]
+        }
+      ],
+      "record_type": "fixed",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R56",
+      "first_seen": "2026-10-21",
+      "label": "[Issue #24489](https://github.com/php/php-src/issues/24489)",
+      "links": [
+        {
+          "text": "Issue #24489",
+          "url": "https://github.com/php/php-src/issues/24489"
+        }
+      ],
+      "pattern": "`master` 브랜치에서 mbstring bailout 수정 일부가 merge 중 누락됐다는 보고",
+      "stated_status": "**Open** (브랜치별 비교 필요)",
+      "link_type": "수정 누락·merge 검증",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/24489",
+          "source": "github",
+          "kind": "issue",
+          "number": 24489,
+          "title": "master: part of the mbstring bailout fix got lost in a merge",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2026-10-21T18:00:34Z",
+          "closed_at": null,
+          "labels": []
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R57",
+      "first_seen": "2026-10-21",
+      "label": "[Issue #24492](https://github.com/php/php-src/issues/24492)",
+      "links": [
+        {
+          "text": "Issue #24492",
+          "url": "https://github.com/php/php-src/issues/24492"
+        }
+      ],
+      "pattern": "새 hard memory limit에서 일부 기존 할당 API가 `_exit(137)`로 프로세스를 종료하는 가용성 회귀",
+      "stated_status": "**Open / Needs Triage**",
+      "link_type": "패치 부작용·allocator API",
+      "verified_sources": [
+        {
+          "url": "https://github.com/php/php-src/issues/24492",
+          "source": "github",
+          "kind": "issue",
+          "number": 24492,
+          "title": "sprintf()/pack()/bin2hex() _exit(137) at hard memory limit where 8.5.11 raised a catchable OOM (incomplete fallible-alloc conversion, 8.5.12/8.4.27)",
+          "state": "open",
+          "state_reason": null,
+          "created_at": "2026-10-21T18:08:45Z",
+          "closed_at": null,
+          "labels": [
+            "Bug",
+            "Status: Needs Triage"
+          ]
+        }
+      ],
+      "record_type": "open",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    },
+    {
+      "id": "R58",
+      "first_seen": "2026-10-21",
+      "label": "[PHP Foundation 경위 설명](https://thephp.foundation/blog/2026/10/21/todays-php-security-release-and-how-were-strengthening-php-security/)",
+      "links": [
+        {
+          "text": "PHP Foundation 경위 설명",
+          "url": "https://thephp.foundation/blog/2026/10/21/todays-php-security-release-and-how-were-strengthening-php-security/"
+        }
+      ],
+      "pattern": "2024년 잠재 OOM 위험 인지·수정 정책 지연과 인력/의사결정 문제를 공식 인정",
+      "stated_status": "공식 설명",
+      "link_type": "거버넌스·공개 타임라인",
+      "verified_sources": [
+        {
+          "url": "https://thephp.foundation/blog/2026/10/21/todays-php-security-release-and-how-were-strengthening-php-security/",
+          "source": "web",
+          "http": 200,
+          "reachable": true
+        }
+      ],
+      "record_type": "design-discussion",
+      "evidence_level": "unassessed",
+      "exposure": "unassessed",
+      "discrepancies": []
+    }
+  ]
+}
