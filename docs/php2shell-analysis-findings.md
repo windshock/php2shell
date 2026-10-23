@@ -1185,3 +1185,47 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 2. 재도출 증적의 커밋 해시가 미기록된 것(WSL git safe.directory).
 
 둘 다 수정해 커밋했다(`a1a7ef1`).
+
+## 11. Phase 6 — Historical Corpus·CoreGuard (2026-10-23, 계획 §13.4·§13.5)
+
+> v2(§10)와 구분된 절이다. 원칙: 과거 기록은 **취약점 목록이 아니며**, 재현 실패는 안전 판정이 아니다. 판정기는 v2.1 fail-closed 계열이고, 모든 증적에 출처(R12)를 기록한다.
+
+### 11.1 H0·H1 — 코퍼스 확보와 원천 검증
+
+- **H0:** 사용자 제공 원조사 문서를 수정 없이 `docs/corpus/php-memory-safety-2016-2026.md`(58건)로 넣었다.
+- **H1:** `linux/corpus/verify-corpus.py`로 원천 63건을 조회했다. 조회 실패 0, 문서 기재 상태와의 불일치 0이다(문서가 같은 날 작성됨). R24만 "확인 필요"에서 closed/completed로 정리됐다.
+- **기록 유형:** fixed 33 / open 14 / advisory 5 / 설계 논의 3 / duplicate 1 / wontfix 1 / unmerged design 1.
+- 결과 표: `docs/historical-corpus.md`.
+
+### 11.2 H2.5 — 현재 탐색기 도달성 (데스크 분류)
+
+`linux/corpus/reachability.json`. 기록 본문을 근거로 분류했으며, H2에서 사례별로 확정한다.
+
+| 분류 | 건수 | 비고 |
+|---|---|---|
+| reachable_now | 3 | R52·R53(2026 CVE 2건), R57(hard limit `_exit(137)` 회귀) |
+| needs_php_code | 24 | 사용자 클래스·소멸자·에러 핸들러·GC/Fiber |
+| needs_extension | 14 | soap 6, mbstring 2, exif 2, xmlreader, filter, simplexml, opcache, pgsql |
+| needs_payload_grammar | 4 | unserialize 조작 페이로드 |
+| needs_oracle | 2 | 임시 파일 누수(디스크 DoS), 파서 bailout 누수 |
+| needs_sapi | 1 | FPM master |
+| out_of_scope | 2 | xmlrpc(8.0에서 제거), 7.3 전용 |
+| design_record | 8 | #3 입력 |
+
+→ 현재 10개 액션 문법으로 hold-out을 적용하면 대부분 **탐색 실패가 아니라 도달 불가**를 재게 된다. 사용자 지적과 같은 결론이며, H2.5 확장을 H3보다 먼저 한다.
+
+### 11.3 H2 — 독립 재현 1차 (`linux/corpus/run-repro.py`)
+
+**방법:**
+- 재현 코드는 원천에서 원문 그대로 받아 커밋했다(`linux/corpus/repro/`). 실행 전에 읽었다.
+- CLI `php -n`, exec·네트워크 함수 차단, 임시·세션 경로는 실행 디렉터리 안으로 제한했다.
+- 증적: `evidence/corpus-h2-20261023T131635-asan`(`citable: true`).
+
+| 기록 | 8.4.4 | 8.4.27 | 해석 |
+|---|---|---|---|
+| **R46** PR #22710 (`zend_hash_clean()` 중 소멸자 bailout, PR 미병합) | **재현**(ASAN SEGV, `php_var_serialize_intern` ← `ps_srlzr_encode_php`) | **재현**(같은 시그니처) | 공개된 미수정 경로가 **현행 수정 릴리스에서도 재현**된다. `session_unset()` 중 E_USER_ERROR bailout 뒤 이미 소멸된 슬롯을 세션 인코더가 다시 소비한다. 공식 패치(8.4.27)가 덮지 않는 **부분 정리 실패 원자성** 부류로, CoreGuard Phase 2 hold-out 후보다. 재현 입력은 이미 공개 PR에 있으므로 D1 신고 대상이 아니다 |
+| R26 GH-12073 (OOM 중 closure 부분 초기화) | 미재현 | 미재현 | 2023-09 수정. 두 빌드 모두 수정 후 버전이라 기대와 일치하며, 수정 전 빌드가 필요하다 |
+| R35 GH-16726 (에러 핸들러 교체 UAF) | 미재현 | 미재현 | 원보고는 fuzzer SAPI 실행 경로 기준이다. 미재현은 안전 판정이 아니다 |
+| R23 GH-10026 (SOAP 후 gc_protect 잔류) | capability_gap(soap) | capability_gap | H2.5 `asanext` 빌드 후 재실행한다. 원 이슈 버전은 외부 호스트에 접속하므로 쓰지 않고, PR 테스트(127.0.0.1)만 쓴다 |
+| R49 GH-24361 (opcache_compile_file 후 GC 보호 잔류) | capability_gap(opcache) | capability_gap | 위와 같음 |
+| R18 #79760 (get_gc OOM 뒤 GC 정리 불일치) | no_reproducer | — | 원천에 스크립트가 없다(Laravel 테스트 중 관측). 재현 코드를 구성해야 한다 |
