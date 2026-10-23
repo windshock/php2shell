@@ -36,23 +36,13 @@ import provenance
 run, build, rc, secs, dirs = sys.argv[1:]
 log = open(run + '/run-tests.log', errors='replace').read()
 counts = {k: int(v) for k, v in re.findall(r'^Tests (\w+)\s*:\s*(\d+)', log, re.M)}
-results = {}
-try:
-    for line in open(run + '/results.txt', errors='replace'):
-        # -W format varies across versions: status first, test path last
-        # (either bare or in [brackets]).
-        m = re.match(r'(PASS|FAIL|SKIP|XFAIL|XLEAK|BORK|WARN|LEAK)\b.*?(\S+\.phpt)\]?\s*$', line)
-        if m:
-            results[m.group(2).lstrip('[')] = m.group(1)
-except FileNotFoundError:
-    pass
 summary = dict(scope='CoreGuard Phase 0 PHPT baseline', build=build, run_tests_rc=int(rc),
-               seconds=int(secs), dirs=dirs.split(), counts=counts,
-               per_test=len(results), **provenance.provenance())
+               seconds=int(secs), dirs=dirs.split(), counts=counts, **provenance.provenance())
 json.dump(summary, open(run + '/summary.json', 'w'), indent=2)
-json.dump(results, open(run + '/per-test.json', 'w'), indent=1, sort_keys=True)
-print(json.dumps(dict(run=run, counts=counts, per_test=len(results), rc=int(rc),
-                      citable=summary['citable']), indent=2))
+print(json.dumps(dict(run=run, counts=counts, rc=int(rc), citable=summary['citable']), indent=2))
 PY
+# per-test results (and the B comparison when PHPT_BASELINE=<B run dir>)
+python3 /mnt/c/Users/user/Downloads/php/linux/coreguard/phpt-parse.py "$run" \
+  ${PHPT_BASELINE:+--compare "$PHPT_BASELINE"}
 # the archive copy is only scratch for run-tests; keep logs and results
 rm -rf "$run/src"
