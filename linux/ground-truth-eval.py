@@ -11,7 +11,7 @@ records, per version:
   error_triggered  the fatal/OOM the path needs occurred where expected
   memory_error     the memory error itself (teardown consumption / UAF)
   block_point      fixed versions only: WHERE the patch stopped the path
-                   (delivery_blocked / consumption_removed / consumer_reset)
+                   (delivery_blocked / consumption_removed / consumption_absent)
 
 A fixed version passes only with input_valid AND reached AND a classified
 block_point AND no memory error: "no memory error" alone is not extinction.
@@ -129,9 +129,11 @@ def eval_p16(summary, expect):
         if expect == 'reproduce':
             row['expectation_met'] = base and row['memory_error']
         else:
-            # The producer still fatals on the fixed build; the patch resets
-            # PS state at MULTIPART_EVENT_START before the consumer uses it.
-            row['block_point'] = ('consumer_reset' if base and rec.get('asan') is None
+            # The producer still fatals on the fixed build and the consumer
+            # runs without consuming anything. WHY (residue never formed vs a
+            # reset) is not observable here - differential-triage.py shows
+            # residue_not_formed (findings §10.11), so the label stays neutral.
+            row['block_point'] = ('consumption_absent' if base and rec.get('asan') is None
                                   else None)
             row['expectation_met'] = (base and row['block_point'] is not None
                                       and not row['memory_error'])
@@ -163,9 +165,9 @@ def eval_p17(summary, expect):
         if expect == 'reproduce':
             row['expectation_met'] = base and row['memory_error']
         else:
-            # Producer residue still created; php_basic_early_rinit() resets
-            # BG(unserialize) before the parse-time decode.
-            row['block_point'] = ('consumer_reset' if base and run.get('asan') is None
+            # Mechanism attribution: see differential-triage.py (the fixed
+            # unserializer unwinds via fallible allocation; no residue).
+            row['block_point'] = ('consumption_absent' if base and run.get('asan') is None
                                   and run.get('result') == 'no_uaf_observed' else None)
             row['expectation_met'] = (base and row['block_point'] is not None
                                       and not row['memory_error'])

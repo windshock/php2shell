@@ -1079,3 +1079,58 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 - 요청 간 잔류 관점의 **음성 결과는 스코프 한정**(`not_found`)이다.
 
 **G5 판정:** 프로파일 3종을 같은 기준으로 비교했다(하네스 오류 0, `g5 passed=true`). FlowFusion 생성물을 Stage 1 다중 요청 실행에 연결하고 측정까지 마쳤으므로 **통과**다.
+
+### 10.11 v2 보완 — 1c code-edge 피드백, Stage 4 커버리지 맵·차등 트리아지, 정정 (2026-10-23)
+
+> 앞선 보고("§12.6.5 12단계 전부 실행")는 **과대 표기**였다. Stage 1c code-edge 피드백과 §12.3 Stage 4의 커버리지 맵·차등 트리아지가 빠져 있었다. 이 절에서 그 세 항목을 구현·측정했다.
+
+**1c — code-edge 피드백** (`build.sh` cov flavor, `lifecycle-explore.py --cov`)
+- **빌드:** `8.4.4-cov` = asan 빌드 + `-fsanitize-coverage=trace-pc-guard`.
+- **수집:** `ASAN_OPTIONS=coverage=1`로 프로세스마다 `.sancov`가 생긴다. CLI 서버는 SIGINT로 정상 종료해야 덤프가 남는다(gdb는 SIGINT를 통과시킨다). ASAN abort로 죽은 프로세스도 덤프된다(스모크: 정상 6,148 / P17 UAF 실행 5,835 edge).
+- **피드백:** 새 edge를 코퍼스 편입·가중치에 반영한다. summary에 `code_edge_coverage`를 기록한다.
+- **G4 재평가** `explore-g34-20261023T071112-8.4.4`(`--cov`, 600s × ON/OFF × seed 1~3, 동일 hold-out):
+
+| 지표(평균) | ON | OFF |
+|---|---|---|
+| code edges | 6,901.7 | 6,907.0 |
+| 고유 전이 T | 21.3 | 26.0 |
+| ASAN 시그니처 | 1.33 | 2.67 |
+| 첫 검증 오류까지 | 175s (2/3회만 발견) | 97s (3/3) |
+
+- **결과:** code-edge 피드백을 넣어도 ON 열세는 그대로다(G4 결론 유지).
+  - edge는 요청 1개(health)만으로 약 6.1k가 덮이고, 두 쪽 모두 약 6.9k에서 포화된다. 이 시퀀스 공간에서 edge는 요청 조합의 차이를 구분하지 못한다. 상태·시퀀스 조합이 핵심 신호다.
+  - G2(루프 폐쇄)는 edge 포함 상태에서도 재확인됐다(on-s1 최대 깊이 5, 재선택 15).
+
+**Stage 4 — 커버리지 맵** (`linux/coverage-map.py`)
+- Fuzz Introspector는 LTO·introspector 빌드 파이프라인이 필요해, 같은 목적을 sancov + llvm-symbolizer로 대체했다(대체 사실 명시).
+- 대상: §10.11 캠페인 6회, `.sancov` 569개, 고유 edge 6,910, 덮인 파일 208개·소스 줄 5,463.
+- **정적 후보 도달**(fault-site-map 후보 줄 + 6줄 창): count_before_fallible **14/44**, init_fallible_destroy **0/5**, global_ptr_request_free **4/7**, refcount_then_fallible **5/13**.
+  - 미도달 후보가 다음 정적·동적 우선순위의 공백 목록이다. 예: `zend_hash.c:955-956`(Path A 카운터, mod_php 전용 multipart 형상이라 CLI 문법으로는 미도달), `session.c:1006/1071/1117`(INIT→fallible→DESTROY 창), `basic_functions.c:2310`.
+- **요청 경로 함수 커버리지:**
+
+| 파일 | 덮인 함수 / 전체 |
+|---|---|
+| rfc1867.c | 27/28 |
+| php_variables.c | 17/28 |
+| session.c | 57/102 |
+| var.c | 12/36 |
+| var_unserializer.re | 19/29 |
+| zend_hash.c | 58/124 |
+| basic_functions.c | 11/84 |
+
+**Stage 4 — 차등 트리아지** (`linux/differential-triage.py`, 8.4.4 ↔ 8.4.27, gdb 상태 관측)
+- 비교 항목: 단계별 응답, 실패 지점, 요청 시작 진입 시와 **종료 시**의 정규화 상태(소유권·초기화), ASAN, 멈춤.
+- 결과: 양성 대조군 5종(Bug S, P16, P17, 탐색기 최소 P17 변형, Path B flock 교착)이 **모두 `residue_not_formed`**, 음성 대조군은 `no_difference`, 문제 0건.
+- **정정(판정 명칭):** §8·§10.2·§10.6은 8.4.27의 P16을 "소비 지점 리셋형(MULTIPART_EVENT_START)", P17을 "생산자 잔존 + 소비 차단형(`php_basic_early_rinit`)"으로 기록했다. 실측은 다르다.
+  - 8.4.27에서 생산자 요청의 **종료 시점에 이미** `BG(unserialize).level=0`, `data=NULL`, PS 포인터 NULL이다.
+  - 8.4.27 unserializer는 `zend_string_falloc(.., fallible)` + `ZEND_HAS_OOM()` 검사 + `zend_mm_delayed_error`(지연 fatal)로 실패 경로를 정상 해제한다. 잔류가 **생기지 않는다**.
+  - 조기 리셋(`php_basic_early_rinit`, main.c:1869)은 이 시퀀스들에서 실행될 대상이 없는 **이중 방어 계층**이다.
+  - 이에 따라 `ground-truth-eval.py`의 차단 지점 라벨 `consumer_reset`을 근거 없는 메커니즘 명칭으로 보고 중립 명칭 `consumption_absent`로 바꿨다. 메커니즘 귀속은 트리아지 결과로 한다. P15의 `delivery_blocked`는 유지한다.
+  - 관측 범위는 CLI 서버다. mod_php·FPM은 같은 코드 경로로 추정되지만 이 트리아지로 직접 관측하지는 않았다.
+
+**정정 — 퍼저 사전 이슈와 원본 소스 트리**
+- Phase 5 v1 이래 "사전(dict) 생성 이슈"의 원인을 확인했다. `generate_unserialize_dict.php`는 stdout이 아니라 `__DIR__/dict/unserialize`에 쓴다. 그래서 하네스는 빈 stdout을 실패로 판정했고, 실제 사전은 **원본 소스 트리**(`sources/php-8.4.4/sapi/fuzzer/dict/unserialize`, 미추적 파일 1개, 10-23 10:13 생성)에 남았다.
+- 이 파일 때문에 `build.sh`가 "Source modified"로 빌드를 거부했다.
+- 조치: 파일을 `evidence/source-tree-stray-20261023/`으로 옮겨 보존했다. 원본 4개 트리는 `git status` 0건이다. 이후로는 생성기 사본을 증적 디렉터리에서 실행하며, 사전 135항목 생성을 확인했다(커밋 `c680a13`).
+
+**커밋 단위 정정:** G1·G2와 G3·G4는 각각 하나의 커밋(`226060e`, `70d4466`)으로 묶여 "게이트당 커밋" 요구와 다르다. 이미 공개된 이력이라 재작성하지 않는다. 이번 보완부터는 항목별로 커밋했다(`c680a13` 사전, `d0755a0` 1c, `ef25ca0` 커버리지 맵, `94ba2f3` 트리아지).
