@@ -754,7 +754,7 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 | R12 적용 | **완료** | `42d3df1`(규칙), `46bcc30`(provenance·진단 스크립트). 인용 진단 2건을 커밋된 스크립트로 재실행해 일치 확인 |
 | 5. #4 H2 → H2.5 → #3 사전 등록 | **H2·사전 등록 완료, H2.5 부분 완료** | H2(`680aa44`, `8137746`, `383f254`): 사례 37건 중 8.4.27 재현 5건(R23·R49·R46·R51·R55, 모두 공개 기록), 8.4.4 전용 2건(R41·R42), 미재현 21, 재현 코드 없음 8, 무기화로 제외 1(R54). H2.5: 확장 빌드 `asanext`(`915c474`, `079403b`) 완료. **HTTP 탐색기의 PHP 코드 액션은 미완**. 사전 등록 v1(`e25bb06`): hold-out R23·R46·R51 고정, 튜닝 R49·R55. 공백: 8.4.27에서 재현되는 OOM·요청 수명 사례 없음 → Phase 1 성공 주장 불가 |
 | 6. #4 H3 | **완료**(OFF 기준선 유지, G4 보류 지속) | findings §11.4~§11.7. 첫 OFF 기준선(`…T133235`)은 하네스 결함(융합 요청 조기 종료)으로 **무효**, `852770e`에서 수정. ON 재설계 `--feedback state`(GC 상태·오류 복구·소유권 가중)는 튜닝 세트(R49→G, R55→A)로만 보정했다. 비교(`…T144334`, `…T154514`, 같은 풀): hold-out은 OFF·state v1·state v2 모두 **0/3**, 미지 시그니처 0. state는 프로그램 다양성을 64에서 28/21로 줄였다(변이 스케줄러 구조 때문). 남은 과제: 부류를 겨냥한 입력 생성(H2.5) |
-| 7. #3 Phase 0~5 | 대기(Phase 0-평가 초안만) | — |
+| 7. #3 Phase 0~5 | **Phase 0 완료, Phase 2b 완료·평가됨.** Phase 1(hold-out 없음), Phase 2(R46 부류), Phase 3(R51 부류) 미착수 | Phase 0: `docs/coreguard/phase0-baseline.md`, B 성능·PHPT 기준선(findings §11.8, PHPT 7,744 통과·0 실패). 사전 등록 v1.1(`9fb3285`, `230b335`): CLI 판정 매핑, 사례별 1회 평가. Phase 2b(`docs/coreguard/phase2b-design.md`, 패치 v2): observe는 회귀 0·hold-out R23 `detected_only` 3/3 → **detect-only Go**. enforce는 R23 `worker_contained` 3/3, PHPT 회귀 19 → **No-Go**. `prevented` 0(findings §11.9) |
 
 ### 13.9 증적 처리 증분화 (2026-10-23, 사용자 요청 반영)
 

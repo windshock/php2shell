@@ -38,4 +38,4 @@
 ## 4. 측정 기준선 (B = 8.4.27, `asanext`)
 
 - hold-out 3건의 B 결과: 모두 재현(H2 2차 증적 `corpus-h2-20261023T132556-asanext`).
-- 성능·호환 기준선(req/s, p50/p95, RSS, PHPT 통과율)은 CoreGuard 빌드 전에 B에서 측정한다. **미측정** — Phase 1/2 착수 전 수행 항목.
+- 성능·호환 기준선: **측정 완료(2026-10-23)**. 빌드 `8.4.27-normalext`, `linux/coreguard/perf-baseline.py`·`phpt-baseline.sh`. 수치는 findings §11.8에 있다(health 약 9.5k req/s, PHPT 7 디렉터리 7,922건 중 통과 7,744 / 건너뜀 174 / XFAIL 4 / 실패 0). C는 같은 스크립트로 측정한다.
