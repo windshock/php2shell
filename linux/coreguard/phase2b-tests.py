@@ -55,6 +55,17 @@ var_dump(@opcache_compile_file($bad));
 $x = 0; for ($i = 0; $i < 1000; $i++) { $x += $i; }
 var_dump($x, gc_status()["protected"]);
 ''', expect=None),  # characterization only: detection needs a refused root
+    # CG-3 hook chain: the VM interrupt path itself (max_execution_time)
+    # must still fire through the guard's chained interrupt hook, and a
+    # destructor-pending object at timeout exercises interrupt -> bailout
+    # -> destructor handling end to end. Characterization: the timeout
+    # firing at all proves the original handler still runs.
+    'T5_timeout_dtor_chain': dict(code='''<?php
+class N { public $s; function __destruct() { trigger_error("dtor", E_USER_ERROR); } }
+$o = new N; $o->s = $o;
+set_time_limit(2);
+$x = 0; while (true) { $x++; }
+''', expect=None),
 }
 
 
@@ -105,6 +116,12 @@ def main():
                     checks.append(('%s.%s==%s' % (mode, k, v), row[mode][k] == v))
         checks.append(('no ASAN in any mode', not any(row[m]['asan'] for m in row)))
         checks.append(('disabled stdout == B stdout', row['disabled']['stdout'] == row['B']['stdout']))
+        # CG-3 disabled/observe equivalence: observe may only add the event
+        # line, never change program output or exit status
+        checks.append(('observe stdout == disabled stdout',
+                       row['observe']['stdout'] == row['disabled']['stdout']))
+        checks.append(('observe rc == disabled rc',
+                       row['observe']['rc'] == row['disabled']['rc']))
         checks.append(('B has no CoreGuard event', not row['B']['event']))
         row['checks'] = [dict(check=c, ok=bool(v)) for c, v in checks]
         ok += sum(1 for _, v in checks if v)

@@ -3,12 +3,13 @@
 # separation): the official source (sources/php-8.4.27) is never edited; the
 # experiment copy ext/coreguard-src-8.4.27 is a clone of it, reset to the
 # same commit and patched from the committed patch files on every build.
-# Flavors: asanext (safety evaluation) / normalext (performance, PHPT) - the
-# same configure options as linux/build.sh so B and C differ only by the patch.
-# Usage: build-coreguard.sh [asanext|normalext]
+# Flavors: asanext (safety evaluation) / normalext (performance, PHPT) /
+# ztsnormalext (normalext + ZTS, CG-3 NTS/ZTS verification) - the same
+# configure options as linux/build.sh so B and C differ only by the patch.
+# Usage: build-coreguard.sh [asanext|normalext|ztsnormalext]
 set -euo pipefail
 flavor=${1:-asanext}
-[[ "$flavor" = asanext || "$flavor" = normalext ]] || exit 2
+[[ "$flavor" = asanext || "$flavor" = normalext || "$flavor" = ztsnormalext ]] || exit 2
 version=8.4.27
 base=/home/phplab/php-lab
 repo=/mnt/c/Users/user/Downloads/php
@@ -40,6 +41,7 @@ if [ "$flavor" = asanext ]; then
 else
   flags=(-g3 -O2 -fno-omit-frame-pointer)
   options+=(--disable-debug)
+  if [ "$flavor" = ztsnormalext ]; then options+=(--enable-zts); fi
 fi
 rm -rf "$build"; mkdir -p "$build"; cd "$build"
 CC=clang CXX=clang++ CFLAGS="${flags[*]}" CXXFLAGS="${flags[*]}" "$copy/configure" "${options[@]}"

@@ -3,7 +3,7 @@ set -euo pipefail
 version=${1:-8.4.4}
 flavor=${2:-asan}
 [[ "$version" =~ ^8\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected stable 8.x.y version'; exit 2; }
-[[ "$flavor" = asan || "$flavor" = normal || "$flavor" = cov || "$flavor" = asanext || "$flavor" = normalext ]] || exit 2
+[[ "$flavor" = asan || "$flavor" = normal || "$flavor" = cov || "$flavor" = asanext || "$flavor" = normalext || "$flavor" = ztsnormalext ]] || exit 2
 base=/home/phplab/php-lab
 source_dir="$base/sources/php-$version"
 build="$base/builds/$version-$flavor"
@@ -42,9 +42,12 @@ else
   options+=(--disable-debug)
   # normalext: release build with the asanext extension set - the
   # performance/compatibility baseline B for CoreGuard (#3 Phase 0).
-  if [ "$flavor" = normalext ]; then
+  # ztsnormalext: normalext with ZTS - B side of the CG-3 hook lifetime
+  # verification (plan 14.2 CG-3).
+  if [ "$flavor" = normalext ] || [ "$flavor" = ztsnormalext ]; then
     options+=("${ext_options[@]}")
   fi
+  if [ "$flavor" = ztsnormalext ]; then options+=(--enable-zts); fi
 fi
 CC=clang CXX=clang++ CFLAGS="${flags[*]}" CXXFLAGS="${flags[*]}" "$source_dir/configure" "${options[@]}"
 make -j2

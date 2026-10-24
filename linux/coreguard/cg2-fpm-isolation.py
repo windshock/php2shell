@@ -389,16 +389,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--faults', type=int, default=10)
     parser.add_argument('--max-children', type=int, nargs='+', default=[1, 4])
+    parser.add_argument('--build-b', default='8.4.27-normalext',
+                        help='baseline build name under install/')
+    parser.add_argument('--build-c', default='8.4.27-coreguard-normalext',
+                        help='CoreGuard build name under install/ (CG-3 ZTS)')
     args = parser.parse_args()
     stamp = time.strftime('%Y%m%dT%H%M%S', time.gmtime())
     root = BASE / 'evidence' / ('cg2-fpm-%s' % stamp)
     root.mkdir(parents=True)
     rows = []
     for mc in args.max_children:
-        for build, mode in (('8.4.27-normalext', 'B'),
-                            ('8.4.27-coreguard-normalext', 'disabled'),
-                            ('8.4.27-coreguard-normalext', 'observe'),
-                            ('8.4.27-coreguard-normalext', 'enforce')):
+        for build, mode in ((args.build_b, 'B'),
+                            (args.build_c, 'disabled'),
+                            (args.build_c, 'observe'),
+                            (args.build_c, 'enforce')):
             row = cell(build, mode, mc, args.faults, root)
             rows.append(row)
             print(json.dumps(row), flush=True)
