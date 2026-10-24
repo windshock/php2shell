@@ -1589,6 +1589,7 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 
 - **도구(커밋 `63db2f2`)**: `ztsnormalext` 플레이버 양쪽 빌드 스크립트에 추가(B·C가 패치만 다름, 나머지 configure 동일), `phase2b-tests.py`에 T5(타임아웃 연쇄, 특성화)·observe≡disabled stdout+rc 동치 검사 추가, `cg2-fpm-isolation.py`에 `--build-b/--build-c`(ZTS FPM 수명 런 재사용).
 - **ZTS 빌드**: 패치 0001~0003 ZTS 컴파일 통과. 배터리 **NTS 43/43·ZTS 43/43**(증적 `coreguard-p2b-tests-20261024T074127-asanext`·`…T075708-ztsnormalext`, citable). 한계: ZTS FPM 워커는 요청당 단일 스레드 — 요청 단위 TSRM 생명주기 검증(다중 스레드 동시 SAPI는 미측정).
-- **훅 연쇄**: T5에서 4모드 전부 ~2.0s rc=255 타임아웃 동일 발발 — 연쇄된 인터럽트 훅 아래 원본 경로 보존. 이벤트 무발생은 타임아웃 bailout이 대상 서명(caught bailout 뒤 GC 보호)을 안 남긴다는 특성화 음성.
-- **훅 수명**: ZTS FPM mc=1 결함 10에서 observe·enforce `guard_events=10`(정확, 잔여·누락 0) — `cg2-fpm-20261024T075732`. NTS 수명은 CG-2와 동일 근거.
+- **훅 연쇄·수명 (17:11 리뷰로 교정 후 재측정)**: 배터리에 T6(무장 연쇄: 잡힌 bailout+거부 루트로 아밍 후 `set_time_limit` — observe 이벤트 1건+원본 타임아웃 rc 255, enforce 가드 fatal 선행)와 T5(비무장 기저선, 가드 비활성 시 보존만 증명) — **배터리 52/52×NTS·ZTS**. 신규 `phase2b-fpm-lifetime.py`(같은 워커 5단계: 아밍→정상 5→재아밍→설치된 훅 통과 타임아웃 2.0s→다음 요청 건강, 이벤트 이름별 집계) — **16/16×NTS·ZTS**(증적 `cg3-p2b-fpm-lifetime-20261024T082955`, citable). 선행 3실행은 `NON-CITABLE.md` 표지 보존.
+- **귀속 교정(17:11 리뷰)**: 처음엔 ZTS FPM 런(`cg2-fpm-20261024T075732`)의 guard_events=10을 "2b 훅 수명" 근거로 썼으나 전부 `bailout_in_destructor`(Phase 3)였다 — 해당 런은 Phase 3 이벤트의 요청 간 결정성 증거로 재귀속. cg2 하네스는 이벤트 이름별 집계로 교정.
+- **하네스 교훈(2b 수명 하네스 개발 중)**: (a) FPM php.ini에 opcache 미로드 시 `opcache_compile_file` 미정의로 아밍 루트 즉사(battery CLI는 `-d zend_extension`로 로드했던 차이) (b) 아밍 검사는 `ZEND_INTERRUPT` 경로에서만 발화 — 직선 `return` 루트는 경계 없이 요청이 끝나 이벤트가 안 남는다(아밍 루트에 점프 루프 필요).
 - **PHPT enforce 19건 No-Go 유지**: 재실행 `coreguard-phpt-20261024T075348`(citable) — counts와 **비통과 이름 집합 23개 모두 기존 런과 동일(차이 0)**, 결정론적.
