@@ -54,7 +54,19 @@ def sync(base, dest, full_rehash=False, audit_dest=False):
     cache = {} if full_rehash or not cache_path.exists() else json.loads(cache_path.read_text())
     stats = dict(copied=0, unchanged=0, hashed=0, cache_hits=0, removed_from_cache=0)
     started = time.time()
-    for src, rel in sources(base):
+    pairs = list(sources(base))
+    # NTFS destinations are case-insensitive: two source paths differing only
+    # by case would silently overwrite each other and the manifest could then
+    # never verify (seen 2026-10-24 with corpus seeds lab-references-r/-R).
+    # Refuse to sync instead; rename one of the colliding source files.
+    seen_fold = {}
+    for _, rel in pairs:
+        folded = rel.as_posix().lower()
+        if folded in seen_fold and seen_fold[folded] != rel.as_posix():
+            raise SystemExit('case-insensitive destination collision: %s vs %s '
+                             '- rename one source file' % (seen_fold[folded], rel.as_posix()))
+        seen_fold[folded] = rel.as_posix()
+    for src, rel in pairs:
         target = dest / rel
         st = src.stat()
         key = rel.as_posix()
@@ -147,6 +159,17 @@ def self_test():
         s7 = sync(base, dest)
         check('fast path: unchanged sources are not copied', s7['copied'] == 0
               and s7['unchanged'] == 2)
+        (base / 'evidence' / 'run1' / 'lab-r').write_text('r')
+        (base / 'evidence' / 'run1' / 'lab-R').write_text('R')
+        try:
+            sync(base, dest)
+            check('case-colliding source pair aborts the sync', False)
+        except SystemExit:
+            check('case-colliding source pair aborts the sync', True)
+        (base / 'evidence' / 'run1' / 'lab-R').unlink()
+        s8 = sync(base, dest)
+        check('sync resumes after the collision is resolved',
+              s8['copied'] == 1 and 'lab-r' in (dest / MANIFEST).read_text())
     print('self_test=%d/%d' % (ok, total))
     return 0 if ok == total else 1
 

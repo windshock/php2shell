@@ -832,7 +832,7 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 | 1 | #5 P0-A/B/C + P1-D/E 판정기 수정 + Multi-Oracle 픽스처 | 모든 재산출의 전제 — 판정이 오염되면 하위 전부 무의미 |
 | 2 | CG-1 `holdout-eval` P0 수정 | CoreGuard 평가 수치의 분모·판정 신뢰성 |
 | 3 | #4 H1/H2 재분류 → 차분 기록 | **완료(2026-10-24)** — H1: fixed 33 → closed_resolution_unverified 32+fix_claimed 1(fixed_verified 0). H2: outcome class 재분류(memory 15·functional 2·custom 8·completed-no-oracle 32·abnormal-no-oracle 25·timeout 0), 재현 집합 불변. §10.12 무차분·§11.14 rc 미기록 한정 수위 조정·CoreGuard 어휘 강등은 주석으로(findings §12) |
-| 4 | #3 CG-2/CG-3/CG-4 + 불변조건 A~D 대조군 구축 | 방어 연구의 다음 게이트. **전제(2026-10-24)**: CG-2는 WSL 잔존 프로세스·무효 증적(`cg2-fpm-20261024T*`) 정리 → 하네스 fail-closed 보강 + listen queue·p95/p99 구현 후 실행(§14.2 #3 CG-2) |
+| 4 | #3 CG-2/CG-3/CG-4 + 불변조건 A~D 대조군 구축 | 방어 연구의 다음 게이트. **전제(2026-10-24)**: CG-2는 WSL 잔존 프로세스·무효 증적(`cg2-fpm-20261024T*`) 정리 → 하네스 fail-closed 보강 + listen queue·p95/p99 구현 후 실행(§14.2 #3 CG-2) — **전제 이행·CG-2 완료(2026-10-24)**: 증폭 음성(교체 1회/결함·큐 0·다음 헬스 100%), enforce 비용은 요청 수준, disabled/observe=B 동치(findings §12.4, evaluation-report §6). 잔여: CG-3·CG-4+불변조건 |
 | 5 | #2 2×2 프로토콜 사전등록 후 실행 | 실험 설계는 판정 인프라 확정 후 |
 
 **유지 원칙**: 기존 종결 판정(§11 전체, CoreGuard observe Go/enforce No-Go/prevented=0, OFF 기저선, not_found)은 본 반영으로 변경하지 않는다. 신규 미공개 결함 의심은 D1 책임 신고 우선, 블라인드 hold-out 절차(#4-H3 v2)와 안전 경계(§9.3·§11.2)는 그대로.

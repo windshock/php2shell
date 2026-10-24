@@ -1558,3 +1558,16 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 | CoreGuard 평가 보고서 | **판정 어휘 갱신 필요** — `worker_contained`가 `guard_terminated_execution`으로 강등되고 `prevented` 조건이 강화됐다(CG-1). 기존 Phase 5 결과는 예방 0·감지 중심이라 수치는 불변이나, 재평가 시 `b_baseline_invalid`·`inconclusive_termination` 신규 어휘가 적용된다. 홀드아웃 1회 평가 원칙상 재실행하지 않고 어휘 매핑 주석만 부여한다. |
 
 **유지 원칙 재확인**: 본 재분류로 §11 전체·CoreGuard observe Go/enforce No-Go/prevented=0·OFF 기저선·not_found 중 어느 것도 뒤집히지 않는다(§14.3 유지 원칙 준수). 변경은 레이블 정밀화와 미관측/미재현의 분모 분리뿐이다.
+
+### 12.4 CG-2 — FPM 격리 매트릭스 (2026-10-24, 계획 §14.2 #3 CG-2)
+
+결과 표·판정은 `docs/coreguard/evaluation-report.md` §6. 여기선 실행 기록과 하네스 수명주기만 남긴다(전 세션 무효 실행 사상(7디렉터리)은 계획 §14.2 CG-2 전제 (c)에 기록·삭제 완료).
+
+- **실행**: 증적 `evidence/cg2-fpm-20261024T055719`(mc 1·4 × B/disabled/observe/enforce, faults=10 — 8셀 전부 유효: 에러 필드 0, `pool_master` 기록, `guard_events`가 observe/enforce에서 결함 수와 정확히 일치) + 스모크 `…T055632`(mc=1, faults=3). 프로토콜: 결함당 (a) fault 요청 (b) 워커 PID 집합 대조 (c) 다음 헬스, 병렬로 백그라운드 `/health` 프로버(50ms 간격, 기저선 3초 창과 폴트 창 분리), listen queue(`ss` Recv-Q) 샘플. 실행 계정 phplab.
+- **하네스 결함 3건 발견·수정(당일)**:
+  1. **무한 스트림 결함은 무가드 모드에서 영원히 종료하지 않는다** — per-recv 소켓 타임아웃은 청크가 계속 흐르면 만료되지 않는다(실측: FPM Recv-Q 28 적층 관측 후 중단). phase3 S1 형태(유계 512회 루프의 256회째 `unset()`이 소멸자 fatal을 본문 중간에 발화)로 재설계 — 전 모드 자가 종료 + enforce의 mid-body `_exit(70)` 보존.
+  2. **포트 선점 검사가 TIME_WAIT 잔여를 점유로 오판**(`SO_REUSEADDR` 없는 bind) — 리스너 한정 검사로 수정. 거짓 양성이 fail-closed 검사를 무조건 차단해 스모크 2회 만에 검출됐다.
+  3. **FPM 데몬화로 셀 정리가 비결정적** — `daemonize = no`(terminate+wait 보장) + 정리 후 포트 해제 대기·pidfile SIGKILL 폴백. root 실행 시 phplab 워커가 `cg-events.log`를 생성하지 못해 `guard_events=0`으로 오판(패치 0002의 fopen 실패→stderr 폴백) — 랩 관례대로 phplab 실행으로 해결.
+- **fail-closed 기동의 실전 검증**: (2)의 거짓 양성 기간 3셀이 `port_in_use`로 차단됐다 — 전 세션 13:27 오측정(고아 스택 측정) 경로가 실제로 막히는 것을 확인.
+- **evidence-sync 대소문자 충돌 버그 발견·수정**: 전체 검증에서 `lab-references-r/-R` 시드 3쌍이 사본에서 병합돼 불일치(NTFS 대소문자 무구분 — 10/23 R/r 시드 추가부터 잠복, `-r` 사본에 `-R` 내용이 들어 있었음). 동기화에 충돌 검사(fail-closed 중단)와 자기테스트 2케이스 추가, 원본 3개 `-R`을 `-R-upper`로 개명(내용 바이트 불변), 오염 사본 재복사 후 전체 검증 75,071/75,071 그린.
+- **요약 판정**(상세는 evaluation-report §6): 재시작 증폭 음성(교체 정확히 1회/결함·listen queue 0·다음 헬스 100% 회복), enforce 비용은 요청 수준(해당 요청 reset·본문 중단)으로 한정, disabled/observe는 B와 전 지표 동치. 한계: 단일 프로버(≈20 rps)·순차 결함·`pm = static` 프로파일 한정.
