@@ -32,6 +32,23 @@ def provenance(argv=None):
                 citable=bool(commit) and dirty is False)
 
 
+def disk_gate(mount='/mnt/c', expect_gb=5.0, label='campaign'):
+    """Fail closed when the host drive backing the WSL vhdx AND the
+    evidence mirror is low: every evidence GB costs ~2GB there (vhdx +
+    var/linux-evidence). The 2026-10-24 ext4 remount-ro incident came from
+    a full C:. Returns the free MB when the gate passes."""
+    try:
+        out = subprocess.check_output(['df', '-B1M', mount], text=True)
+        avail_mb = int(out.splitlines()[1].split()[3])
+    except (OSError, ValueError, IndexError):
+        return None  # df unavailable: unmeasurable, do not block
+    need_mb = int(expect_gb * 2 * 1024 + 10240)
+    if avail_mb < need_mb:
+        raise SystemExit('disk_gate: %s free %dMB < required %dMB (evidence x2 '
+                         '+ 10GB) - refusing (%s)' % (mount, avail_mb, need_mb, label))
+    return avail_mb
+
+
 def preserve_inputs(paths, evidence_dir):
     """Copy input files into <evidence_dir>/inputs/; returns the copies."""
     dest = Path(evidence_dir) / 'inputs'

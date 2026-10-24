@@ -692,6 +692,16 @@ def archive_sessions(out):
     arc = out / 'sessions.tar.gz'
     with tarfile.open(arc, 'w:gz') as tf:
         tf.add(sess, arcname='sessions')
+    # verify the archive BEFORE deleting anything - a full disk can
+    # truncate the write (23:04 review); a bad archive must keep originals
+    members = [m for m in tarfile.open(arc).getmembers() if m.isfile()]
+    orig = [p for p in sess.rglob('*') if p.is_file()]
+    if (len(members) != len(orig)
+            or sum(m.size for m in members) != sum(p.stat().st_size for p in orig)):
+        arc.unlink(missing_ok=True)
+        print('WARNING: sessions archive verification failed; originals kept',
+              file=sys.stderr)
+        return False
     shutil.rmtree(sess)
     return True
 
@@ -906,6 +916,7 @@ def campaign(args):
                                         args.seed, os.getpid())
     out_base = Path(args.out) if args.out else BASE / 'evidence' / ('explore-' + run_id)
     out_base.mkdir(parents=True, exist_ok=True)
+    provenance.disk_gate(label=run_id)  # 2026-10-24 incident: full C: -> ext4 remount-ro
     execs_log = (out_base / 'execs.jsonl').open('a')
     sched_log = (out_base / 'scheduler.jsonl').open('a')
     exclude = {tuple(p.split('>')) for p in args.exclude_pairs}

@@ -48,10 +48,22 @@ def sources(base):
         yield manifest, Path('builds') / manifest.parent.name / 'build-manifest.json'
 
 
-def sync(base, dest, full_rehash=False, audit_dest=False):
+def sync(base, dest, full_rehash=False, audit_dest=False, allow_shrink=False):
     dest.mkdir(parents=True, exist_ok=True)
     cache_path = dest / CACHE
     cache = {} if full_rehash or not cache_path.exists() else json.loads(cache_path.read_text())
+    if audit_dest and not allow_shrink:
+        # shrink guard (2026-10-24 review): a filesystem incident can lose
+        # ORIGINAL files; audit mode would then drop the mirror copies too
+        # (second loss). Refuse until the loss is verified as intended.
+        missing = [k for k in cache
+                   if (k.startswith('evidence/') or k.startswith('logs/'))
+                   and not (base / k).exists()]
+        if missing:
+            raise SystemExit('originals missing vs the last snapshot (%d, e.g. %s): '
+                             'refusing --audit-dest (it would delete the mirror copies '
+                             'too) - verify the loss, then pass --allow-shrink'
+                             % (len(missing), missing[:3]))
     stats = dict(copied=0, unchanged=0, hashed=0, cache_hits=0, removed_from_cache=0)
     started = time.time()
     pairs = list(sources(base))
@@ -153,6 +165,17 @@ def self_test():
         s5 = sync(base, dest, audit_dest=True)
         check('deleted destination file leaves the manifest', s5['removed_from_cache'] == 1
               and 'extra.txt' not in (dest / MANIFEST).read_text())
+        (base / 'evidence' / 'run1' / 'a.json').unlink()
+        try:
+            sync(base, dest, audit_dest=True)
+            check('missing original blocks --audit-dest (shrink guard)', False)
+        except SystemExit:
+            check('missing original blocks --audit-dest (shrink guard)', True)
+        sync(base, dest, audit_dest=True, allow_shrink=True)
+        check('--allow-shrink keeps the mirror copy of a lost original',
+              'evidence/run1/a.json' in (dest / MANIFEST).read_text())
+        (base / 'evidence' / 'run1' / 'a.json').write_text('{"a": 22}')
+        sync(base, dest)
         s6 = sync(base, dest, full_rehash=True)
         check('--full-rehash re-copies and re-hashes every source file',
               s6['copied'] == 2 and s6['unchanged'] == 0)
@@ -182,11 +205,15 @@ def main():
     parser.add_argument('--full-rehash', action='store_true')
     parser.add_argument('--audit-dest', action='store_true',
                         help='walk the destination too (destination-only/deleted files)')
+    parser.add_argument('--allow-shrink', action='store_true',
+                        help='let --audit-dest proceed even when original files '
+                             'went missing (verified loss, e.g. intentional removal)')
     parser.add_argument('--self-test', action='store_true')
     args = parser.parse_args()
     if args.self_test:
         return self_test()
-    print(json.dumps(sync(args.base, args.dest, args.full_rehash, args.audit_dest), indent=2))
+    print(json.dumps(sync(args.base, args.dest, args.full_rehash, args.audit_dest,
+                          args.allow_shrink), indent=2))
     return 0
 
 
