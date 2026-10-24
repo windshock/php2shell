@@ -30,7 +30,7 @@
 | 0 | 기준선·사전 등록 | 완료 | `phase0-baseline.md`, B 성능·PHPT 기준선 |
 | 1 | 요청 소유권(잔류 탐지, observe 전용) | **detect-only, 성공 주장 불가** | hold-out 없음(선언된 공백). 양성 대조 4/4. 8.4.27 탐색·PHPT 이벤트 0(공식 조기 리셋이 지울 잔류가 생기지 않음) |
 | 2 | 할당 실패 원자성 | **No-Go(중복)** | 할당 실패 주입 10개 부류에서 모든 실패가 지연 OOM fatal로 끝남. 메모리 오류 0. 공식 수정과 중복이라 구현하지 않음 |
-| 2b | 잡힌 bailout 뒤 GC 보호 | observe **Go(detect-only)** / enforce **No-Go** | observe: PHPT 회귀 0, 성능 노이즈 안, R23 탐지 3/3. enforce: PHPT 회귀 19(SOAP 정상 흐름 종료) |
+| 2b | 잡힌 bailout 뒤 GC 보호 | observe **Go(detect-only)** / enforce **No-Go** | observe: PHPT 회귀 0, 성능 노이즈 안, R23 탐지 3/3. enforce: PHPT 회귀 19(SOAP 정상 흐름 종료). **탐지 범위 한계(§7 T5 교정 참조): 재개 후 인터럽트 검사 지점(함수 호출 계열 핸들러·루프 점프)을 지나는 코드에 한함 — 그 지점을 지나지 않고 끝나면 이벤트 없음** |
 | 3 | 소멸자 bailout 격리 | observe **Go(detect-only)** / enforce **조건부(가용성 대가)** | observe: 회귀 0, R46 탐지 3/3. enforce: 추가 PHPT 회귀 0, R46 피해 전 종료 3/3, 정상 부하에서 워커 종료 0. 단 소멸자 안의 OOM도 종료를 일으켜 재시작 유도가 가능하다(설계 §5) |
 | 4 | 할당기·HW | 낮은 우선순위 유지 | 이중 해제(R55)만 결정적으로 검출. R41·R42는 검출 없음. GWP-ASan 추가 이득 없음 |
 | 5 | 반증 가능한 평가 | 이 문서 | `prevented` 0 |
@@ -86,7 +86,7 @@
 
 ## 8. CG-4 — 불변조건 A~D 공통 대조군 (2026-10-24, 사전등록 `cg4-invariant-design.md`)
 
-> 5셀(V=8.4.4-asanext·F=8.4.27-asanext·C disabled/observe/enforce) × 6레코드(트리거 R46·R23·R49 + 특이성 R01·R26·R35) = 30셀, 동결 기대표 평가. **30/30 통과**(증적 `cg4-invariants-20261024T090149`, citable; 사전등록 오기 1건 정정 후 재실행 — 첫 실행 `…T085932` 29/30 보존).
+> 5셀(V=8.4.4-asanext·F=8.4.27-asanext·C disabled/observe/enforce) × 6레코드(트리거 R46·R23·R49 + 특이성 R01·R26·R35) = 30셀, 동결 기대표 평가. **동결 평가 29/30 — 기대표 오기 1건(R23/C-enforce rc 70→255), 정정 후 재실행 30/30**(근거 실행: 정정 후 `cg4-invariants-20261024T090149` citable, 첫 실행 `…T085932` 29/30 보존). **측정 범위: A·D는 트리거 대조 측정(V/F/C×3), B는 특이성(침묵)만, C는 기존 P16 V/F 차등 증적 인용(CoreGuard 셀 측정 없음)** — "A~D 전부 측정"이 아니다.
 
 | 불변조건 | 레코드 | V | F | C-disabled | C-observe | C-enforce |
 |---|---|---|---|---|---|---|

@@ -832,7 +832,32 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 | 1 | #5 P0-A/B/C + P1-D/E 판정기 수정 + Multi-Oracle 픽스처 | 모든 재산출의 전제 — 판정이 오염되면 하위 전부 무의미 |
 | 2 | CG-1 `holdout-eval` P0 수정 | CoreGuard 평가 수치의 분모·판정 신뢰성 |
 | 3 | #4 H1/H2 재분류 → 차분 기록 | **완료(2026-10-24)** — H1: fixed 33 → closed_resolution_unverified 32+fix_claimed 1(fixed_verified 0). H2: outcome class 재분류(memory 15·functional 2·custom 8·completed-no-oracle 32·abnormal-no-oracle 25·timeout 0), 재현 집합 불변. §10.12 무차분·§11.14 rc 미기록 한정 수위 조정·CoreGuard 어휘 강등은 주석으로(findings §12). *정정(2026-10-24): 수정 판정기 재실행으로 memory_error 14·custom 9 — 1행 사실검증 강등, 원본 변조 복구와 함께 findings §12.5* |
-| 4 | #3 CG-2/CG-3/CG-4 + 불변조건 A~D 대조군 구축 | 방어 연구의 다음 게이트. **전제(2026-10-24)**: CG-2는 WSL 잔존 프로세스·무효 증적(`cg2-fpm-20261024T*`) 정리 → 하네스 fail-closed 보강 + listen queue·p95/p99 구현 후 실행(§14.2 #3 CG-2) — **전제 이행·CG-2 완료(2026-10-24)**: 증폭 음성(교체 1회/결함·큐 0·다음 헬스 100%), enforce 비용은 요청 수준, disabled/observe=B 동치(findings §12.4, evaluation-report §6). **CG-3 완료(2026-10-24, 17:11 리뷰 교정 반영)**: ZTS 빌드·배터리(T5 비무장 기저선+T6 무장 연쇄) 52/52×NTS·ZTS·FPM 5단계 훅 수명 하네스 16/16×NTS·ZTS(아밍→정상→재아밍→설치된 훅 통과 타임아웃→다음 요청 건강, 이벤트 이름별 집계)·PHPT 19건 회귀 결정론적 유지로 enforce No-Go 지속(findings §12.6, evaluation-report §7). **CG-4 완료(2026-10-24, 순위 4 종결)**: 사전등록 동결 평가기로 A~D 대조군 30/30(R46 차단 rc 70·R23/R49 가드 종료·특이성 3레코드 전 셀 침묵, 사전등록 오기 1건 정정각) — findings §12.7, evaluation-report §8, `cg4-invariant-design.md`. **순위 4 전체 완료** → 잔여: 순위 5(#2 2×2)·이슈 클로저 |
-| 5 | #2 2×2 프로토콜 사전등록 후 실행 | 실험 설계는 판정 인프라 확정 후. **완료(2026-10-24)** — 사전등록 동결(`28f1a90`, `docs/exploration-2x2-prereg.md`) 후 12/12 유효 실행(H1은 WSL I/O 사고 후 사전등록 무효화 조항대로 재실행): **양축 ON(state) 우위 미증명 → OFF 기저선 유지**, F1 다양성 손실 재확인(28.7→24.0), 생성기축 F0>H0 고유 키 +43%(기술 비교), 발견 0(8.4.27 예상 음성). findings §12.8 |
+| 4 | #3 CG-2/CG-3/CG-4 + 불변조건 A~D 대조군 구축 | 방어 연구의 다음 게이트. **전제(2026-10-24)**: CG-2는 WSL 잔존 프로세스·무효 증적(`cg2-fpm-20261024T*`) 정리 → 하네스 fail-closed 보강 + listen queue·p95/p99 구현 후 실행(§14.2 #3 CG-2) — **전제 이행·CG-2 완료(2026-10-24)**: 증폭 음성(교체 1회/결함·큐 0·다음 헬스 100%), enforce 비용은 요청 수준, disabled/observe=B 동치(findings §12.4, evaluation-report §6). **CG-3 완료(2026-10-24, 17:11 리뷰 교정 반영)**: ZTS 빌드·배터리(T5 비무장 기저선+T6 무장 연쇄) 52/52×NTS·ZTS·FPM 5단계 훅 수명 하네스 16/16×NTS·ZTS(아밍→정상→재아밍→설치된 훅 통과 타임아웃→다음 요청 건강, 이벤트 이름별 집계)·PHPT 19건 회귀 결정론적 유지로 enforce No-Go 지속(findings §12.6, evaluation-report §7). **CG-4 완료(2026-10-24, 순위 4 종결)**: 사전등록 동결 평가기로 A~D 대조군 **동결 평가 29/30(기대표 오기 1건 정정 후 재실행 30/30)** — 측정 범위 A·D 트리거 대조·B 특이성만·C 기존 P16 인용(CoreGuard 셀 없음). R46 차단 rc 70·R23/R49 가드 종료·특이성 3레코드 전 셀 침묵 — findings §12.7, evaluation-report §8, `cg4-invariant-design.md`. **순위 4 전체 완료** → 잔여: 순위 5(#2 2×2)·이슈 클로저 |
+| 5 | #2 2×2 프로토콜 사전등록 후 실행 | 실험 설계는 판정 인프라 확정 후. **완료(2026-10-24)** — 사전등록 동결(`28f1a90`) 후 12/12 유효 실행(H1은 WSL I/O 사고 후 사전등록 무효화 조항대로 재실행): **양축 ON(state) 우위 미증명 → OFF 기저선 유지**, F1 다양성 손실 재확인(28.7→24.0), 생성기축 비교는 F(융합풀) vs H(**기본 액션 문법 — 계획 정의 "과거 부류 문법"과 달라 생성기 축 질문은 미답**, 18:41·21:03 리뷰 정정)로 키 +43%(전제·분해 함께 기록), 발견 0(8.4.27 예상 음성). findings §12.8 |
 
 **유지 원칙**: 기존 종결 판정(§11 전체, CoreGuard observe Go/enforce No-Go/prevented=0, OFF 기저선, not_found)은 본 반영으로 변경하지 않는다. 신규 미공개 결함 의심은 D1 책임 신고 우선, 블라인드 hold-out 절차(#4-H3 v2)와 안전 경계(§9.3·§11.2)는 그대로.
+
+## 15. 2026-10-24 신규 연구 이슈 #6·#7 반영 (사용자 등록, 검토 20:30·20:35)
+
+> 배경: v2.2 §14.3 종결 후 사용자가 #6(불변조건 기반 피드백), #7(능동 상태 모델 학습·구별 실험)을 등록. 30분 검토자의 코드 사실 대조(20:30·20:35)에 따라 아래로 확정. **전제 순서: ext4 사고 후 원본 무결성 대조(v27 읽기전용) → #7 P0(읽기 전용, 착수 비용 최저)와 #6 P0(정의 동결) 병행 가능 → #6 P1 shadow → #7 P1 → 각 P2/P3.**
+
+### 15.1 #6 — 불변조건 기반 피드백 (조건부 Go)
+
+- 질문: GDB 상태·수명주기·오류 지점 데이터로 "불변조건 위반에 접근하는 상태 전이"를 피드백으로 쓰면 같은 예산에서 더 다양한 유효 오류 경로를 적은 중복으로 탐색하는가. **기존 탐색기 루프의 효율화** — 신규 퍼저·형식검증 엔진 아님.
+- P0 실행 전 동결: `invariant_signals` 계층(성립조건→위반 접근→후보→독립 확인), MVP 부류 I-GC(잡힌 bailout 뒤 복구)·I-REQ(요청 경계 소유 상태), 출력 필드(`invariant_id/stage/preconditions_observed/observer_status/evidence_ids/same_worker/confidence`), `harness_failed·not_reached·inconclusive` 무보상, ASAN 부재·종료형 fatal·주소 재등장 성공 아님.
+- P1: `observe()`·`verdicts.integrity()` 위 별도 feature extractor, **shadow mode**(계산·로깅만) 선행 → 통과 시 소규모 `--feedback invariant`. `off`·`state` 보존, `verdicts.py` 성공 정의 불변.
+- P2: 2×2와 독립된 새 사전등록 3군(OFF·state·invariant)×지표 7종(분모 포함). 오프라인 재점수는 반사실 아님 — 이점 없으면 No-Go.
+- 검토자 주의(반영 필수): ①I-GC는 기존 G 키와 겹침 — 재사용하거나 차이 명시(이중 보상 방지) ②"정상 재개" 관측 지점 사전 동의(인터럽트 검사 지점 제약, CG-3 교훈) ③생성기 게이트 — I-GC 진전은 부류 문법에선 쉽고(§11.14) FlowFusion 풀에선 0이었음(§11.6): 3군 비교 생성기 사전등록 고정 + 부류 문법의 hold-out 설계 지식 고지 ④shadow extractor는 기존 STATE/EVENT 출력만 사용(gdb 새 중단점 금지 — 처리량 하한 execs −25%).
+
+### 15.2 #7 — 능동 상태 모델 학습·구별 실험 (Research Go, 단계적)
+
+- 질문: 같은 상태로 보이는(h(p1)==h(p2)) 다른 이력이 같은 후속 요청에서 다르게 동작(O(p1+q)≠O(p2+q), 독립 반복 안정)하는가 — 구별 반례로 상태 모델을 세분화해 중복 실행·잘못된 부모 선택을 줄이는가. **부분적·반증 가능한 모델 학습** — 완전 증명 아님. 주소·세션ID·PID 원값은 동등성 키 불가; 관측 불가=unknown(같음 아님).
+- P0(오프라인 읽기 전용): fingerprint 스키마(`state_fingerprint/prefix_trace/worker_epoch/observation_completeness/source_commit/binary_sha256`), 같은 fingerprint·다른 prefix 쌍 집계, 가짜 동일성(주소 재사용·carried 오분류) 격리. **Go 게이트: 유효 쌍·후속 관측·재실행 질의 계약 + 질의 예산 확보.**
+- P1: 구별 실험 MVP(유한 알파벳, MAX_LEN=6 내 suffix 1~2 — 실행 전 동결, 자기 대조로 비결정성 우선 측정), 합성 단위 시험 8종(무효 사례 반례 승격 금지).
+- P2~P3: shadow 모델 갱신→`model-guided` 실험 플래그, 독립 사전등록(OFF·state·model-guided, 1차 지표=유효·독립 재현 반례/실행 비용).
+- 검토자 주의(반영 필수): ①현재 S 키에 GC 상태·이벤트 없음 — fingerprint 포함·제외 필드 먼저 동결(안 하면 "같은 fingerprint 다른 미래"가 GC·이벤트 차이로 대량 유발) ②fault·memory_limit은 시퀀스 수준이지만 8.4.27은 요청마다 재설정(main.c:1915) — 주입/무주입 분리 ③질의 비용(gdb 관측 ~100실행/30분, 반례 1건 검증에 수십 실행) ④관측 지점 공백(요청 경계 스냅샷만) 사전등록 명시.
+
+### 15.3 공통 보호·인프라 잔여
+
+- 보호: 기존 2×2·그 재실행 불변, R23·R46·R51 개발·튜닝 금지(재발견 주장 금지), R49·R55 양성 대조만, D1 절차, 신규 미공개 후보는 로컬 보관.
+- 인프라 잔여(§13.9): ①탐색 캠페인 아카이브(exec-* 단위 tar+내부 매니페스트, 검증기 병행 개정 — 최대 절감) ②vhdx 압축 일정(사용자 협의, WSL 정지 필요) ③크래시 덤프 상한(.wslconfig 또는 정기 삭제) ④장기 배치 전 C: 여유 게이트는 `explore-2x2.sh`에 도입 완료(`0b15fe6`) — 향후 드라이버에 동일 패턴 적용.

@@ -38,7 +38,7 @@
 
 근거: H2 reclassified(§1 표), Phase 5 hold-out 1회 평가(R46·R23 enforce=worker_contained rc 70, observe=detected_only), phase2b T1(R49 observe/enforce). 평가기: 어느 셀이든 기대 외 결과·미분류·계측 누락은 **실패(fail-closed)**, 종료 코드 비영.
 
-> **§3 정정(2026-10-24, 첫 실행 `cg4-invariants-20261024T085932` 이후 — 해당 실행은 보존)**: R23/C-enforce의 rc를 70으로 등록한 것은 R46의 Phase 3 `_exit(70)` 서명을 과잉 일반화한 사전등록 오기다. 실측: 이벤트 `gc_protected_after_caught_bailout` + cg_fatal(E_ERROR) + rc 255 + ASAN 없음 — Phase 2b enforce의 정상 경로(R49에 동결했던 것과 동일). 기능 발산이 가드 종료 이전에 관측됨(worker_contained≠prevented, Phase 5 동결 판정과 일치). 측정은 정확했고 등록이 틀렸다. 기대표는 위 행과 하네스 주석에서 정정 후 재실행한다.
+> **§3 정정(2026-10-24, 첫 실행 `cg4-invariants-20261024T085932` 이후 — 해당 실행은 보존)**: R23/C-enforce의 rc를 70으로 등록한 것은 R46의 Phase 3 `_exit(70)` 서명을 과잉 일반화한 사전등록 오기다. **근거 확 인 실수: R23의 홀드아웃 근거 증적(`coreguard-holdout-20261023T164640`, enforce rc=255)을 읽지 않고 R46 값(`…T231409`, rc=70)을 일반화했다.** 실측: 이벤트 `gc_protected_after_caught_bailout` + cg_fatal(E_ERROR) + rc 255 + ASAN 없음 — Phase 2b enforce의 정상 경로(R49에 동결했던 것과 동일). 기능 발산이 가드 종료 이전에 관측됨(worker_contained≠prevented, Phase 5 동결 판정과 일치). 측정은 정확했고 등록이 틀렸다. 기대표는 위 행과 하네스 주석에서 정정 후 재실행한다.
 
 ## 4. hold-out 동결·노출 기록
 

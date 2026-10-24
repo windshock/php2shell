@@ -1598,14 +1598,14 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 
 사전등록 `docs/coreguard/cg4-invariant-design.md`(실행 전 평가기 동결), 하네스 `linux/coreguard/cg4-invariant-controls.py`. 상세 표·판정은 evaluation-report §8.
 
-- **구성**: 근거→레코드 매핑(A: R10·R26·R46 / B: R01·R35·R40 / C: R08·R53 / D: R18·R23·R49) 후 실행 가능 6레코드 × 5셀(V·F·C-disabled/observe/enforce) = 30셀 — **30/30 통과**(증적 `cg4-invariants-20261024T090149`, citable).
-- **핵심 결과**: R46(A)=V·F·C-disabled 모두 ASAN(공식 8.4.27도 #22710 미수정) → C-observe 탐지·C-enforce **rc 70 차단(ASAN 없음)**; R23·R49(D)=C-observe 탐지, C-enforce 가드 종료; **R01·R26·R35 특이성 음성 대조 — 전 셀 이벤트 0(오탐 없음)**. 이벤트 이름: R46=`bailout_in_destructor`(Phase 3), R23·R49=`gc_protected_after_caught_bailout`(Phase 2b).
-- **사전등록 정정(첫 실행 보존)**: R23/C-enforce를 rc 70으로 등록한 것은 R46의 Phase 3 서명 과잉 일반화 — 실측 rc 255+cg_fatal(Phase 2b E_ERROR, R49와 동일 경로). 측정 정확·등록 오기 → 정정각 후 재실행(첫 실행 `…T085932` 29/30 보존).
+- **구성**: 근거→레코드 매핑(A: R10·R26·R46 / B: R01·R35·R40 / C: R08·R53 / D: R18·R23·R49) 후 실행 가능 6레코드 × 5셀(V·F·C-disabled/observe/enforce) = 30셀 — **동결 평가 29/30(기대표 오기 1건: R23/C-enforce rc 70→255), 정정 후 재실행 30/30**(정정 후 `cg4-invariants-20261024T090149` citable, 첫 실행 보존). **측정 범위: A·D 트리거 대조 측정, B 특이성(침묵)만, C 기존 P16 증적 인용(CoreGuard 셀 없음)**.
+- **핵심 결과**: R46(A)=V·F·C-disabled 모두 ASAN(공식 8.4.27도 #22710 미수정) → C-observe 탐지·C-enforce **rc 70 차단(ASAN 없음)**; R23·R49(D)=C-observe 탐지, C-enforce 가드 종료; **R01·R26·R35 특이성 음성 대조 — 전 셀 이벤트 0(비대상 3기록×5셀 범위에서 오탐 0)**. 이벤트 이름: R46=`bailout_in_destructor`(Phase 3), R23·R49=`gc_protected_after_caught_bailout`(Phase 2b).
+- **사전등록 정정(첫 실행 보존)**: R23/C-enforce를 rc 70으로 등록한 것은 **R23의 홀드아웃 근거 증적(`coreguard-holdout-20261023T164640`, rc=255)을 읽지 않고 R46 값(rc=70)을 일반화**한 것 — 실측 rc 255+cg_fatal(Phase 2b E_ERROR, R49와 동일 경로). 측정 정확·등록 오기 → 정정각 후 재실행(첫 실행 `…T085932` 29/30 보존).
 - **범위 정렬·노출**: Phase 1 관측 전용·Phase 2 표본 한계·상류 논거 정렬은 설계문서 §5. hold-out R23·R46는 계측 재사용(노출 3회 문서화), **R51 미실행 유지**. C의 차등은 P16 기존 증적 인용.
 
 ### 12.8 순위 5 — #2 2×2 프로토콜 (2026-10-24, 사전등록 `docs/exploration-2x2-prereg.md`)
 
-- **실행**: `explore-2x2-20261024T093018` — 4셀(F=융합풀/H=수명주기문법 × off/state) × 시드 3 × 600초, 동일 바이너리(`9e49bdc3`)·공통 동결 풀(seed 11, 200). **사고 기록**: 배치 중 WSL ext4가 읽기전용 리마운트되어 H1 3런 중단(H1-s1 부분본 `H1-s1-iofail` NON-CITABLE 보존) — 사전등록 무효화 조항에 따라 H1만 동일 시드 재실행(`68b2572` 부분재실행 지원), 최종 **12/12 유효**(harness_errors 0·예산 준수·binary SHA 일치).
+- **실행**: `explore-2x2-20261024T093018` — 4셀(**F=융합풀 / H=기본 요청(액션) 문법, PHP 코드 생성 없음** — 계획 §14.2의 "과거 부류 문법"(`payload-grammar.py`)과 달라 **생성기 축 질문은 이 배치로 미답**, 18:41·21:03 리뷰 정정) × off/state × 시드 3 × 600초, 동일 바이너리(`9e49bdc3`)·공통 동결 풀(seed 11, 200). **사고 기록**: 배치 중 WSL ext4가 읽기전용 리마운트되어 H1 3런 중단(H1-s1 부분본 `H1-s1-iofail` 보존) — **근원은 호스트 C: 디스크 풀**(vhdx 확장 불가; 증적 20GB 중 19.26GB가 `lifecycle-explore.py:700-702`의 3MB 고정 세션 복사 18,344개 — 검토자 규명·정리 `builds/` 5.7GB·크래시 덤프 1.8GB, 커밋 `436b779`·`d53c699`). 사전등록 무효화 조항에 따라 H1만 동일 시드 재실행(`68b2572` 부분재실행 지원), 최종 **12/12 유효**(harness_errors 0·예산 준수·binary SHA 일치). **R12 출처 공백(21:03 리뷰)**: 탐색기·`batch-check` summary에 source_commit이 없어(이전 담당 설계) 사후 출처 노트로 보완(배치 본체 `28f1a90`, H1 재실행 `68b2572`).
 - **결과(동결 지표)**:
 
 | 셀 | execs 평균 | unique keys 평균 | findings | time-to-first |
@@ -1616,5 +1616,6 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 | H1 | 120.3 | 20.0 | 0 | 미발견×3 |
 
 - **동결 판정: 양 생성기축 모두 ON(state) 우위 미증명 → OFF 기저선 유지**(①서명 수 동점 0=0, ②첫 발견 단축 없음 — 3/3 시드 미발견). F1은 execs +32%에도 고유 키 −16%(28.7→24.0) — G4·H3의 다양성 손실 재확인. H1은 고유 키 이득 0.
-- **생성기축(기술 비교, F0 vs H0)**: 융합 풀이 동일 예산에서 고유 피드백 키 +43%(20.0→28.7), execs 유사 — 행동 부류 커버리지는 융합 생성기가 넓다. 단 8.4.27(수정 빌드)에서는 어느 셀도 메모리 오류 발견 0(예상 음성, H3·not_found와 일관).
+- **생성기축(기술 비교, F0 vs H0 — 해석 정정 21:03 리뷰)**: 융합 풀이 동일 예산에서 고유 피드백 키 +43%(20.0→28.7), execs 유사. 단 **키 부류 분해**(execs.jsonl)하면 차이의 대부분이 `fused` 액션 자체에서 오는 `|fused|` 전이 키(F0의 T 키 19~20 중 5~6개)와 액션 집합 차이(T 19-20/F 7-8 vs T 14/F 4)다 — "행동 부류 커버리지가 넓다"는 이 전제를 붙여 읽는다. PHP 코드 생성 축(부류 문법)과의 비교는 미측정(위 정정 참조). 8.4.27(수정 빌드)에서는 어느 셀도 메모리 오류 발견 0(예상 음성, H3·not_found와 일관).
 - **반례 컨트롤**: findings 0 → 알려진 서명 오주장·미지 서명 주장 모두 없음(진공 충족). hold-out 미투입 유지. 기존 600s×3 탐색적 해석은 본 결과로 대체되지 않고 부합한다.
+- **ext4 사고 후 원본 무결성 대조(20:15 전달, 읽기 전용 v27 기준)**: evidence·logs 전수 `sha256sum -c` 결과 **유실 2건**(apache-lab·apache-lab-8.4.4-pathb의 ASAN 보고 각 1 — 사고 시점 소실 추정) → 검증된 Windows 미러 사본으로 복원 후 전수 OK. 문서화된 개서 1건(T082440 표지). builds 14행은 직접 대조 일치(초회 검사 스크립트 오판). **탐색기 증적 사후 출처 노트 12건 작성**(write_note, 전부 `reconstruction_valid: true` — H1 노트 초안이 `until` 추측 오류로 도구 커밋을 창에 잡았으나 run_id+wall_s 재산출로 교정, 노트 도구의 fail-closed가 오추정을 스스로 차단).
