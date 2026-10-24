@@ -808,7 +808,7 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 **#3 — CoreGuard 평가 게이트 보강 (기존 결론 유지)**
 
 1. **CG-1 [P0]**: `holdout-eval` — B 각 반복 유효성 필수(빈 `all([])` 금지), `guard_event_observed / guard_terminated_execution / fpm_worker_replaced / next_request_healthy / prevented` 독립 필드, `prevented`는 완료표식+rc=0+출력 일치+접근 이전 인터럽트 증명+B harm 확인 모두 충족 시만. CLI의 `worker_contained` 명칭은 `guard_terminated_execution`으로 강등. 실패 주입 픽스처(B 전체 timeout·event 후 rc 99·end-mark+비정상 rc 등).
-2. **CG-2 [P0/P1]**: Phase 3 `_exit(70)` — 재시작 증폭 DoS 공격면 평가(`pm.max_children` 매트릭스·old/new PID·다음 요청 건강·HTTP 성공률·listen queue·p95/p99), `_exit`의 shutdown/atexit 우회 명시, 파괴 프레임 내 로깅의 안전 모델(사전 개방 FD·유계 write) 평가, FPM 독립 워커 실험으로 한정. 운영 배포 권고 안 함 유지.
+2. **CG-2 [P0/P1]**: Phase 3 `_exit(70)` — 재시작 증폭 DoS 공격면 평가(`pm.max_children` 매트릭스·old/new PID·다음 요청 건강·HTTP 성공률·listen queue·p95/p99), `_exit`의 shutdown/atexit 우회 명시, 파괴 프레임 내 로깅의 안전 모델(사전 개방 FD·유계 write) 평가, FPM 독립 워커 실험으로 한정. 운영 배포 권고 안 함 유지. **하네스 전제(2026-10-24 기록)**: (a) 현 `cg2-fpm-isolation.py`는 listen queue·p95/p99 미계측, old/new PID도 최초 목록+교체 수만 기록 — 풀 매트릭스 실행 전 구현 보완 필수(집계 `elapsed_s`로 대체 불가). (b) 셀 착수 판정이 포트 `/health` 폴링뿐(`start_new_session` 데몬은 하네스 사망 시 잔존) — 착수 전 18095/19095 선점 검사와 자기 `fpm.pid`(스폰 PID) 대조를 필수로 전환(fail-closed). (c) **2026-10-24 무효 실행**: 고아 FPM/nginx가 포트를 점유한 채 남아 이후 실행들의 자체 바인드가 실패했고, 13:27 실행은 고아(B 빌드) 스택에 `/health`·`/fault`를 발사(모드 불일치 미검출 오측정), 14:06 실행은 정지 잔존. `evidence/cg2-fpm-20261024T*` 7디렉터리 전부 무효(유효 CG-2 측정 0건) — 증적 동기화 제외 후 삭제.
 3. **CG-3 [P1]**: Phase 2b VM 인터럽트 훅 — NTS/ZTS 수명·훅 연쇄 검증, enforce PHPT 19건 회귀 해소 전 No-Go 유지, disabled/observe 동치성 측정.
 4. **CG-4 + 불변조건 A~D**: Phase 1은 관측임을 완료로 오기 금지, Phase 2 스윕 표본 한계 명시, **A 실패 원자성 / B 재진입 안전점 / C 요청 수명 소유권 / D caught-bailout 복구** 4대 불변조건에 원문 근거(#76846·#12073·#22710 / #72530·#16726·#20018 / #76167·GHSA-109619 / #79760·#10026·#24361·PR#24366)별 취약/수정/CoreGuard 3빌드 공통 대조군, 이벤트-PID-시간순서 계측, 가드 구현 전 평가기·hold-out 동결 및 노출 기록. 상류 논거: 무조건 gc_protect 해제는 위험(PHP 개발자 지적) — 경로별 처리·보수적 격리가 상류 방향과 부합.
 
@@ -832,7 +832,7 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 | 1 | #5 P0-A/B/C + P1-D/E 판정기 수정 + Multi-Oracle 픽스처 | 모든 재산출의 전제 — 판정이 오염되면 하위 전부 무의미 |
 | 2 | CG-1 `holdout-eval` P0 수정 | CoreGuard 평가 수치의 분모·판정 신뢰성 |
 | 3 | #4 H1/H2 재분류 → 차분 기록 | **완료(2026-10-24)** — H1: fixed 33 → closed_resolution_unverified 32+fix_claimed 1(fixed_verified 0). H2: outcome class 재분류(memory 15·functional 2·custom 8·completed-no-oracle 32·abnormal-no-oracle 25·timeout 0), 재현 집합 불변. §10.12 무차분·§11.14 rc 미기록 한정 수위 조정·CoreGuard 어휘 강등은 주석으로(findings §12) |
-| 4 | #3 CG-2/CG-3/CG-4 + 불변조건 A~D 대조군 구축 | 방어 연구의 다음 게이트 |
+| 4 | #3 CG-2/CG-3/CG-4 + 불변조건 A~D 대조군 구축 | 방어 연구의 다음 게이트. **전제(2026-10-24)**: CG-2는 WSL 잔존 프로세스·무효 증적(`cg2-fpm-20261024T*`) 정리 → 하네스 fail-closed 보강 + listen queue·p95/p99 구현 후 실행(§14.2 #3 CG-2) |
 | 5 | #2 2×2 프로토콜 사전등록 후 실행 | 실험 설계는 판정 인프라 확정 후 |
 
 **유지 원칙**: 기존 종결 판정(§11 전체, CoreGuard observe Go/enforce No-Go/prevented=0, OFF 기저선, not_found)은 본 반영으로 변경하지 않는다. 신규 미공개 결함 의심은 D1 책임 신고 우선, 블라인드 hold-out 절차(#4-H3 v2)와 안전 경계(§9.3·§11.2)는 그대로.
