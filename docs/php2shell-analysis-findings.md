@@ -1548,6 +1548,7 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 
 - **재현 집합은 불변**: 8.4.4 {R23, R41, R42, R46, R51}, 8.4.27 {R23, R46, R49, R51, R55} — 재분류는 레이블 정밀화이지 결과를 바꾸지 않는다.
 - R23(양 버전)이 `functional_regression`(GC runs 정지 = 기능 오라클)으로 정정 분류됨 — findings §11에서 R23을 "8.4.27 재현"으로 세던 표현은 "기능 회귀 재현"으로 수위가 낮아진다. 메모리 오류 재현은 여전히 R46·R51(공개 미해결 경로).
+- *(정정 2026-10-24, §12.5)* 수정 판정기(사실검증)로 재생성한 `reclassified.json` 집계는 **memory_error 14·custom 9** — 1행(`reproduced`+`memory_error` 오라클인데 ASAN 음성·rc∉{134,139})이 `custom`으로 강등됐다. 위 표는 0b3a020 당시 구판 분류기의 기록이다.
 
 ### 12.3 영향 수치 차분 — §10.12·§11.14·CoreGuard 평가
 
@@ -1563,7 +1564,7 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 
 결과 표·판정은 `docs/coreguard/evaluation-report.md` §6. 여기선 실행 기록과 하네스 수명주기만 남긴다(전 세션 무효 실행 사상(7디렉터리)은 계획 §14.2 CG-2 전제 (c)에 기록·삭제 완료).
 
-- **실행**: 증적 `evidence/cg2-fpm-20261024T055719`(mc 1·4 × B/disabled/observe/enforce, faults=10 — 8셀 전부 유효: 에러 필드 0, `pool_master` 기록, `guard_events`가 observe/enforce에서 결함 수와 정확히 일치) + 스모크 `…T055632`(mc=1, faults=3). 프로토콜: 결함당 (a) fault 요청 (b) 워커 PID 집합 대조 (c) 다음 헬스, 병렬로 백그라운드 `/health` 프로버(50ms 간격, 기저선 3초 창과 폴트 창 분리), listen queue(`ss` Recv-Q) 샘플. 실행 계정 phplab.
+- **실행**: **인용 근거 `evidence/cg2-fpm-20261024T070908`**(mc 1·4 × B/disabled/observe/enforce, faults=10 — 8셀 전부 유효: 에러 필드 0, `pool_master` 기록, `guard_events`가 observe/enforce에서 결함 수와 정확히 일치, `source_commit 9a6128e`·`citable: true`). 선행 실행 `…T055719`·스모크 `…T055632`는 미커밋 하네스 실행(`citable: false`)이라 `NON-CITABLE.md` 표지 — 판정 동일(노이즈 내, R12 재실행으로 인용성 확보). 프로토콜: 결함당 (a) fault 요청 (b) 워커 PID 집합 대조 (c) 다음 헬스, 병렬로 백그라운드 `/health` 프로버(50ms 간격, 기저선 3초 창과 폴트 창 분리), listen queue(`ss` Recv-Q) 샘플. 실행 계정 phplab.
 - **하네스 결함 3건 발견·수정(당일)**:
   1. **무한 스트림 결함은 무가드 모드에서 영원히 종료하지 않는다** — per-recv 소켓 타임아웃은 청크가 계속 흐르면 만료되지 않는다(실측: FPM Recv-Q 28 적층 관측 후 중단). phase3 S1 형태(유계 512회 루프의 256회째 `unset()`이 소멸자 fatal을 본문 중간에 발화)로 재설계 — 전 모드 자가 종료 + enforce의 mid-body `_exit(70)` 보존.
   2. **포트 선점 검사가 TIME_WAIT 잔여를 점유로 오판**(`SO_REUSEADDR` 없는 bind) — 리스너 한정 검사로 수정. 거짓 양성이 fail-closed 검사를 무조건 차단해 스모크 2회 만에 검출됐다.
@@ -1571,3 +1572,12 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 - **fail-closed 기동의 실전 검증**: (2)의 거짓 양성 기간 3셀이 `port_in_use`로 차단됐다 — 전 세션 13:27 오측정(고아 스택 측정) 경로가 실제로 막히는 것을 확인.
 - **evidence-sync 대소문자 충돌 버그 발견·수정**: 전체 검증에서 `lab-references-r/-R` 시드 3쌍이 사본에서 병합돼 불일치(NTFS 대소문자 무구분 — 10/23 R/r 시드 추가부터 잠복, `-r` 사본에 `-R` 내용이 들어 있었음). 동기화에 충돌 검사(fail-closed 중단)와 자기테스트 2케이스 추가, 원본 3개 `-R`을 `-R-upper`로 개명(내용 바이트 불변), 오염 사본 재복사 후 전체 검증 75,071/75,071 그린.
 - **요약 판정**(상세는 evaluation-report §6): 재시작 증폭 음성(교체 정확히 1회/결함·listen queue 0·다음 헬스 100% 회복), enforce 비용은 요청 수준(해당 요청 reset·본문 중단)으로 한정, disabled/observe는 B와 전 지표 동치. 한계: 단일 프로버(≈20 rps)·순차 결함·`pm = static` 프로파일 한정.
+
+### 12.5 corpus-h2 원본 복구와 재분류 재실행 (2026-10-24, 리뷰 `.zwork/handoff-20261024T1545-claude-review.md` P0·P1)
+
+- **사고**: `0b3a020`의 구판 `reclassify-results.py`가 corpus-h2 `summary.json` 10개 **원본을 제자리 변조**(재분류 키 주입, 12:54). `95c41cd`(P1-4)는 이후 실행만 분리 출력으로 고쳤고 이미 변조된 10개는 방치됐다. 10/24 14:58 evidence-sync가 변조 바이트를 Windows 사본까지 확산시켰다.
+- **2차 사고(본인)**: 복구 전에 매니페스트 v23 스냅샷을 찍어 변조 해시가 정본화됐다(10/10 불일치 확인) — v23은 폐기·삭제하고 v24로 대체한다.
+- **복구**: `reclassify-results.py --restore`(신규, 커밋 `9a6128e`) — 키 제거 직렬화가 v22 사전 변조 매니페스트와 해시 일치할 때만 쓰기(fail-closed, 쓰기 후 재검증). **10/10 바이트 정확 복원**. 이어 수정 판정기로 `reclassified.json` 10개 재생성(원본 불변, 원본 SHA-256 기록).
+- **판정기 재실행의 정정**: 집계 memory_error 15→14, custom 8→9 — 1행이 `reproduced`+`memory_error` 오라클인데 ASAN 음성·rc∉{134,139}라 사실검증으로 `custom` 강등(§12.2 정정각). 재현 집합 불변.
+- **R12 재실행(P1)**: CG-2 매트릭스를 커밋판 하네스로 재실행해 인용성 확보(`T070908`, `citable: true`) — 구 실행 2건은 `NON-CITABLE.md` 표지 후 보존(§12.4).
+- **예방(리뷰 P2·P3 수용)**: 무효 증적은 앞으로 삭제하지 않고 표지로 관리한다(이번 7디렉터리 삭제는 §14.2 (c) 기록 시점에 이미 완료된 행위). 랩 실행 계정 phplab 원칙은 §12.4에 기록.
