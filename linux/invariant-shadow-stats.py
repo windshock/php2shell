@@ -5,11 +5,15 @@ the frozen invariant_signals layer (docs/invariant-signals-prereg.md 1-2).
 Applies the frozen stage definitions literally over existing campaign
 evidence (observer STATE/EVENT + execs.jsonl only - no new observation):
 
-I-GC  preconditions: step k has an _zend_bailout EVENT and progressed
-      (response received or alive_after);
+I-GC  preconditions (v2): step k has an _zend_bailout EVENT and ended
+      NORMALLY (completed or no failure_sites - the existing G-key
+      predicate; v1 counted terminating fatals too, which always leave
+      gc_protected set at the next pre-gc_reset startup - 274/274 on the
+      2x2 corpus, a tautology; docs/invariant-signals-prereg.md v2 note);
       progress: the SAME worker pid shows gc_protected=1 at the STARTUP
       boundary of step k+1 (or an oom_while_gc_protected event at k);
-      candidate: both.
+      candidate: both. anomaly_no_bailout_protected counts next-startup
+      protection WITHOUT a bailout event (event loss / shutdown bailout).
 I-REQ preconditions: step k ended abnormally (failure_sites non-empty);
       progress: startup[k+1] (same pid) has request-owned residue
       (ser/unser level > 0, ps_id/ps_mod/ps_session_vars set, url_hosts>0);
@@ -71,8 +75,9 @@ def parse_exec(exec_dir):
 def shadow_one_exec(exec_dir, row):
     """Frozen stage evaluation for one exec; counts only, no rewards."""
     startups, events, status = parse_exec(exec_dir)
-    out = dict(observer_status=status,
-               igc=dict(preconditions=0, progress=0, candidate=0),
+    out = dict(observer_status=status, definition='v2',
+               igc=dict(preconditions=0, progress=0, candidate=0,
+                        anomaly_no_bailout_protected=0),
                ireq=dict(preconditions=0, progress=0, candidate=0))
     if status != 'gdb_ok':
         return out
@@ -81,27 +86,30 @@ def shadow_one_exec(exec_dir, row):
     for k in sorted(set(events) | set(by_idx)):  # steps without events count too
         evs = events.get(k, [])
         step = by_idx.get(k)
-        progressed = step is not None and (
-            step.get('response') not in (None, 'no_status', 'aborted')
-            or step.get('alive_after'))
-        # I-GC
+        nxt = startups.get(k + 1)
+        next_protected = (nxt is not None
+                          and nxt.get('pid') == startups.get(k, {}).get('pid')
+                          and nxt.get('gc_protected') == 1)
+        # I-GC (v2): caught bailout + NORMAL return only
         bailout = any(e.get('name') == '_zend_bailout' for e in evs)
-        if bailout and progressed:
-            out['igc']['preconditions'] += 1
-            nxt = startups.get(k + 1)
-            crossed = (nxt is not None and nxt.get('pid') == startups.get(k, {}).get('pid')
-                       and nxt.get('gc_protected') == 1)
-            oom_prot = any(e.get('name') == 'zend_mm_delayed_error'
-                           and e.get('gc_protected') and not e.get('in_shutdown')
-                           for e in evs)
-            if crossed or oom_prot:
-                out['igc']['progress'] += 1
-                if crossed:  # the frozen core signal: boundary crossing
+        if bailout and next_protected:
+            ended_normally = step is not None and (
+                step.get('completed') or not step.get('failure_sites'))
+            if ended_normally:
+                out['igc']['preconditions'] += 1
+                oom_prot = any(e.get('name') == 'zend_mm_delayed_error'
+                               and e.get('gc_protected') and not e.get('in_shutdown')
+                               for e in evs)
+                if next_protected or oom_prot:
+                    out['igc']['progress'] += 1
                     out['igc']['candidate'] += 1
+            # terminating fatal after bailout: expected engine state, not a
+            # signal (v2 note) - no stage counted
+        elif next_protected and not bailout:
+            out['igc']['anomaly_no_bailout_protected'] += 1
         # I-REQ
         if step is not None and step.get('failure_sites'):
             out['ireq']['preconditions'] += 1
-            nxt = startups.get(k + 1)
             if nxt is not None and nxt.get('pid') == startups.get(k, {}).get('pid'):
                 residue = (nxt.get('ser_level', 0) > 0 or nxt.get('unser_level', 0) > 0
                            or any(nxt.get(f) for f in OWNED_POINTER_FIELDS)
@@ -176,22 +184,30 @@ def self_test():
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp) / 'exec-0000'
         d.mkdir()
-        # step0: caught bailout, next startup protected same pid -> I-GC candidate
-        # step1: abnormal end (fatal), next startup residue -> I-REQ candidate
+        # step0: caught bailout + NORMAL end, next startup protected ->
+        #        I-GC v2 candidate
+        # step1: bailout + TERMINATING fatal (failure_sites), next startup
+        #        protected -> expected engine state, NO I-GC stage (v2);
+        #        abnormal end + ps residue -> I-REQ candidate
+        # step2: no bailout, next startup protected -> anomaly class
         (d / 'observer.log').write_text(
             'STATE %s\n' % json.dumps(snap(0)) +
             'EVENT %s\n' % json.dumps(dict(name='_zend_bailout', uri='/x?step=0')) +
-            'STATE %s\n' % json.dumps(snap(1, gc_protected=1, ps_id=99)) +
-            'STATE %s\n' % json.dumps(snap(2, gc_protected=1)))
-        row = dict(exec=0, new_keys=['H:x', 'G:y|gc_protected'],
-                   steps=[dict(i=0, response='s200', failure_sites=['f'], alive_after=True),
-                          dict(i=1, response='s500', failure_sites=['f']),
+            'STATE %s\n' % json.dumps(snap(1, gc_protected=1)) +
+            'EVENT %s\n' % json.dumps(dict(name='_zend_bailout', uri='/x?step=1')) +
+            'STATE %s\n' % json.dumps(snap(2, gc_protected=1, ps_id=99)) +
+            'STATE %s\n' % json.dumps(snap(3, gc_protected=1)))
+        row = dict(exec=0, new_keys=[],
+                   steps=[dict(i=0, response='s200', failure_sites=[]),
+                          dict(i=1, response='s500', failure_sites=['oom']),
                           dict(i=2, response='s200', failure_sites=[])])
         r = shadow_one_exec(d, row)
-        check('I-GC candidate (boundary crossing)', r['igc'] == dict(
-            preconditions=1, progress=1, candidate=1))
+        check('I-GC v2: normal-return bailout -> candidate, fatal excluded, anomaly counted',
+              r['igc'] == dict(preconditions=1, progress=1, candidate=1,
+                               anomaly_no_bailout_protected=1))
         check('I-REQ candidate (abnormal end + residue)', r['ireq'] == dict(
-            preconditions=2, progress=1, candidate=1))
+            preconditions=1, progress=1, candidate=1))
+        check('definition marker v2', r['definition'] == 'v2')
         (d / 'observer.log').unlink()
         check('missing observer -> gdb_missing, zero stages',
               shadow_one_exec(d, row)['observer_status'] == 'gdb_missing')
@@ -214,7 +230,8 @@ def main():
                    'definitions docs/invariant-signals-prereg.md 1-2)',
                    runs=results, **provenance.provenance())
     (out_dir / 'summary.json').write_text(json.dumps(summary, indent=2))
-    tot = dict(igc=dict(preconditions=0, progress=0, candidate=0),
+    tot = dict(igc=dict(preconditions=0, progress=0, candidate=0,
+                        anomaly_no_bailout_protected=0),
                ireq=dict(preconditions=0, progress=0, candidate=0),
                overlap=dict(igc_candidate_execs_with_G=0, ireq_candidate_execs_with_H=0,
                             execs_with_G=0, execs_with_H=0, igc_candidates=0,

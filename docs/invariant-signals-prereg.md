@@ -8,12 +8,15 @@
 
 불변조건: 잡힌 bailout 이후 보호가 해소되지 않은 채 사용자 코드 실행이 이어지지 않는다.
 
-| stage | 정의(동결) | 관측(동결) |
+> **v2 개정(2026-10-25 00:04 리뷰, 사유 기록)**: v1 preconditions("bailout EVENT + 스텝 진행")은 **종료형 fatal도 모두 만족**했다 — `_zend_bailout()`은 종료형에서도 항상 `gc_protect(1)`을 건다(`Zend/zend.c:1262`)且 startup 관측 중단점이 `php_request_startup` **진입**이라 `zend_activate()`의 `gc_reset()`(`zend_gc.c:538`)보다 **먼저** 찍히므로, 종료형 fatal 뒤 다음 startup의 `gc_protected=1`은 **정상 엔진 상태**다. 실측(2×2 전 exec, 같은 pid): bailout EVENT 스텝 → 다음 startup 보호 **274/274(100%)**, 무bailout → 0/1,415 — v1 progress는 판별 정보 0(autology). v1 shadow 실행 `invariant-shadow-20261024T145621`은 **"v1 정의 결과"로 표지·보존**한다. 개정 선택: **(b) preconditions를 "잡힌 bailout 뒤 정상 반환"으로 좁힘**(기존 `ended_normally` 판정 재사용 — 관측점 추가 불필요). **(a) gc_reset 이후 관측**은 새 gdb 중단점을 요구해 shadow 원칙(기존 출력만)과 충돌 — P2에서 비용 측정 후 재검토. **구조적 기대값(동결): 고정 생성기(기본 액션 문법)에는 잡힌 bailout이 발생하지 않으므로 I-GC 진전은 0이 설계상 예상** — 3군 비교에서 I-GC 축의 무효과는 결과가 아니라 설계임.
+
+| stage | 정의(동결 v2) | 관측(동결 v2) |
 |---|---|---|
-| `preconditions` | 이 요청에서 bailout이 잡혔고(= `_zend_bailout` EVENT + 이후 같은 스텝 진행: 응답 수신 또는 `alive_after`) | EVENT 로그 + steps 응답 |
-| `progress` | 보호가 **요청 경계를 넘어** 잔류 — 같은 워커(pid 동일)의 **다음 요청 startup STATE에서 `gc_protected=1`** | observer STATE(다음 요청 startup) — 엔진 내부 인터럽트 검사 지점 제약을 받지 않는 GDB 경계 관측(주의 ②: "재개 증거"의 정의를 이렇게 동결) |
-| `candidate` | preconditions ∧ progress ∧ 기존 키가 같은 사실에 보상을 주지 않음(§2 매핑) | 위 둘 + 매핑 확인 |
+| `preconditions` | 이 요청에서 bailout이 잡혔고(= `_zend_bailout` EVENT) **정상 반환**(`ended_normally` = `completed` 또는 failure_sites 비음 — 기존 G 키 판정 재사용) | EVENT 로그 + steps |
+| `progress` | 보호가 **요청 경계를 넘어** 잔류 — 같은 워커(pid 동일)의 **다음 요청 startup STATE에서 `gc_protected=1`**. 정상 반환 뒤에도 남아 있다는 것이 v2에서 의미를 갖는다(종료형은 preconditions에서 이미 배제) | observer STATE(다음 요청 startup) |
+| `candidate` | preconditions ∧ progress ∧ 기존 키가 같은 사실에 보상을 주지 않음(§2 매핑 v2: I-GC는 G와 **같은 전제 부류, 다른 경계**(자기 shutdown vs 다음 startup) — 스텝 양쪽 발화 가능, 승격 시 동일 스텝 적립 금지) | 위 둘 + 매핑 확인 |
 | `confirmed` | candidate가 **결정적 재실행**(replay)에서 재현(새 프로세스에서 경계 횡단 재관측) 또는 같은 워커의 후속 ASAN 오류로 속성 상승 | replay/validate 기계 + ASAN 귀속 |
+| (분류) | `anomaly_no_bailout_protected`: bailout EVENT 없이 다음 startup이 보호된 경계 — EVENT 누락(관측 실패) 또는 shutdown 중 bailout 후보로 분리 기록(2×2 실측 0건, 리뷰 관측 22건은 wider 데이터) | observer 대조 |
 
 ### I-REQ — 요청 경계 소유 상태
 
