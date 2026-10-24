@@ -25,10 +25,16 @@ import sys
 
 def integrity(seq, steps, states=None, observer='gdb'):
     """seq: planned sequence; steps: observe()'d steps; states: raw gdb
-    STATE records (startup/shutdown) when the gdb observer ran."""
+    STATE records (startup/shutdown) when the gdb observer ran.
+
+    Execution means the planned indices ran exactly once, in order (#5
+    P0-A): a step count alone proves nothing. A contiguous prefix that
+    legitimately ended in a fault is reported as `executed_until_fault`,
+    never as `executed`."""
     planned = len(seq.get('steps', []))
     harness = next((s['harness_error'] for s in steps if 'harness_error' in s), None)
     executed = [s for s in steps if 'i' in s]
+    step_ids = [s['i'] for s in executed]
     last = executed[-1] if executed else None
     ended_by = None
     if last is not None:
@@ -45,23 +51,41 @@ def integrity(seq, steps, states=None, observer='gdb'):
         match = re.search(r'[?&]step=(\d+)', st.get('uri') or '')
         if match and st.get('tag') == 'startup':
             startups.add(int(match.group(1)))
-    # A request aborted mid-upload never reaches php_request_startup, so it
-    # legitimately has no startup record (it is not an observer failure).
-    observed_ok = (observer != 'gdb') or all(
-        s['i'] in startups or s.get('response') in ('aborted', 'reset') for s in executed)
-    complete = len(executed) == planned
+
+    def reached_php(step):
+        # A request aborted mid-upload never reaches php_request_startup, so
+        # it legitimately has no startup record. A step carrying its own
+        # fault evidence (asan / hang / dead process) also reached PHP. A
+        # bare connection reset proves neither (#5 P0-A).
+        return (step['i'] in startups or step.get('response') == 'aborted'
+                or bool(step.get('asan')) or bool(step.get('hung'))
+                or step.get('alive_after') is False)
+
+    observed_ok = (observer != 'gdb') or all(reached_php(s) for s in executed)
+    complete = step_ids == list(range(planned))
+    contiguous = step_ids == list(range(len(step_ids)))
+    reason = None
     if harness:
         status = 'harness_failed'
     elif not executed:
         status = 'not_reached'
+    elif not contiguous:
+        status = 'integrity_failed'
+        unique = sorted(set(step_ids))
+        reason = ('duplicate step indices' if len(step_ids) != len(unique)
+                  else 'non-monotonic step indices %s' % unique)
     elif not observed_ok:
         status = 'inconclusive'
     elif not complete and ended_by is None:
         status = 'not_reached'
     else:
-        status = 'executed'
+        # Partial contiguous runs are a fault-terminated prefix, not a full
+        # execution; callers gate on the explicit status value.
+        status = 'executed' if complete else 'executed_until_fault'
     return dict(status=status, planned=planned, executed=len(executed),
-                ended_by=ended_by, harness_error=harness, observer_ok=observed_ok)
+                last_valid_step=(step_ids[-1] if contiguous and step_ids else None),
+                ended_by=ended_by, harness_error=harness, observer_ok=observed_ok,
+                reason=reason)
 
 
 def sigs(steps):
@@ -80,16 +104,21 @@ def _sig(step):
 def differential(target, vuln_steps, vuln_int, fixed_steps, fixed_int):
     """Fixed-version verdict for a target signature reproduced on the
     vulnerable version. extinct is true ONLY with a verified run AND an
-    observed block point."""
+    observed block point; the target-specific fact (`target_absent`,
+    `extinct`) and the whole-patch verdict (`overall_patch_verdict`) stay
+    separate (#5 P0-C): a fixed run with a different memory error is never
+    a patch success even though the target signature disappeared."""
     out = dict(target=target, vuln_integrity=vuln_int['status'],
-               fixed_integrity=fixed_int['status'], extinct=False, evidence=[],
+               fixed_integrity=fixed_int['status'], extinct=False,
+               target_absent=False, verified_target_block=False,
+               overall_patch_verdict='inconclusive', evidence=[],
                new_memory_errors=[])
     k = next((s['i'] for s in vuln_steps if 'i' in s and _sig(s) == target), None)
-    if vuln_int['status'] != 'executed' or k is None:
+    if vuln_int['status'] not in ('executed', 'executed_until_fault') or k is None:
         out['verdict'] = 'inconclusive'
         out['reason'] = 'target not reproduced on the vulnerable run'
         return out
-    if fixed_int['status'] in ('harness_failed', 'inconclusive'):
+    if fixed_int['status'] in ('harness_failed', 'inconclusive', 'integrity_failed'):
         out['verdict'] = fixed_int['status']
         return out
     fixed_k = next((s for s in fixed_steps if s.get('i') == k), None)
@@ -97,7 +126,9 @@ def differential(target, vuln_steps, vuln_int, fixed_steps, fixed_int):
     out['new_memory_errors'] = sorted(x for x in found if x != target)
     if target in found:
         out['verdict'] = 'reproduced'
+        out['overall_patch_verdict'] = 'not_fixed'
         return out
+    out['target_absent'] = True
     if fixed_k is None:
         out['verdict'] = 'not_reached'
         out['reason'] = 'fixed run never executed the consumer step %d' % k
@@ -113,8 +144,14 @@ def differential(target, vuln_steps, vuln_int, fixed_steps, fixed_int):
             and not carried(f_state):
         out['evidence'].append('carried_state_absent_at_consumer_start')
     if out['evidence']:
-        out['verdict'] = 'extinct_at_verified_block_point'
+        out['verified_target_block'] = True
         out['extinct'] = True
+        if out['new_memory_errors']:
+            out['verdict'] = 'target_absent_new_memory_error'
+            out['overall_patch_verdict'] = 'regression_or_inconclusive'
+        else:
+            out['verdict'] = 'extinct_at_verified_block_point'
+            out['overall_patch_verdict'] = 'patch_effect_verified'
     else:
         out['verdict'] = 'inconclusive'
         out['reason'] = 'target absent but no observed block point'
@@ -160,11 +197,17 @@ def flowfusion(gen_ok, steps, states, log_text):
                         'ended_by_memory_error' if ended_early else 'consumer_incomplete')
     found = sigs(steps)
     violations = any(s.get('violations') for i, s in executed.items() if i > 0)
+    res['program_executed'] = res['request0'] in ('program_completed', 'program_runtime_fatal')
     if harness:
         res['verdict'] = 'harness_failed'
         res['harness_error'] = harness
     elif res['request0'] in ('request0_not_executed', 'request0_timeout'):
         res['verdict'] = 'not_reached'
+    elif res['request0'] == 'program_compile_error':
+        # The generated program never ran: healthy consumers alone are not a
+        # lifecycle observation, and compile failures stay out of the
+        # program-execution denominator (#5 P0-B).
+        res['verdict'] = 'compile_failed'
     elif found:
         step0 = any(_sig(s) for i, s in executed.items() if i == 0)
         res['verdict'] = 'intra_request' if step0 else 'cross_request'
@@ -173,11 +216,13 @@ def flowfusion(gen_ok, steps, states, log_text):
         res['verdict'] = 'consumer_incomplete'
     elif violations:
         res['verdict'] = 'carried_state'
+    elif not res['program_executed']:
+        # Defensive: 'clean' requires the program itself to have executed.
+        res['verdict'] = 'not_reached'
     else:
         res['verdict'] = 'clean'
     res['lifecycle_observed'] = res['verdict'] in ('clean', 'carried_state', 'cross_request',
                                                   'intra_request')
-    res['program_executed'] = res['request0'] in ('program_completed', 'program_runtime_fatal')
     return res
 
 
@@ -187,10 +232,12 @@ def flowfusion(gen_ok, steps, states, log_text):
 def triage(vuln_steps, vuln_int, fixed_steps, fixed_int, fixed_events, vuln_events=None):
     """observed_outcome / observed_state_at_shutdown / inferred_fix_mechanism
     / verified_block_point (needs a recorded instrumentation event)."""
-    row = dict(vuln_integrity=vuln_int['status'], fixed_integrity=fixed_int['status'])
+    row = dict(vuln_integrity=vuln_int['status'], fixed_integrity=fixed_int['status'],
+               target_absent=False, overall_patch_verdict='inconclusive')
     consumer = next((s for s in vuln_steps if 'i' in s and (s.get('asan') or s.get('hung'))),
                     None)
-    if vuln_int['status'] != 'executed' or fixed_int['status'] != 'executed':
+    if (vuln_int['status'] not in ('executed', 'executed_until_fault')
+            or fixed_int['status'] not in ('executed', 'executed_until_fault')):
         bad = vuln_int['status'] if vuln_int['status'] != 'executed' else fixed_int['status']
         row['verdict'] = bad
         return row
@@ -244,7 +291,17 @@ def triage(vuln_steps, vuln_int, fixed_steps, fixed_int, fixed_events, vuln_even
         if row['observed_state_at_shutdown'] == 'absent_at_observed_shutdown' else
         'reset between requests' if row['observed_state_at_shutdown'] ==
         'present_at_observed_shutdown' else 'unknown')
-    row['verdict'] = 'extinct'
+    row['target_absent'] = True
+    if row['new_memory_errors']:
+        # Target-specific disappearance and whole-patch safety stay separate
+        # (#5 P0-C): a different memory error on the fixed build fails the
+        # overall patch verdict while preserving the target_absent fact.
+        row['verdict'] = 'target_absent_new_memory_error'
+        row['overall_patch_verdict'] = 'regression_or_inconclusive'
+    else:
+        row['verdict'] = 'extinct'
+        row['overall_patch_verdict'] = ('patch_effect_verified'
+                                        if row['verified_block_point'] else 'inconclusive')
     row['status'] = 'validated' if row['verified_block_point'] else 'inferred'
     return row
 
@@ -312,6 +369,42 @@ def self_test():
     check('different ASAN on fixed is reported as new memory error',
           d['new_memory_errors'] == ['heap-buffer-overflow:x'])
 
+    # #5 P0-A: exact-sequence integrity fixtures. Count matches with
+    # duplicates, skips or bare resets must never count as executed.
+    dup = [dict(i=0, a='runtime_oom', response='s500', alive_after=True),
+           dict(i=0, a='runtime_oom', response='s500', alive_after=True)]
+    check('duplicate step indices -> integrity_failed',
+          integrity(seq2, dup, st(0) + st(0))['status'] == 'integrity_failed')
+    skip = [dict(vuln[0], i=0), dict(vuln[1], i=2)]
+    check('skipped step index -> integrity_failed',
+          integrity(dict(steps=[1, 2, 3]), skip, st(0) + st(2))['status']
+          == 'integrity_failed')
+    bare_reset = [dict(i=0, response='reset', alive_after=True),
+                  dict(i=1, response='reset', alive_after=True)]
+    check('bare resets without startup or fault evidence -> not executed',
+          integrity(seq2, bare_reset, [])['status'] == 'inconclusive')
+    prefix = [dict(vuln[0], i=0), dict(vuln[1], i=1, alive_after=False, asan=None)]
+    pi = integrity(dict(steps=[1, 2, 3]), prefix, st(0) + st(1))
+    check('fault-terminated contiguous prefix -> executed_until_fault',
+          pi['status'] == 'executed_until_fault' and pi['last_valid_step'] == 1
+          and pi['ended_by'] == 'process_lost')
+    check('reset with dead process reaches php (fault is the evidence)',
+          integrity(seq2, [dict(vuln[0], i=0), dict(vuln[1], i=1, response='reset')],
+                    st(0) + st(1))['status'] == 'executed')
+
+    # #5 P0-C: target disappearance and whole-patch safety stay separate.
+    replaced = [dict(good_fixed[0]), dict(good_fixed[1], asan=dict(sig='heap-use-after-free:zz'),
+                                            alive_after=False)]
+    d = differential(target, vuln, v_int, replaced, integrity(seq2, replaced, st(0) + st(1)))
+    check('target absent but different ASAN on fixed -> overall regression, '
+          'target fact preserved',
+          d['verdict'] == 'target_absent_new_memory_error' and d['extinct']
+          and d['target_absent']
+          and d['overall_patch_verdict'] == 'regression_or_inconclusive')
+    d = differential(target, vuln, v_int, good_fixed, integrity(seq2, good_fixed, st(0) + st(1)))
+    check('clean fixed verdict -> overall patch_effect_verified',
+          d['overall_patch_verdict'] == 'patch_effect_verified')
+
     # FlowFusion
     four = st(0) + st(1) + st(2) + st(3)
     ok_steps = [dict(i=i, response='s200', alive_after=True) for i in range(4)]
@@ -325,6 +418,8 @@ def self_test():
     f = flowfusion(True, ok_steps, four, 'PHP Parse error:  syntax error, unexpected x')
     check('FF parse error -> program_compile_error, not program_executed',
           f['request0'] == 'program_compile_error' and not f['program_executed'])
+    check('FF parse error with healthy consumers -> compile_failed, not clean (#5 P0-B)',
+          f['verdict'] == 'compile_failed' and not f['lifecycle_observed'])
     f = flowfusion(True, [dict(harness_error='startup timeout')], [], '')
     check('FF server not started -> harness_failed', f['verdict'] == 'harness_failed')
     f = flowfusion(True, ok_steps[:1], st(1), '')
@@ -358,8 +453,10 @@ def self_test():
     check('triage fixed start failure -> harness_failed', t['verdict'] == 'harness_failed')
     tf2 = [dict(tf[0]), dict(tf[1], asan=dict(sig='heap-buffer-overflow:y'), alive_after=False)]
     t = triage(tv, integrity(seq, tv, st(0) + st(1)), tf2, integrity(seq, tf2, st(0) + st(1)), [])
-    check('triage different ASAN on fixed recorded', t['new_memory_errors'] == [
-        'heap-buffer-overflow:y'])
+    check('triage different ASAN on fixed recorded, overall regression',
+          t['new_memory_errors'] == ['heap-buffer-overflow:y']
+          and t['verdict'] == 'target_absent_new_memory_error'
+          and t['overall_patch_verdict'] == 'regression_or_inconclusive')
     both_bad = triage(bad, integrity(seq, bad, []), bad, integrity(seq, bad, []), [])
     check('triage both sides harness failure -> harness_failed',
           both_bad['verdict'] == 'harness_failed')

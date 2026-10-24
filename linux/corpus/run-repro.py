@@ -154,8 +154,15 @@ def run_case(rid, case, version, flavor, root):
     started = time.time()
     try:
         res = subprocess.run(args, capture_output=True, text=True, timeout=120, cwd=out, env=env)
-    except subprocess.TimeoutExpired:
-        rec.update(verdict='not_reproduced', reason='timeout 120 s')
+    except subprocess.TimeoutExpired as exc:
+        # #5 P1-D: a timeout is an unobserved run, never evidence of
+        # non-reproduction. Keep whatever partial output the child produced.
+        rec.update(verdict='timeout', reason='timeout 120 s',
+                   partial_output=bool(exc.stdout or exc.stderr))
+        if exc.stdout or exc.stderr:
+            sep = bytes([10]) + b'--stderr--' + bytes([10])
+            (out / 'timeout-partial.txt').write_bytes(
+                (exc.stdout or b'')[-20000:] + sep + (exc.stderr or b'')[-20000:])
         return rec
     (out / 'stdout.txt').write_text(res.stdout)
     (out / 'stderr.txt').write_text(res.stderr)

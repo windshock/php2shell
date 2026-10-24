@@ -66,11 +66,22 @@ def run(php, prog, out):
                 or res.returncode < 0 or res.returncode in (134, 139):
             sig = sig or ('zend_mm_panic' if 'zend_mm' in out_txt else 'signal:%d' % res.returncode)
             return dict(prog=prog.name, kind='memory_error', sig=sig, cls=h3.classify(sig))
+        # #5 P1-D: an end marker or GC line alone proves nothing while the
+        # process exited abnormally; keep the marker as evidence, but do not
+        # call it ok/gc_protected.
+        clean_exit = res.returncode == 0
         gcl = re.findall(r'^gc (\d+) (\d) (\d+)$', res.stdout, re.M)
-        if 'end' in res.stdout.splitlines()[-1:] and gcl and gcl[-1][1] == '1':
-            return dict(prog=prog.name, kind='gc_protected')
+        marker = 'end' in res.stdout.splitlines()[-1:]
+        if marker and gcl and gcl[-1][1] == '1':
+            if clean_exit:
+                return dict(prog=prog.name, kind='gc_protected')
+            return dict(prog=prog.name, kind='marker_then_abnormal_exit',
+                        rc=res.returncode, gc_protected_marker=True)
         if res.stdout.rstrip().endswith('end'):
-            return dict(prog=prog.name, kind='ok')
+            if clean_exit:
+                return dict(prog=prog.name, kind='ok')
+            return dict(prog=prog.name, kind='marker_then_abnormal_exit',
+                        rc=res.returncode)
         return dict(prog=prog.name, kind='fatal', rc=res.returncode)
 
 

@@ -120,16 +120,26 @@ require '{app}';
 
 
 def send_fused(idx):
+    """Send one fused-program request. The response body is drained fully:
+    closing the connection early aborts the program at its next output
+    (#5 P0-B; see findings 11.4-11.5 for the identical lifecycle-explore
+    fix). Returns (status, body_tail) so callers keep the marker evidence."""
     try:
         with urllib.request.urlopen('http://127.0.0.1:%d/fused?step=%d' % (ex.PORT, idx),
                                     timeout=20) as res:
-            return 's%d' % res.status
+            body = res.read()
+            tail = body[-200:].decode('utf-8', 'replace')
+            return 's%d' % res.status, tail
     except urllib.error.HTTPError as exc:
-        return 's%d' % exc.code
+        try:
+            exc.read()
+        except Exception:
+            pass
+        return 's%d' % exc.code, ''
     except (ConnectionResetError, BrokenPipeError):
-        return 'reset'
+        return 'reset', ''
     except Exception as exc:
-        return 'error:%s' % type(exc).__name__
+        return 'error:%s' % type(exc).__name__, ''
 
 
 def run_program(code, prefix, out, limit='16M'):
@@ -160,8 +170,11 @@ def run_program(code, prefix, out, limit='16M'):
         for idx, action in enumerate(actions):
             before_log = proc.error_log.stat().st_size if proc.error_log.exists() else 0
             before_asan = {p.name for p in proc.asan_dir.glob('asan.*')}
-            response = send_fused(idx) if action == 'fused' else ex.send(action, {'a': action},
-                                                                         idx, ctx)
+            fused_tail = ''
+            if action == 'fused':
+                response, fused_tail = send_fused(idx)
+            else:
+                response = ex.send(action, {'a': action}, idx, ctx)
             time.sleep(0.3)
             asan = None
             deadline = time.time() + (4.0 if not response.startswith('s') else 0.8)
@@ -181,6 +194,7 @@ def run_program(code, prefix, out, limit='16M'):
                 step0_log = log_text
             alive = proc.alive()
             steps.append(dict(i=idx, a=action, response=response,
+                             fused_body_tail=fused_tail,
                               failure_sites=ex.failure_sites(log_text), asan=asan,
                               alive_after=alive, hung=False, ended_by_probe=False))
             if not alive:

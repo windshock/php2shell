@@ -1130,6 +1130,10 @@ def replay(args):
         return 1
     if not stable or (diff and not diff.get('extinct')):
         return 2
+    if diff and diff.get('overall_patch_verdict') == 'regression_or_inconclusive':
+        # #5 P0-C: the target vanished but the fixed build produced a
+        # different memory error - not a verified patch effect.
+        return 3
     return 0
 
 

@@ -45,9 +45,17 @@ step triage python3 linux/differential-triage.py
 python3 - "$root" "$sha" "$dirty" "$g34" "$g5" "${steps[@]}" <<'PY'
 import json, sys
 root, sha, dirty, g34, g5, *steps = sys.argv[1:]
+rcs = {s.rsplit('=', 1)[0]: int(s.rsplit('=', 1)[1]) for s in steps}
 json.dump(dict(scope='v2.1 re-derivation (plan §13.6 step 4)', source_sha=sha,
                uncommitted_linux_changes=int(dirty), g34_batch=g34, g5_batch=g5,
-               steps={s.rsplit('=', 1)[0]: int(s.rsplit('=', 1)[1]) for s in steps}),
+               steps=rcs, failed_steps=[k for k, v in rcs.items() if v != 0],
+               complete=all(v == 0 for v in rcs.values())),
           open(root + '/rederive.json', 'w'), indent=2)
 PY
+# #5 P1-E: recorded step codes must gate the driver's own exit status; a
+# failed step can never leave rederive rc=0.
+failed=$(printf '%s
+' "${steps[@]}" | awk -F= '$2!=0{n++} END{print n+0}')
+echo "failed_steps=$failed"
 echo "ROOT=$root"
+[ "$failed" -eq 0 ]

@@ -98,11 +98,16 @@ def main():
                    vuln_integrity_detail=v_int, fixed_integrity_detail=f_int)
         rows.append(row)
         verdict = row['verdict']
-        if verdict in ('harness_failed', 'not_reached', 'inconclusive'):
+        if verdict in ('harness_failed', 'not_reached', 'inconclusive',
+                       'integrity_failed'):
             problems.append('%s: integrity %s' % (case['name'], verdict))
+        if verdict == 'target_absent_new_memory_error':
+            problems.append('%s: target vanished but NEW_MEMORY_ERROR on %s '
+                            '(overall %s)' % (case['name'], args.fixed,
+                                              row.get('overall_patch_verdict')))
         if verdict == 'NOT_FIXED':
             problems.append('%s: same error on %s' % (case['name'], args.fixed))
-        if row.get('new_memory_errors'):
+        if row.get('new_memory_errors') and verdict != 'target_absent_new_memory_error':
             problems.append('%s: NEW_MEMORY_ERROR on %s: %s'
                             % (case['name'], args.fixed, row['new_memory_errors']))
         if case.get('control') == 'positive' and verdict == 'no_difference':
