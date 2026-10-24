@@ -355,8 +355,18 @@ def cell(build, mode, max_children, faults, root, env_extra=''):
             stream_intact = -1
         record['first_chunk_bytes'] = stream_intact
         cg = out / 'cg-events.log'
-        record['guard_events'] = (cg.read_text().count('COREGUARD event=')
-                                  if cg.exists() else 0)
+        if cg.exists():
+            by_name = {}
+            for ln in cg.read_text().splitlines():
+                if 'COREGUARD event=' in ln:
+                    kind = ln.split('event=', 1)[1].split()[0]
+                    by_name[kind] = by_name.get(kind, 0) + 1
+            record['guard_events'] = sum(by_name.values())
+            # by NAME: line counts alone conflated Phase 3 containment
+            # events with Phase 2b hook events (2026-10-24 review)
+            record['guard_events_by_name'] = by_name
+        else:
+            record['guard_events'] = 0
     finally:
         for pidfile in ('fpm.pid', 'nginx.pid'):
             try:

@@ -55,17 +55,32 @@ var_dump(@opcache_compile_file($bad));
 $x = 0; for ($i = 0; $i < 1000; $i++) { $x += $i; }
 var_dump($x, gc_status()["protected"]);
 ''', expect=None),  # characterization only: detection needs a refused root
-    # CG-3 hook chain: the VM interrupt path itself (max_execution_time)
-    # must still fire through the guard's chained interrupt hook, and a
-    # destructor-pending object at timeout exercises interrupt -> bailout
-    # -> destructor handling end to end. Characterization: the timeout
-    # firing at all proves the original handler still runs.
+    # CG-3, guard-inactive baseline (corrected per review 2026-10-24 16:45):
+    # the destructor never runs (zend_objects_store_mark_destructed during
+    # the fatal) and no caught bailout occurs, so the 2b hook is never
+    # installed - this shows ONLY that max_execution_time is preserved while
+    # the guard is inactive. The armed variant is T6.
     'T5_timeout_dtor_chain': dict(code='''<?php
 class N { public $s; function __destruct() { trigger_error("dtor", E_USER_ERROR); } }
 $o = new N; $o->s = $o;
 set_time_limit(2);
 $x = 0; while (true) { $x++; }
 ''', expect=None),
+    # CG-3 hook chain, armed variant (review 2026-10-24 16:45 design):
+    # patch 0001 installs cg_interrupt LAZILY at a refused GC root after a
+    # caught bailout - T5 never installs it. Step 1 arms the hook, step 2
+    # must still time out through the chained interrupt handler. Observe:
+    # 1 event + the original timeout (rc 255); enforce: the guard fatal
+    # ends the request before the timeout would fire.
+    'T6_armed_timeout_chain': dict(code='''<?php
+$bad = sys_get_temp_dir() . "/t6.php"; file_put_contents($bad, "<?php\\nbreak 2;\\n");
+@opcache_compile_file($bad);
+class N { public $s; }
+$o = new N; $o->s = $o; unset($o);
+set_time_limit(2); $x = 0; while (true) { $x++; }
+''', expect=dict(
+        observe=dict(event=True, cg_fatal=False),
+        enforce=dict(event=True, cg_fatal=True))),
 }
 
 
@@ -82,7 +97,15 @@ def run(php, code, mode, workdir):
     args = [str(php), '-n'] + rr.opcache_args(php) + rr.SANDBOX + [
         '-d', 'sys_temp_dir=%s' % workdir, '-d', 'memory_limit=128M', str(script)]
     t0 = time.time()
-    res = subprocess.run(args, capture_output=True, text=True, timeout=120, cwd=workdir, env=env)
+    try:
+        res = subprocess.run(args, capture_output=True, text=True, timeout=120,
+                             cwd=workdir, env=env)
+    except subprocess.TimeoutExpired:
+        # fail visible, not loud: a chained-hook defect that swallows the
+        # timeout would hang the script (T6) - surface it as a row instead
+        # of crashing the battery
+        return dict(rc='harness_timeout', seconds=round(time.time() - t0, 2),
+                    event=False, cg_fatal=False, asan=[], stdout='', stderr='')
     asan = [p.name for p in asan_dir.glob('asan.*')
             if 'AddressSanitizer' in p.read_text(errors='replace')]
     return dict(rc=res.returncode, seconds=round(time.time() - t0, 2),

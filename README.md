@@ -60,7 +60,7 @@ curl -F "file=@README.md" http://127.0.0.1:18084/upload
 - **신규 경로 탐색(Phase 5)**: `linux/patch-protect-map.sh`, `linux/state-sites.sh`, `linux/ordering-sites.sh`, `linux/phase5-b1.sh`, `linux/phase5-b2b.sh`, `linux/gdb-state-diff.py`, `linux/fuzz-phase5.sh`
 - **SAPI/WAF/Fuzzer**: `linux/apache-lab.sh`, `linux/waf-compare.py`, `linux/fuzz-smoke.sh`
 - **패치 검증**: `linux/phase4.sh`, `linux/patch-diff.sh`, `linux/verify-evidence.py`
-- **증적**: `var/linux-evidence/` + `docs/evidence-manifest-20261021.sha256`
+- **증적**: `var/linux-evidence/` + 최신 스냅샷 `docs/evidence-manifest-20261024-v25.sha256` (v23은 corpus-h2 복구 전에 찍은 오염 스냅샷이라 폐기 — 공개 이력 커밋 `0a3d60e`에만 존재)
 - 원본 소스: `sources/php-src-php-8.4.4/` (ZIP 내부 디렉터리 이름 기준)
 - 우선 검토 위치: `ext/session/session.c`, `ext/session/php_session.h`, `ext/standard/var.c`, `ext/standard/basic_functions.c`, `main/main.c`, `main/php_variables.c`, `main/rfc1867.c`.
 - 보고서의 `Z_TRY_ADDREF(progress->data)` 포인터 수명 가설과 `BG(serialize)` 요청 간 상태 가설을 별도로 검증해야 한다.
