@@ -56,8 +56,13 @@ def sync(base, dest, full_rehash=False, audit_dest=False, allow_shrink=False):
         # shrink guard (2026-10-24 review): a filesystem incident can lose
         # ORIGINAL files; audit mode would then drop the mirror copies too
         # (second loss). Refuse until the loss is verified as intended.
-        missing = [k for k in cache
+        # Only entries recorded FROM A SOURCE count (5-element cache rows);
+        # destination-only rows from an earlier audit walk (3-element) have
+        # no original to lose (23:33 review: the first version counted them
+        # and broke the self-test at s5).
+        missing = [k for k, entry in cache.items()
                    if (k.startswith('evidence/') or k.startswith('logs/'))
+                   and isinstance(entry, list) and len(entry) >= 5
                    and not (base / k).exists()]
         if missing:
             raise SystemExit('originals missing vs the last snapshot (%d, e.g. %s): '
