@@ -448,7 +448,7 @@
    - WSL 루트 마운트 옵션은 `errors=remount-ro`다. ext4가 **메타데이터·저널 오류를 감지했을 때** 읽기 전용으로 전환하는 동작이다.
    - 이 사고는 프로세스 중단만이 아니라 디스크 오류 신호일 수 있다. 증적 원본(`/home/phplab/php-lab/evidence`)이 그 파일시스템에 있다.
    - 필요한 확인:
-     - (a) 사고 이전 증적이 최신 매니페스트(v27)와 일치하는지 WSL 전체 검증(`verify-evidence.py --root var/linux-evidence`가 아니라 **원본 트리 대조**: `evidence-sync.py --full-rehash`로 원본을 다시 읽어 캐시와 비교)
+     - (a) 사고 이전 증적이 최신 매니페스트(v27)와 일치하는지 **원본 트리를 읽기 전용으로 대조**한다. 예: `/home/phplab/php-lab`에서 `sha256sum -c --quiet`로 v27의 `evidence/`·`logs/` 행을 검사한다. `build-manifest.json`은 매니페스트 경로(`builds/<이름>/`)와 원본 경로(`install/<이름>/`)가 다르므로 따로 대조한다. *(정정, 같은 날 20:15: 처음에는 `evidence-sync.py --full-rehash`를 권했다. 그 옵션은 원본을 다시 해시해 사본과 매니페스트를 **새로 쓰므로**, 원본이 손상됐다면 손상을 정본으로 만든다. 대조 수단이 아니다.)*
      - (b) 사고 직전에 끝난 런(H0-s3 등)의 `summary.json`·`execs.jsonl`이 끝까지 쓰였는지
      - (c) 가능하면 사고 원인(디스크 공간 부족, vhdx 문제, 호스트 절전 등) 기록
    - 원인을 모르는 채 재실행 결과만 합치면, 같은 사고가 남은 런에서 조용히 데이터를 깨뜨릴 수 있다.
