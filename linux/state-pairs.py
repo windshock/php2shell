@@ -224,13 +224,15 @@ def main():
     if not runs:
         print('usage: state-pairs.py <run_dir> [...] [--out DIR]')
         return 2
-    loaded, failed = [], []
+    loaded, failed, completeness = [], [], {'complete': 0, 'partial': 0, 'missing': 0}
     for r in runs:
         got = load_run(r)
         if got is None:
             failed.append(r)
         else:
             loaded.append(got)
+            for row in got[1]:
+                completeness[row['completeness']] = completeness.get(row['completeness'], 0) + 1
     candidates, confirmed, carried = aggregate(loaded)
     go_gate = dict(confirmed_pairs=confirmed, threshold=20, passed=confirmed >= 20,
                    note='P1 needs >=20 confirmed pairs + the p1+q/p2+q replay '
@@ -238,6 +240,7 @@ def main():
     summary = dict(scope='#7 P0 read-only state-pair aggregation '
                    '(schema frozen: docs/state-pair-schema.md)',
                    runs=[c for c, _ in loaded], failed_runs=failed,
+                   completeness_distribution=completeness,
                    fingerprints_with_multiple_prefixes=len(candidates),
                    confirmed_pairs=confirmed, carried_isolated_groups=carried,
                    go_gate=go_gate, **provenance.provenance())
