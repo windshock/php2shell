@@ -83,3 +83,20 @@
 - **Phase 3 봉쇄의 요청 간 결정성(귀속 교정)**: ZTS FPM 런 `cg2-fpm-20261024T075732`의 guard_events 20건은 전부 `bailout_in_destructor`(Phase 3)다 — 이 실행이 보이는 것은 **Phase 3 봉쇄 이벤트가 반복 요청에서 결함당 정확히 1건씩 발화**한다는 것(2026-10-24 17:11 리뷰로 귀속 교정, 이벤트 이름별 집계 도입으로 재확인). Phase 2b 수명 근거는 위의 전용 하네스다.
 - **disabled/observe 동치**: 배터리 전 테스트에서 observe의 stdout·rc가 disabled와 동일(이벤트 로그만 추가) — NTS·ZTS 모두. disabled는 B stdout과 동일(기존 검사 유지).
 - **PHPT 19건 회귀 No-Go 유지**: enforce 재실행 `coreguard-phpt-20261024T075348`(citable) — counts 19/7725 동일, **비통과 23개 이름 집합이 기존 런과 완전 동일(차이 0)** → 회귀는 결정론적이며 해소되지 않음, enforce No-Go 판정 유지.
+
+## 8. CG-4 — 불변조건 A~D 공통 대조군 (2026-10-24, 사전등록 `cg4-invariant-design.md`)
+
+> 5셀(V=8.4.4-asanext·F=8.4.27-asanext·C disabled/observe/enforce) × 6레코드(트리거 R46·R23·R49 + 특이성 R01·R26·R35) = 30셀, 동결 기대표 평가. **30/30 통과**(증적 `cg4-invariants-20261024T090149`, citable; 사전등록 오기 1건 정정 후 재실행 — 첫 실행 `…T085932` 29/30 보존).
+
+| 불변조건 | 레코드 | V | F | C-disabled | C-observe | C-enforce |
+|---|---|---|---|---|---|---|
+| A 실패 원자성 | R46(#22710) | ASAN | **ASAN(수정 아님)** | ASAN | ASAN+**탐지** | **rc 70 차단·ASAN 없음** |
+| D caught-bailout | R23(#10026) | 기능회귀 | 기능회귀 | 기능회귀 | 회귀+**탐지** | 회귀 관측 후 **가드 fatal(rc 255)** |
+| D caught-bailout | R49(#24361) | custom | custom | custom | custom+**탐지** | **가드 fatal 우선** |
+| B·특이성 | R01·R26·R35 | — | — | — | **전 셀 이벤트 0(침묵)** | 침묵 |
+
+- **이벤트 이름 구분(계측 결과)**: R46 → `bailout_in_destructor`(Phase 3, rc 70 경로), R23·R49 → `gc_protected_after_caught_bailout`(Phase 2b, E_ERROR 경로) — 불변조건별 가드 경로가 이름으로 구분된다.
+- **차단의 시간순서**: C-enforce에서 이벤트 + ASAN 부재 + 종료 서명(70/255) — 피해 이전 차단은 R46(접근 이전 종료, Phase 5 판정 재확인), R23은 발산 관측 후 종료(worker_contained≠prevented 유지).
+- **특이성**: 비대상 부류(R01·R26·R35)에서 관측·강제 모드 이벤트 0 — 오탐 없음(음성 대조).
+- **정정 기록**: 사전등록이 R23/C-enforce를 rc 70으로 오기(R46의 Phase 3 서명 과잉 일반화) — 실측이 정확했고 등록을 정정 후 재실행(§3 정정각).
+- **범위 정렬**(설계문서 §5): Phase 1은 관측 전용으로 "완료" 주장 금지, Phase 2 스윕은 10부류 표본 한계, 무조건 gc_protect 해제 위험(상류 논거) 대비 경로별·보수적 격리 방향 부합. C 불변조건의 차등은 기존 P16 증적 인용(8.4.4 3/3 vs 8.4.27 소멸). hold-out 노출: R23·R46 3회 접촉(전부 문서화), **R51 미실행 유지**.

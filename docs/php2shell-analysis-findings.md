@@ -1593,3 +1593,12 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 - **귀속 교정(17:11 리뷰)**: 처음엔 ZTS FPM 런(`cg2-fpm-20261024T075732`)의 guard_events=10을 "2b 훅 수명" 근거로 썼으나 전부 `bailout_in_destructor`(Phase 3)였다 — 해당 런은 Phase 3 이벤트의 요청 간 결정성 증거로 재귀속. cg2 하네스는 이벤트 이름별 집계로 교정.
 - **하네스 교훈(2b 수명 하네스 개발 중)**: (a) FPM php.ini에 opcache 미로드 시 `opcache_compile_file` 미정의로 아밍 루트 즉사(battery CLI는 `-d zend_extension`로 로드했던 차이) (b) 아밍 검사는 `ZEND_INTERRUPT` 경로에서만 발화 — 직선 `return` 루트는 경계 없이 요청이 끝나 이벤트가 안 남는다(아밍 루트에 점프 루프 필요).
 - **PHPT enforce 19건 No-Go 유지**: 재실행 `coreguard-phpt-20261024T075348`(citable) — counts와 **비통과 이름 집합 23개 모두 기존 런과 동일(차이 0)**, 결정론적.
+
+### 12.7 CG-4 — 불변조건 A~D 공통 대조군 (2026-10-24, 계획 §14.2 #3 CG-4)
+
+사전등록 `docs/coreguard/cg4-invariant-design.md`(실행 전 평가기 동결), 하네스 `linux/coreguard/cg4-invariant-controls.py`. 상세 표·판정은 evaluation-report §8.
+
+- **구성**: 근거→레코드 매핑(A: R10·R26·R46 / B: R01·R35·R40 / C: R08·R53 / D: R18·R23·R49) 후 실행 가능 6레코드 × 5셀(V·F·C-disabled/observe/enforce) = 30셀 — **30/30 통과**(증적 `cg4-invariants-20261024T090149`, citable).
+- **핵심 결과**: R46(A)=V·F·C-disabled 모두 ASAN(공식 8.4.27도 #22710 미수정) → C-observe 탐지·C-enforce **rc 70 차단(ASAN 없음)**; R23·R49(D)=C-observe 탐지, C-enforce 가드 종료; **R01·R26·R35 특이성 음성 대조 — 전 셀 이벤트 0(오탐 없음)**. 이벤트 이름: R46=`bailout_in_destructor`(Phase 3), R23·R49=`gc_protected_after_caught_bailout`(Phase 2b).
+- **사전등록 정정(첫 실행 보존)**: R23/C-enforce를 rc 70으로 등록한 것은 R46의 Phase 3 서명 과잉 일반화 — 실측 rc 255+cg_fatal(Phase 2b E_ERROR, R49와 동일 경로). 측정 정확·등록 오기 → 정정각 후 재실행(첫 실행 `…T085932` 29/30 보존).
+- **범위 정렬·노출**: Phase 1 관측 전용·Phase 2 표본 한계·상류 논거 정렬은 설계문서 §5. hold-out R23·R46는 계측 재사용(노출 3회 문서화), **R51 미실행 유지**. C의 차등은 P16 기존 증적 인용.
