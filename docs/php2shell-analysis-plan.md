@@ -774,4 +774,6 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 - **일상(단계 중간):** WSL `evidence-sync.py` → Windows `verify-evidence --incremental --manifest-only` → WSL `verify-evidence --skip-manifest`.
 - **매니페스트 스냅샷 커밋 전(필수):** WSL `evidence-sync.py --audit-dest` → WSL `verify-evidence`(전체 해시 모드). 증분 결과(`passed_incremental`)는 스냅샷의 근거가 될 수 없다. mtime을 보존한 내용 변조는 전체 모드에서만 잡힌다.
 
+**스냅샷 v22(2026-10-24):** `evidence-sync.py --audit-dest`(대상에만 남은 세션 파일 사본 78,203개를 캐시·매니페스트에서 제거. 원본은 실행별 `sessions.tar.gz`로 보존) → WSL 전체 검증 `passed`(74,938/74,938 해시, 누락 0, 불일치 0) → `docs/evidence-manifest-20261024-v22.sha256`. 성능 측정은 이제 세션 파일을 직접 묶는다(`fc76ef5`).
+
 **남은 과제(파일 수 자체 축소):** 종료된 캠페인의 `exec-*`, FlowFusion `fused/`처럼 시드로 다시 만들 수 있는 산출물을 캠페인 단위 아카이브(tar + 내부 매니페스트)로 묶는 방식이다. 증적 형식과 검사기(R2)를 함께 바꿔야 하므로 별도 단계로 둔다.
