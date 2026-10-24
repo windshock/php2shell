@@ -1194,7 +1194,7 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 
 - **H0:** 사용자 제공 원조사 문서를 수정 없이 `docs/corpus/php-memory-safety-2016-2026.md`(58건)로 넣었다.
 - **H1:** `linux/corpus/verify-corpus.py`로 원천 63건을 조회했다. 조회 실패 0, 문서 기재 상태와의 불일치 0이다(문서가 같은 날 작성됨). R24만 "확인 필요"에서 closed/completed로 정리됐다.
-- **기록 유형:** fixed 33 / open 14 / advisory 5 / 설계 논의 3 / duplicate 1 / wontfix 1 / unmerged design 1.
+- **기록 유형:** fixed 33 / open 14 / advisory 5 / 설계 논의 3 / duplicate 1 / wontfix 1 / unmerged design 1. *(2026-10-24 정정, #4 H1: `fixed 33`은 원천 상태 자동 분류 — 수정 확인 아님. 재분류: `closed_resolution_unverified 32` + `fix_claimed 1`. `fixed_verified`는 별도 확인 필요.)*
 - 결과 표: `docs/historical-corpus.md`.
 
 ### 11.2 H2.5 — 현재 탐색기 도달성 (데스크 분류)
@@ -1519,3 +1519,42 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 4. **순서 기록:** CoreGuard hold-out 평가(R23은 §11.9, R46·R51은 §11.11)는 이 문법보다 **먼저** 실행됐다. 계획 §13.6은 5(H2.5) → 6(H3) → 7(CoreGuard) 순서다.
    - 평가 결과에 미치는 영향은 없다. 사전 등록의 선정 규칙("H2.5 이후 도달 가능")이 요구하는 도달성은 사례를 CLI에서 직접 실행하는 경로다. 그 도달성은 H2 2차(`asanext` 빌드, 세 건 모두 B에서 재현)에서 이미 확인됐다. 평가 스크립트도 탐색기나 생성기를 쓰지 않는다.
    - 사전 등록 v1.1은 사례별 **1회** 평가를 정한다. 그래서 순서를 맞추려고 평가를 다시 돌리지 않는다. 다시 돌리면 hold-out을 두 번 쓰게 된다.
+
+
+## 12. v2.2 순위 3 — #4 H1/H2 재분류와 영향 수치 차분 (2026-10-24, 계획 §14.3)
+
+수정된 판정기(커밋 `c3fdd87`)를 적용해 기존 증적을 재판정했다. **PHP 재실행 없이 기록된 실행 사실(rc·ASAN·오라클·EXPECT 불일치)만으로 재분류**했다(도구: `linux/corpus/reclassify-results.py`, 증적 원본은 각 summary에 인라인 갱신).
+
+### 12.1 H1 — closed ≠ fixed 재분류
+
+| 항목 | 기존 | 재분류 |
+|---|---|---|
+| `fixed` | 33 | `closed_resolution_unverified` 32 + `fix_claimed` 1 (PR merged) |
+| 나머지 유형 | open 14 / advisory 5 / 설계 3 / duplicate 1 / wontfix 1 / unmerged 1 | 변경 없음 |
+
+- 어휘 변경: `verify-corpus.py`의 `record_type()`이 GitHub closed·bugs.php.net Closed를 더 이상 `fixed`로 표기하지 않는다. `fixed_verified`(수정 커밋+버전 관계 또는 회귀 테스트 확인)는 별도 칼럼으로 부여 예정 — 현재 0건이며, 이는 결함이 아니라 **확인 작업이 아직 없다**는 뜻이다.
+- 정정 주석: `docs/historical-corpus.md` 요약 행과 findings §11 H1 기록 유형 행에 정정각.
+
+### 12.2 H2 — 재현 결과의 outcome class 재분류 (집계, 10개 런 74+α 레코드-버전 행)
+
+| outcome class | 건수 | 의미 |
+|---|---|---|
+| memory_error | 15 | ASAN/신호 — 메모리 안전 위반 관측 |
+| **functional_regression** | **2** | EXPECT 불일치 — 기능 회귀이지 메모리 안전 위반이 아님(§14.2 요구 반영) |
+| custom(GC 등) | 8 | 사례별 커스텀 오라클 발화 |
+| completed_no_oracle | 32 | rc=0 정상 종료·오라클 미발화 — **미재현의 근거** |
+| abnormal_exit_no_oracle | 25 | rc≠0 종료·오라클 미발화 — 미관측이며 미재현 근거로 쓰지 않는다 |
+| no_reproducer / capability_gap / excluded_weaponized / timeout | 18/4/2/0 | 실행 전 분류 |
+
+- **재현 집합은 불변**: 8.4.4 {R23, R41, R42, R46, R51}, 8.4.27 {R23, R46, R49, R51, R55} — 재분류는 레이블 정밀화이지 결과를 바꾸지 않는다.
+- R23(양 버전)이 `functional_regression`(GC runs 정지 = 기능 오라클)으로 정정 분류됨 — findings §11에서 R23을 "8.4.27 재현"으로 세던 표현은 "기능 회귀 재현"으로 수위가 낮아진다. 메모리 오류 재현은 여전히 R46·R51(공개 미해결 경로).
+
+### 12.3 영향 수치 차분 — §10.12·§11.14·CoreGuard 평가
+
+| 보고 항목 | 차분 |
+|---|---|
+| findings §10.12 (v2.1 재도출) | **변경 없음** — 재도출 판정은 `verdicts.integrity`·`differential` 기반인데 P0-A/B/C 수정은 기존 유효 실행(정상 시퀀스·프로그램 완주)에는 동일 판정을 내림. 신규 음성 픽스처(32/32)는 오분류 경로 차단이며, 기존 증적의 재판정은 순위 3 재실행(§14.3 3단계) 때 실시 — 본 절의 H2 재분류가 그 첫 적용이다. |
+| findings §11.14 (H3 문법) | **해석 수위 조정** — GC 부류 3/3 "도달"은 `gc_protected` 마커 기준인데 P1-D 수정 전 실행은 rc를 기록하지 않아 (runs.jsonl에 rc 필드 없음) 마커-이후-비정상-종료 가능성을 원증적으로 배제할 수 없다. 결론(GC 부류 도달)은 유지하되 **"rc 미기록 조건" 한정**으로 수위를 낮춘다. 이후 문법 실행은 `marker_then_abnormal_exit` 분리 판정기로 재생성된 증적만 인용한다. |
+| CoreGuard 평가 보고서 | **판정 어휘 갱신 필요** — `worker_contained`가 `guard_terminated_execution`으로 강등되고 `prevented` 조건이 강화됐다(CG-1). 기존 Phase 5 결과는 예방 0·감지 중심이라 수치는 불변이나, 재평가 시 `b_baseline_invalid`·`inconclusive_termination` 신규 어휘가 적용된다. 홀드아웃 1회 평가 원칙상 재실행하지 않고 어휘 매핑 주석만 부여한다. |
+
+**유지 원칙 재확인**: 본 재분류로 §11 전체·CoreGuard observe Go/enforce No-Go/prevented=0·OFF 기저선·not_found 중 어느 것도 뒤집히지 않는다(§14.3 유지 원칙 준수). 변경은 레이블 정밀화와 미관측/미재현의 분모 분리뿐이다.

@@ -831,7 +831,7 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 |---|---|---|
 | 1 | #5 P0-A/B/C + P1-D/E 판정기 수정 + Multi-Oracle 픽스처 | 모든 재산출의 전제 — 판정이 오염되면 하위 전부 무의미 |
 | 2 | CG-1 `holdout-eval` P0 수정 | CoreGuard 평가 수치의 분모·판정 신뢰성 |
-| 3 | #4 H1/H2 재분류 → §10.12·§11.14·CoreGuard 보고 수치 재산출(차분 기록) | 수정된 판정기로 기존 결론 재확인 |
+| 3 | #4 H1/H2 재분류 → 차분 기록 | **완료(2026-10-24)** — H1: fixed 33 → closed_resolution_unverified 32+fix_claimed 1(fixed_verified 0). H2: outcome class 재분류(memory 15·functional 2·custom 8·completed-no-oracle 32·abnormal-no-oracle 25·timeout 0), 재현 집합 불변. §10.12 무차분·§11.14 rc 미기록 한정 수위 조정·CoreGuard 어휘 강등은 주석으로(findings §12) |
 | 4 | #3 CG-2/CG-3/CG-4 + 불변조건 A~D 대조군 구축 | 방어 연구의 다음 게이트 |
 | 5 | #2 2×2 프로토콜 사전등록 후 실행 | 실험 설계는 판정 인프라 확정 후 |
 

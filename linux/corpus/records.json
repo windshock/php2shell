@@ -31,7 +31,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R02",
@@ -61,7 +64,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R03",
@@ -91,7 +97,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R04",
@@ -121,7 +130,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R05",
@@ -151,7 +163,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R06",
@@ -181,7 +196,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R07",
@@ -211,7 +229,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R08",
@@ -241,7 +262,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R09",
@@ -271,7 +295,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R10",
@@ -301,7 +328,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R11",
@@ -331,7 +361,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R12",
@@ -361,7 +394,10 @@
       "record_type": "duplicate",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "duplicate",
+      "record_type_previous": "duplicate",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R13",
@@ -391,7 +427,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R14",
@@ -421,7 +460,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R15",
@@ -451,7 +493,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R16",
@@ -481,7 +526,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R17",
@@ -511,7 +559,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R18",
@@ -541,7 +592,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R19",
@@ -571,7 +625,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R20",
@@ -601,7 +658,10 @@
       "record_type": "wontfix",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "wontfix",
+      "record_type_previous": "wontfix",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R21",
@@ -638,7 +698,10 @@
       "record_type": "unmerged_design",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "unmerged_design",
+      "record_type_previous": "unmerged_design",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R22",
@@ -668,7 +731,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R23",
@@ -753,7 +819,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R24",
@@ -789,7 +858,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R25",
@@ -824,7 +896,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R26",
@@ -859,7 +934,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R27",
@@ -894,7 +972,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R28",
@@ -932,7 +1013,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R29",
@@ -967,7 +1051,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R30",
@@ -1004,7 +1091,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "fix_claimed",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R31",
@@ -1049,7 +1139,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R32",
@@ -1085,7 +1178,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R33",
@@ -1121,7 +1217,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R34",
@@ -1157,7 +1256,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R35",
@@ -1193,7 +1295,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R36",
@@ -1229,7 +1334,10 @@
       "record_type": "design-discussion",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "design-discussion",
+      "record_type_previous": "design-discussion",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R37",
@@ -1259,7 +1367,10 @@
       "record_type": "advisory",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "advisory",
+      "record_type_previous": "advisory",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R38",
@@ -1295,7 +1406,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R39",
@@ -1331,7 +1445,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R40",
@@ -1366,7 +1483,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R41",
@@ -1402,7 +1522,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R42",
@@ -1438,7 +1561,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R43",
@@ -1468,7 +1594,10 @@
       "record_type": "advisory",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "advisory",
+      "record_type_previous": "advisory",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R44",
@@ -1498,7 +1627,10 @@
       "record_type": "advisory",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "advisory",
+      "record_type_previous": "advisory",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R45",
@@ -1534,7 +1666,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R46",
@@ -1572,7 +1707,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R47",
@@ -1608,7 +1746,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R48",
@@ -1634,7 +1775,10 @@
       "record_type": "design-discussion",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "design-discussion",
+      "record_type_previous": "design-discussion",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R49",
@@ -1676,7 +1820,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R50",
@@ -1711,7 +1858,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R51",
@@ -1746,7 +1896,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R52",
@@ -1776,7 +1929,10 @@
       "record_type": "advisory",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "advisory",
+      "record_type_previous": "advisory",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R53",
@@ -1806,7 +1962,10 @@
       "record_type": "advisory",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "advisory",
+      "record_type_previous": "advisory",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R54",
@@ -1841,7 +2000,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R55",
@@ -1877,7 +2039,10 @@
       "record_type": "fixed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "closed_resolution_unverified",
+      "record_type_previous": "fixed",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R56",
@@ -1909,7 +2074,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R57",
@@ -1944,7 +2112,10 @@
       "record_type": "open",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "open",
+      "record_type_previous": "open",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     },
     {
       "id": "R58",
@@ -1970,7 +2141,34 @@
       "record_type": "design-discussion",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
-      "discrepancies": []
+      "discrepancies": [],
+      "record_type_source_state": "design-discussion",
+      "record_type_previous": "design-discussion",
+      "reclassification_note": "source-state vocabulary (#4 H1): tracker closure is not fix verification"
     }
-  ]
+  ],
+  "reclassification": {
+    "at": "2026-10-24",
+    "reason": "#4 H1: closed!=fixed (plan 14.2)",
+    "old_counts": {
+      "fixed": 33,
+      "duplicate": 1,
+      "open": 14,
+      "wontfix": 1,
+      "unmerged_design": 1,
+      "design-discussion": 3,
+      "advisory": 5
+    },
+    "new_counts": {
+      "closed_resolution_unverified": 32,
+      "duplicate": 1,
+      "open": 14,
+      "wontfix": 1,
+      "unmerged_design": 1,
+      "fix_claimed": 1,
+      "design-discussion": 3,
+      "advisory": 5
+    },
+    "changed": 33
+  }
 }

@@ -114,16 +114,21 @@ def check(url):
 
 
 def record_type(results):
+    """Source-state classification only (#4 H1): what the tracker SAYS.
+    'closed_resolution_unverified' / 'fix_claimed' deliberately do not say
+    'fixed' - a verified fix needs a fix commit + version relation or a
+    regression test, recorded separately."""
     kinds = []
     for r in results:
         if r.get('fetch_error'):
             continue
         if r['source'] == 'github' and r.get('kind') == 'pr':
-            kinds.append('fixed' if r.get('merged') else
+            kinds.append('fix_claimed' if r.get('merged') else
                          'unmerged_design' if r.get('state') == 'closed' else 'open')
         elif r['source'] == 'github':
             kinds.append('open' if r.get('state') == 'open' else
-                         'wontfix' if r.get('state_reason') == 'not_planned' else 'fixed')
+                         'wontfix' if r.get('state_reason') == 'not_planned' else
+                         'closed_resolution_unverified')
         elif r['source'] == 'ghsa':
             kinds.append('advisory')
         elif r['source'] == 'bugs.php.net':
@@ -132,13 +137,15 @@ def record_type(results):
                                          'feedback', 're-opened') else
                          'duplicate' if 'duplicate' in s else
                          'wontfix' if 'wont' in s or 'not a bug' in s else
-                         'fixed' if s in ('closed',) else 'unverified')
+                         'closed_resolution_unverified' if s in ('closed',) else
+                         'unverified')
         else:
             kinds.append('design-discussion')
     if not kinds:
         return 'unverified'
-    for k in ('open', 'fixed', 'advisory', 'duplicate', 'wontfix', 'unmerged_design',
-              'design-discussion', 'unverified'):
+    for k in ('open', 'advisory', 'duplicate', 'wontfix', 'unmerged_design',
+              'design-discussion', 'closed_resolution_unverified', 'fix_claimed',
+              'unverified'):
         if k == kinds[0]:
             return k
     return kinds[0]

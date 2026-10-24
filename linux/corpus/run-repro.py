@@ -180,11 +180,24 @@ def run_case(rid, case, version, flavor, root):
     oracle = case['oracle']
     if oracle == 'memory_error':
         hit = bool(asan) or res.returncode < 0 or res.returncode in (134, 139)
+        if hit:
+            rec['outcome_class'] = 'memory_error'
     elif oracle == 'expect':
         hit = expect is not None and not expect_matches(expect[1], res.stdout, expect[0])
         rec['expect_format'] = expect[0] if expect else None
+        if hit:
+            # #4 H2: an EXPECT/EXPECTF mismatch is a functional divergence,
+            # not by itself a memory-safety violation.
+            rec['outcome_class'] = 'functional_regression'
     else:
         hit = CUSTOM[case['custom']](res.stdout)
+        if hit:
+            rec['outcome_class'] = 'gc_state_stuck' if oracle == 'gc' else 'custom'
+    if not hit:
+        # Separate clean completion from abnormal-exit-with-no-oracle so the
+        # denominators stay honest (#4 H2).
+        rec['outcome_class'] = ('completed_no_oracle' if res.returncode == 0
+                                else 'abnormal_exit_no_oracle')
     rec['verdict'] = 'reproduced' if hit else 'not_reproduced'
     rec['oracle'] = oracle
     return rec
