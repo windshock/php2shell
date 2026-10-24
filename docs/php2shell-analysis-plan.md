@@ -777,3 +777,62 @@ P15~P18 설계에 대한 재검토 결과다. 상세 근거는 findings §7.5.
 **스냅샷 v22(2026-10-24):** `evidence-sync.py --audit-dest`(대상에만 남은 세션 파일 사본 78,203개를 캐시·매니페스트에서 제거. 원본은 실행별 `sessions.tar.gz`로 보존) → WSL 전체 검증 `passed`(74,938/74,938 해시, 누락 0, 불일치 0) → `docs/evidence-manifest-20261024-v22.sha256`. 성능 측정은 이제 세션 파일을 직접 묶는다(`fc76ef5`).
 
 **남은 과제(파일 수 자체 축소):** 종료된 캠페인의 `exec-*`, FlowFusion `fused/`처럼 시드로 다시 만들 수 있는 산출물을 캠페인 단위 아카이브(tar + 내부 매니페스트)로 묶는 방식이다. 증적 형식과 검사기(R2)를 함께 바꿔야 하므로 별도 단계로 둔다.
+
+## 14. 2026-10-24 심층 리서치 후속 리뷰 반영 (Issues #2·#3·#4·#5)
+
+> **출처** (2026-10-24 09:37~10:05 KST 댓글, 검토 기준 HEAD `947e2f1`): [#2 FlowFusion 외부 기준선·2×2 비교](https://github.com/windshock/php2shell/issues/2) · [#3 CoreGuard 평가 오라클·FPM 격리·불변조건](https://github.com/windshock/php2shell/issues/3) · [#4 코퍼스 품질·hold-out 독립성·연구자 원문](https://github.com/windshock/php2shell/issues/4) · [#5 판정기 무결성·Multi-Oracle 계약](https://github.com/windshock/php2shell/issues/5).
+>
+> 리뷰 스스로 명시한 범위 제한을 그대로 유지한다: 정적 코드 검토 + 판정 함수 격리 재현이며 랩 독립 재실행이 아님, **기존 결과(observe Go / enforce No-Go / prevented=0 / OFF 기저선 / H3·문법 종결)를 뒤집는 주장이 아님** — 판정 오분류 경로와 평가 게이트를 보강하는 후속이다.
+
+### 14.1 사실 확인 (HEAD `2327dad` 코드 대조)
+
+반영 전 P0·P1 코드 주장 6건을 직접 확인했다. **전부 사실.**
+
+| ID | 지적 | 확인 근거 |
+|---|---|---|
+| #5-A | `verdicts.integrity()` 개수만 검사 | `linux/verdicts.py:52` `complete = len(executed) == planned` — 중복(`[0,0]`)·스킵(`[0,2]`)·전 단계 reset이 `executed`로 통과 |
+| #5-B | FlowFusion 컴파일 실패도 `clean` | `verdicts.py` flowfusion(): `program_compile_error` 차단 분기 없이 소비자 관찰·ASan 무이면 `clean`; `flowfusion-bridge.py` send 경로는 응답 본문 완독 마커 없음(`lifecycle-explore.py`의 §11.5 수정과 불일치) |
+| #5-C | `extinct`와 신규 ASan 동시 반환 | `verdicts.py` differential(): `new_memory_errors` 산출 후 block-point evidence 조건만으로 `extinct=True` — 타깃 소멸과 패치 전체 안전성 미분리 |
+| CG-1 | `holdout-eval.py` 빈 B 성공 처리 | `linux/coreguard/holdout-eval.py:159` `all(... if 'harness' not in r)` — B 전체 harness 실패 시 `all([])==True`; `verdict()`가 rc·cg_fatal·FPM 워커 교체 무검사로 `worker_contained`/`prevented` 분류 |
+| H1 | closed→`fixed` 자동 분류 | `linux/corpus/verify-corpus.py:116` record_type(): GitHub closed(not_planned 아님)·bugs.php.net `Closed` → `fixed` — 수정 커밋/릴리스 확인 아님 |
+| H2 | 타임아웃→`not_reproduced` | `linux/corpus/run-repro.py:157` `TimeoutExpired` → `not_reproduced` — 미관측과 미재현 미분리 |
+
+### 14.2 이슈별 반영 요약
+
+**#5 — 판정기 무결성 + Multi-Oracle Verdict Contract (최우선)**
+
+1. **P0-A/B/C 수정**: ① integrity는 `step_ids == range(planned)` 정밀 검사 + 부분 실행 시 `executed_until_fault`(마지막 유효 단계·중단 원인) ② FlowFusion 축 분리(`generation_valid/compile_succeeded/program_completed/consumers/lifecycle_clean`), 브리지 본문 완독·종료 마커 ③ `target_absent / verified_target_block / new_memory_error / overall_patch_verdict` 분리(신규 ASan 있으면 패치 판정 `regression_or_inconclusive`). 각각 실패 주입 픽스처 동반.
+2. **P1-D/E**: `run-repro` 타임아웃 `timeout/hang/inconclusive`로, `grammar-reach` 종료 마커·rc 분리; `rederive-v21.sh`·`measure-c.sh` 단계 rc 합산 최종 게이트.
+3. **Multi-Oracle 계약**: 사례별 필수 오라클(asan/msan/ubsan/valgrind/gdb_watchpoint/php_gc_invariant/version_differential) 명시, `미설치/계측실패/미실행/실행-미관측` 분리, 미관측은 `unknown/not_tested` 보존(false 아님), 공통 실행·증거 필드(run_id·binary SHA·worker_pid/epoch·oracle_profile), 최종 분류 어휘(harness_failed/not_reached/reached_no_trigger/invariant_violation_candidate/sanitizer_confirmed/functional_regression/new_memory_error/patch_effect_verified/inconclusive), `attackability_assessed` 별도. **완료: 4개 오라클 부류(ASan·MSan·GDB·PHP GC)의 성공/실패/미관측 픽스처 통과 + 유효 분모 재산출.**
+
+**#3 — CoreGuard 평가 게이트 보강 (기존 결론 유지)**
+
+1. **CG-1 [P0]**: `holdout-eval` — B 각 반복 유효성 필수(빈 `all([])` 금지), `guard_event_observed / guard_terminated_execution / fpm_worker_replaced / next_request_healthy / prevented` 독립 필드, `prevented`는 완료표식+rc=0+출력 일치+접근 이전 인터럽트 증명+B harm 확인 모두 충족 시만. CLI의 `worker_contained` 명칭은 `guard_terminated_execution`으로 강등. 실패 주입 픽스처(B 전체 timeout·event 후 rc 99·end-mark+비정상 rc 등).
+2. **CG-2 [P0/P1]**: Phase 3 `_exit(70)` — 재시작 증폭 DoS 공격면 평가(`pm.max_children` 매트릭스·old/new PID·다음 요청 건강·HTTP 성공률·listen queue·p95/p99), `_exit`의 shutdown/atexit 우회 명시, 파괴 프레임 내 로깅의 안전 모델(사전 개방 FD·유계 write) 평가, FPM 독립 워커 실험으로 한정. 운영 배포 권고 안 함 유지.
+3. **CG-3 [P1]**: Phase 2b VM 인터럽트 훅 — NTS/ZTS 수명·훅 연쇄 검증, enforce PHPT 19건 회귀 해소 전 No-Go 유지, disabled/observe 동치성 측정.
+4. **CG-4 + 불변조건 A~D**: Phase 1은 관측임을 완료로 오기 금지, Phase 2 스윕 표본 한계 명시, **A 실패 원자성 / B 재진입 안전점 / C 요청 수명 소유권 / D caught-bailout 복구** 4대 불변조건에 원문 근거(#76846·#12073·#22710 / #72530·#16726·#20018 / #76167·GHSA-109619 / #79760·#10026·#24361·PR#24366)별 취약/수정/CoreGuard 3빌드 공통 대조군, 이벤트-PID-시간순서 계측, 가드 구현 전 평가기·hold-out 동결 및 노출 기록. 상류 논거: 무조건 gc_protect 해제는 위험(PHP 개발자 지적) — 경로별 처리·보수적 격리가 상류 방향과 부합.
+
+**#4 — 코퍼스 스키마·독립성 (판정기 수정 후 재산출 전제)**
+
+1. **H1**: `source_state/closure_reason/fix_commit/fixed_release/resolution_confidence` 분리, `fixed_verified`는 수정 커밋+버전 관계 또는 회귀 테스트로 확인 시만(나머지 `closed_resolution_unverified`/`fix_claimed`), 분류 회귀 픽스처, "상태 불일치 0"은 상태 텍스트 대조임을 명시.
+2. **H2**: 재현 판정 `memory_error/functional_regression/gc_state_stuck/heap_corruption/timeout/unreached` 분리, 사례별 사전조건(확장·할당기·버전) 기록, 음성 픽스처.
+3. **H3**: hold-out 메타데이터(`evaluation_role/same_root_cause_family/developer_exposure/blindness_level`) 추가, v1='known-class, pre-registered, non-blind'로 명명, v2는 도구 동결 후 외부 평가자 선정·봉인, GC 56건 부류 도달 ≠ 독립 재발견 명시.
+4. **H4**: generator×feedback 교차 비교 분리(§14.3 #2와 동일 원칙), 기존 600s×3은 탐색적, hold-out 과적합 금지.
+5. **연구자 원문 확장**: Taoguang Chen·Check Point·Nikita Popov·neex/Orange Tsai·Quarkslab·FlowFusion·Calif/Wiz 원문 맵 + 우선 부류(caught bailout/GC, 재진입, cross-request, 수정 전후 대조, 2026-10 오픈 triage 후보 #24481·#24532·#24492 — 미확정 후보로만)의 독립 필드 수집.
+
+**#2 — 생성기×피드백 2×2 분리 비교 프로토콜**
+
+- F0/F1(FlowFusion 융합 × feedback OFF/ON) × H0/H1(과거 부류 문법 × OFF/ON) 동일 환경(PHP SHA·SAPI·확장·sanitizer·실행기·예산) 비교; FlowFusion 원형 실행과 래틀 래너 투입은 별도 군, hybrid+A→B 스케줄러는 제2트랙(변수 혼합 방지). 모든 지표 분모 포함(유효 PHPT·컴파일 성공·프로그램 완주·startup·동일 PID·불변조건 도달·time-to-first-valid-finding/distinct-root-cause). 반례 controls(#76167·#79760·#10026/#24361·#16726), wall-clock과 유효 실행 수 기준 병용, 사전등록 시드·풀·예산 다독립 반복. **기존 600s×3 결과는 탐색적 해석 유지, ON 우위 미증명 시 OFF 기저선 유지.**
+- 정적 후보 확장은 Coccinelle/CodeQL 구조 검사로 제안(+`#76846`·`#12073` fixed controls로 FP/FN 측정), #5 fail-closed 테스트 선통과를 필수 게이트로.
+
+### 14.3 실행 우선순위 (v2.2)
+
+| 순위 | 작업 | 이유 |
+|---|---|---|
+| 1 | #5 P0-A/B/C + P1-D/E 판정기 수정 + Multi-Oracle 픽스처 | 모든 재산출의 전제 — 판정이 오염되면 하위 전부 무의미 |
+| 2 | CG-1 `holdout-eval` P0 수정 | CoreGuard 평가 수치의 분모·판정 신뢰성 |
+| 3 | #4 H1/H2 재분류 → §10.12·§11.14·CoreGuard 보고 수치 재산출(차분 기록) | 수정된 판정기로 기존 결론 재확인 |
+| 4 | #3 CG-2/CG-3/CG-4 + 불변조건 A~D 대조군 구축 | 방어 연구의 다음 게이트 |
+| 5 | #2 2×2 프로토콜 사전등록 후 실행 | 실험 설계는 판정 인프라 확정 후 |
+
+**유지 원칙**: 기존 종결 판정(§11 전체, CoreGuard observe Go/enforce No-Go/prevented=0, OFF 기저선, not_found)은 본 반영으로 변경하지 않는다. 신규 미공개 결함 의심은 D1 책임 신고 우선, 블라인드 hold-out 절차(#4-H3 v2)와 안전 경계(§9.3·§11.2)는 그대로.
