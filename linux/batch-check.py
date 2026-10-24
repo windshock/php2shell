@@ -15,6 +15,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import provenance  # R12: batch evidence needs a source commit too
+
 
 def check_run(run_dir, rc):
     run_dir = Path(run_dir)
@@ -49,6 +51,7 @@ def verdict(root, pairs):
                   valid=[r['run'] for r in runs if r['status'] == 'valid'],
                   failed=[r['run'] for r in runs if r['status'] != 'valid'])
     report['ok'] = bool(runs) and not report['failed']
+    report.update(provenance.provenance())
     Path(root, 'batch.json').write_text(json.dumps(report, indent=2))
     return report
 

@@ -44,10 +44,13 @@ import os
 import random
 import re
 import secrets
+import shutil
 import signal
 import socket
 import subprocess
 import sys
+import tarfile
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -58,6 +61,7 @@ sys.path.insert(0, str(HERE))
 from probe import multipart  # noqa: E402
 import explore_sapi  # noqa: E402
 import verdicts  # noqa: E402
+import provenance  # noqa: E402
 
 REPO = HERE.parent
 BASE = Path('/home/phplab/php-lab')
@@ -674,6 +678,24 @@ def send(action, step, idx, ctx):
         return 'error:%s' % type(exc).__name__
 
 
+def archive_sessions(out):
+    """Archive an exec's sessions/ into sessions.tar.gz and drop the dir.
+
+    The fixed 3MB session fixture (written per exec, random sid) accumulated
+    19.26GB over 18k execs and filled the host disk (2026-10-24 ext4
+    remount-ro incident). Bytes are preserved in the archive; observation
+    and verdicts never read session file contents (gdb STATE/EVENT,
+    php-error.log, ASAN only)."""
+    sess = out / 'sessions'
+    if not sess.exists() or not any(sess.iterdir()):
+        return False
+    arc = out / 'sessions.tar.gz'
+    with tarfile.open(arc, 'w:gz') as tf:
+        tf.add(sess, arcname='sessions')
+    shutil.rmtree(sess)
+    return True
+
+
 def execute(seq, prefix, out, observer, sapi='cli', version=None, cov=False):
     """Run one sequence in one fresh process; return per-step observations."""
     global PORT
@@ -765,6 +787,7 @@ def execute(seq, prefix, out, observer, sapi='cli', version=None, cov=False):
         steps.append(dict(harness_error=str(exc)))
     finally:
         proc.stop()
+        archive_sessions(out)
     states, events = [], []
     if observer == 'gdb' and (out / 'observer.log').exists():
         for line in (out / 'observer.log').read_text(errors='replace').splitlines():
@@ -1032,6 +1055,7 @@ def campaign(args):
                    findings=findings, time_to_first_valid_finding=(
                        min((f['first_t'] for f in findings.values()), default=None)))
     (out_base / 'corpus.json').write_text(json.dumps(corpus, indent=2))
+    summary.update(provenance.provenance())  # R12: source_commit/dirty/citable
     (out_base / 'summary.json').write_text(json.dumps(summary, indent=2))
     print(json.dumps({k: summary[k] for k in ('run_id', 'feedback', 'execs', 'wall_s',
                                               'unique_keys', 'corpus_size',
@@ -1168,6 +1192,16 @@ def self_test():
           set(carried_request_state(norm)) == {'unser_level>0', 'unser_data carried'})
     check('clean state has no violation',
           not carried_request_state(normalize_state(dict(st, unser_level=0, unser_data=0), prev)))
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as tmp:
+        sess = Path(tmp) / 'exec' / 'sessions'
+        sess.mkdir(parents=True)
+        (sess / 'sess_x').write_text('big|s:3:"aaa";')
+        check('sessions archived after exec (dir gone, bytes kept in tar)',
+              archive_sessions(sess.parent) and not sess.exists()
+              and (sess.parent / 'sessions.tar.gz').exists()
+              and tarfile.open(sess.parent / 'sessions.tar.gz').getnames() == ['sessions',
+                                                                               'sessions/sess_x'])
     sites = failure_sites('[x] PHP Fatal error:  Allowed memory size of 8388608 bytes exhausted '
                           'at file:0 (tried to allocate 3149568 bytes) in Unknown on line 0')
     check('failure site normalized', sites == ['oom:2^21@Unknown:0'])
