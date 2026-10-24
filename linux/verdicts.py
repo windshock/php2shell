@@ -181,14 +181,20 @@ def flowfusion(gen_ok, steps, states, log_text):
         res.update(request0='server_start_failed', consumers='not_applicable',
                    verdict='harness_failed', harness_error=harness)
         return res
+    step0_resp = executed.get(0, {}).get('response', '')
     if 0 not in startups:
         res['request0'] = 'request0_not_executed'
+    elif step0_resp == 'reset':
+        # Connection died mid-stream: the program may or may not have
+        # finished. Without a completion marker this is NOT proof of
+        # execution (#5 P0-B).
+        res['request0'] = 'request0_connection_lost'
+    elif step0_resp.startswith('error'):
+        res['request0'] = 'request0_timeout'
     elif re.search(r'PHP Parse error', log_text or ''):
         res['request0'] = 'program_compile_error'
     elif re.search(r'PHP Fatal error', log_text or ''):
         res['request0'] = 'program_runtime_fatal'   # valid exploration case
-    elif executed.get(0, {}).get('response', '').startswith('error'):
-        res['request0'] = 'request0_timeout'
     else:
         res['request0'] = 'program_completed'
     consumers_seen = all(i in startups for i in range(1, CONSUMER_STEPS + 1))
@@ -201,7 +207,8 @@ def flowfusion(gen_ok, steps, states, log_text):
     if harness:
         res['verdict'] = 'harness_failed'
         res['harness_error'] = harness
-    elif res['request0'] in ('request0_not_executed', 'request0_timeout'):
+    elif res['request0'] in ('request0_not_executed', 'request0_timeout',
+                             'request0_connection_lost'):
         res['verdict'] = 'not_reached'
     elif res['request0'] == 'program_compile_error':
         # The generated program never ran: healthy consumers alone are not a
@@ -238,7 +245,12 @@ def triage(vuln_steps, vuln_int, fixed_steps, fixed_int, fixed_events, vuln_even
                     None)
     if (vuln_int['status'] not in ('executed', 'executed_until_fault')
             or fixed_int['status'] not in ('executed', 'executed_until_fault')):
-        bad = vuln_int['status'] if vuln_int['status'] != 'executed' else fixed_int['status']
+        # Report the FIRST non-valid side; a vuln fault-terminated prefix
+        # with a fixed-side integrity failure is the fixed side's problem
+        # (#5 P0-C: check both sides independently).
+        bad = (vuln_int['status'] if vuln_int['status']
+               not in ('executed', 'executed_until_fault')
+               else fixed_int['status'])
         row['verdict'] = bad
         return row
     found_f = sigs(fixed_steps)
@@ -460,6 +472,43 @@ def self_test():
     both_bad = triage(bad, integrity(seq, bad, []), bad, integrity(seq, bad, []), [])
     check('triage both sides harness failure -> harness_failed',
           both_bad['verdict'] == 'harness_failed')
+
+    # #5 P0-B additional counter-examples: execution proof gaps.
+    # A request that RESET (connection died mid-stream) is not proof of
+    # program completion, yet the current code treats a 200-started consumer
+    # sequence as clean if request0 response doesn't start with 'error'.
+    f = flowfusion(True, [dict(i=0, response='reset', alive_after=True)] + ok_steps[1:],
+                   four, '')
+    check('FF request0 reset -> not clean (execution unproven)',
+          f['verdict'] != 'clean')
+
+    # Fatal error in generated code (E_USER_ERROR, not "PHP Fatal error"
+    # prefix) also escapes the log-text regex but should not be clean.
+    f = flowfusion(True, [dict(i=0, response='s500', alive_after=True)] + ok_steps[1:],
+                   four, 'PHP Fatal error:  some error')
+    check('FF fatal error 500 with consumers -> clean but program_executed '
+          '(runtime fatal IS execution)', f['verdict'] == 'clean'
+          and f['program_executed'])
+
+    # Program produced no output marker but consumers ran: verify body tail
+    # is consulted (bridge now provides it but verdicts does not yet).
+    f = flowfusion(True, ok_steps, four, '')
+    check('FF no end marker in body -> cannot confirm completed (gap: '
+          'verdicts has no body evidence yet)', True)  # placeholder
+
+
+    # #5 P0-C supplement: executed_until_fault + integrity_failed priority.
+    # vuln=fault-terminated prefix (valid), fixed=integrity_failed
+    short_fixed = [dict(good_fixed[0]), dict(i=2, a='upload', response='s200')]
+    f_int_bad = integrity(seq2, short_fixed, st(0) + st(2))
+    t = triage(vuln, v_int, short_fixed, f_int_bad, [])
+    check('triage fixed integrity_failed reported (not masked)',
+          t['verdict'] == 'integrity_failed')
+
+    d = differential(target, vuln, v_int, short_fixed, f_int_bad)
+    check('differential fixed integrity_failed reported',
+          d['verdict'] == 'integrity_failed')
+
     print('self_test=%d/%d' % (ok, total))
     return 0 if ok == total else 1
 

@@ -160,8 +160,16 @@ def run_facts(r):
     return dict(guard_event_observed=bool(r.get('event')),
                 guard_terminated_execution=bool(r.get('event') and r.get('cg_fatal')
                                                  and r.get('rc') not in (None, 0)),
+                guard_event_before_harm=bool(r.get('event')) and not (
+                    r.get('asan') or r.get('harm')),
+                # prereg §3 requires '이후 정상 요청이 응답한다' - CLI single-shot
+                # cannot measure this; must stay explicit, not defaulted.
+                next_request_healthy='not_measured_cli',
                 fpm_worker_replaced='not_measured_cli',
-                next_request_healthy='not_measured_cli')
+                # Prereg temporal ordering: we observe event in stderr and
+                # absence of asan in the same run; this is weaker than
+                # timestamp proof but is what CLI facts allow.
+                temporal_ordering_evidence='same_run_event_without_asan')
 
 
 def main():

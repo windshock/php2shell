@@ -224,7 +224,16 @@ def main():
         dict(record=r['record'], version=r['version'], verdict=r['verdict'],
              asan=r.get('asan'), signal=r.get('signal'), missing=r.get('missing_extensions'))
         for r in rows]), indent=2))
-    return 0 if all(r['verdict'] != 'harness_failed' for r in rows) else 1
+    # P1-5: timeout and capability_gap also indicate incomplete campaigns.
+    # A run that never observed the case is not a completed experiment.
+    from collections import Counter
+    verdicts = Counter(r['verdict'] for r in rows)
+    incomplete = sum(verdicts.get(v, 0) for v in ('harness_failed', 'timeout',
+                                                  'capability_gap'))
+    complete = len(rows) - incomplete
+    print(json.dumps(dict(total=len(rows), complete=complete,
+                          incomplete=incomplete, verdicts=dict(verdicts))))
+    return 0 if incomplete == 0 else 1
 
 
 if __name__ == '__main__':

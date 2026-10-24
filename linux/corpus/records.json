@@ -28,7 +28,7 @@
           "title": "PHP :: Bug #72530 :: Use After Free in GC with Certain Destructors"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -61,7 +61,7 @@
           "title": "PHP :: Sec Bug #73092 :: Unserialize use-after-free when resizing object&#039;s properties hash table"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -94,7 +94,7 @@
           "title": "PHP :: Sec Bug #73147 :: Use After Free in unserialize()"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -127,7 +127,7 @@
           "title": "PHP :: Bug #73900 :: Use After Free in unserialize() SplFixedArray"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -160,7 +160,7 @@
           "title": "PHP :: Sec Bug #74101 :: Unserialize Heap Use-After-Free (READ: 1) in zval_get_type"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -193,7 +193,7 @@
           "title": "PHP :: Sec Bug #74614 :: Use-after-free in PHP7&#039;s unserialize()"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -226,7 +226,7 @@
           "title": "PHP :: Bug #76047 :: Use-after-free when accessing already destructed backtrace arguments"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -259,7 +259,7 @@
           "title": "PHP :: Bug #76167 :: mbstring may use/efree() pointer from some previous request"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -292,7 +292,7 @@
           "title": "PHP :: Sec Bug #76409 :: heap use after free in _php_stream_free"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -325,7 +325,7 @@
           "title": "PHP :: Bug #76846 :: Segfault in shutdown function after memory limit error"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -358,7 +358,7 @@
           "title": "PHP :: Bug #77185 :: Use-after-free in FPM master event handling"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -424,7 +424,7 @@
           "title": "PHP :: Bug #77843 :: Use after free with json serializer"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -457,7 +457,7 @@
           "title": "PHP :: Bug #78379 :: Cast to object confuses GC, causes crash"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -490,7 +490,7 @@
           "title": "PHP :: Sec Bug #78876 :: Long variables in multipart/form-data cause OOM and temp files are not cleaned"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -523,7 +523,7 @@
           "title": "PHP :: Sec Bug #78793 :: Use-after-free in exif parsing under memory sanitizer"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -556,7 +556,7 @@
           "title": "PHP :: Bug #79029 :: Use After Free&#039;s in XMLReader / XMLWriter"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -622,7 +622,7 @@
           "title": "PHP :: Bug #79784 :: Use after free if changing array during undef var during array write fetch"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -728,7 +728,7 @@
           "title": "PHP :: Sec Bug #81708 :: UAF due to php_filter_float() failing for ints"
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -855,7 +855,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -893,7 +893,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -931,7 +931,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -969,7 +969,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -1088,7 +1088,7 @@
           "draft": false
         }
       ],
-      "record_type": "fixed",
+      "record_type": "fix_claimed",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -1175,7 +1175,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -1214,7 +1214,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -1253,7 +1253,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -1403,7 +1403,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -1442,7 +1442,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -1519,7 +1519,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -1558,7 +1558,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -1743,7 +1743,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -1855,7 +1855,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
@@ -2036,7 +2036,7 @@
           ]
         }
       ],
-      "record_type": "fixed",
+      "record_type": "closed_resolution_unverified",
       "evidence_level": "unassessed",
       "exposure": "unassessed",
       "discrepancies": [],
