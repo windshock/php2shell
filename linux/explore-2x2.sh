@@ -5,18 +5,25 @@
 # (8.4.27-asanext, cli, gdb observer, opcache). The fused pool is generated
 # ONCE (seed 11, count 200) and shared by F0/F1 (program matching). Hold-out
 # records R23/R46/R51 are never used. Usage: explore-2x2.sh [budget_s]
+# Env overrides for prereg-sanctioned partial reruns (invalidation clause):
+# ROOT=<existing run root> GENS="H" MODES="state" SEEDS="1 2 3" POOL=<pool dir>
 set -u
 cd /mnt/c/Users/user/Downloads/php
 budget=${1:-600}
 stamp=$(date -u +%Y%m%dT%H%M%S)
-root=/home/phplab/php-lab/evidence/explore-2x2-$stamp
+root=${ROOT:-/home/phplab/php-lab/evidence/explore-2x2-$stamp}
+gens=${GENS:-"F H"}
+modes=${MODES:-"off state"}
+seeds=${SEEDS:-"1 2 3"}
 mkdir -p "$root"
-python3 linux/fused-pool.py --out "$root/pool" --count 200 --seed 11 --version 8.4.27 \
-  > "$root/pool.log" 2>&1 || { echo "pool generation failed"; exit 1; }
+if [[ " $gens " == *" F "* ]] && [ ! -d "${POOL:-$root/pool}" ]; then
+  python3 linux/fused-pool.py --out "$root/pool" --count 200 --seed 11 --version 8.4.27 \
+    > "$root/pool.log" 2>&1 || { echo "pool generation failed"; exit 1; }
+fi
 runs=()
-for gen in F H; do
-  for m in off state; do
-    for s in 1 2 3; do
+for gen in $gens; do
+  for m in $modes; do
+    for s in $seeds; do
       cell="$gen$([ "$m" = off ] && echo 0 || echo 1)"
       out="$root/$cell-s$s"
       echo "=== $cell seed=$s -> $out"
