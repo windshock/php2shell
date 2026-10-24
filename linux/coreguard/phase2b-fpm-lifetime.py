@@ -46,6 +46,10 @@ if ($u === '/r49arm') {
     @opcache_compile_file($bad);
     class N { public $s; }
     $o = new N; $o->s = $o; unset($o);
+    // the armed check fires at an interrupt boundary (ZEND_INTERRUPT at the
+    // loop jump) - a straight-line return would end the request before any
+    // boundary runs (2026-10-24 first-run lesson)
+    for ($i = 0; $i < 50; $i++) { $x = $i; }
     echo "armed";
     return true;
 }
@@ -84,7 +88,16 @@ def cell(build, mode, root):
     if busy:
         record['error'] = 'port_in_use:%s' % ','.join(map(str, busy))
         return record
-    procs, logs, _env = cg2.lab(build, mode, 1, out)
+    # the arm route needs opcache_compile_file (the caught-bailout source);
+    # cg2's FPM ini does not load opcache - the first run failed on
+    # "Call to undefined function opcache_compile_file()" (kept, NON-CITABLE)
+    so = sorted((BASE / 'install' / build / 'lib' / 'php' / 'extensions').glob(
+        '*/opcache.so'))
+    if not so:
+        record['error'] = 'opcache.so not found for %s' % build
+        return record
+    ini_extra = 'zend_extension=%s\nopcache.enable=1\n' % so[-1]
+    procs, logs, _env = cg2.lab(build, mode, 1, out, ini_extra)
     try:
         (out / 'router.php').write_text(ROUTER)  # replace before startup
         deadline = time.time() + 20
@@ -143,7 +156,11 @@ def cell(build, mode, root):
             worker_survived=workers_after == workers,
         )
         record['checks'] = [
-            ('step1 exactly one 2b event', ev1.get(P2B_EVENT) == 1),
+            # the caught compile fatal leaves the request unclean, so the
+            # status is 500 - what matters is the body ran to the end and
+            # exactly one 2b event fired
+            ('step1 ran to end and exactly one 2b event',
+             b'armed' in (b1 or b'') and ev1.get(P2B_EVENT) == 1),
             ('step2 no new events', ev2 == ev1),
             ('step2 all healthy', all(s == 200 for s in record['step2']['statuses'])),
             ('step3 second 2b event', ev3.get(P2B_EVENT) == 2),
