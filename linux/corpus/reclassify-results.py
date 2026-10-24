@@ -9,14 +9,24 @@ abnormal_exit_no_oracle / timeout. Writes a differential report
 aggregate table for the findings diff.
 
 Usage: reclassify-results.py [--evidence-root /home/phplab/php-lab/evidence]
+       reclassify-results.py --restore [--reference-manifest <v22 snapshot>]
+
+--restore reverses the 0b3a020 in-place mutation bug (this script's pre-
+95c41cd run wrote 'reclassification'/'outcome_class' keys INTO corpus-h2
+summary.json originals). It strips the injected keys and rewrites the file
+ONLY when the stripped serialization hash-matches the pre-mutation
+reference manifest; any file that cannot be matched aborts without write.
 """
 import argparse
+import hashlib
 import json
 import sys
 from collections import Counter
 from pathlib import Path
 
 CASES = Path(__file__).resolve().parent / 'h2-cases.json'
+REPO = Path(__file__).resolve().parents[2]
+DEFAULT_REFERENCE = REPO / 'docs' / 'evidence-manifest-20261024-v22.sha256'
 
 
 def verify_outcome_class(row):
@@ -47,11 +57,65 @@ def verify_outcome_class(row):
     return 'completed_no_oracle' if rc == 0 else 'abnormal_exit_no_oracle' 
 
 
+def strip_injected(data):
+    """Remove the keys the 0b3a020 in-place run added; True if any removed."""
+    changed = False
+    if 'reclassification' in data:
+        del data['reclassification']
+        changed = True
+    for r in data.get('results', []):
+        if 'outcome_class' in r:
+            del r['outcome_class']
+            changed = True
+    return changed
+
+
+def restore(evidence_root, reference_manifest):
+    reference = {}
+    for line in reference_manifest.read_text().splitlines():
+        digest, _, rel = line.partition('  ')
+        if rel.startswith('evidence/corpus-h2-') and rel.endswith('/summary.json'):
+            reference[rel] = digest
+    if not reference:
+        print('reference manifest has no corpus-h2 summary entries: %s'
+              % reference_manifest, file=sys.stderr)
+        return 1
+    restored = clean = 0
+    for path in sorted(evidence_root.glob('corpus-h2-*/summary.json')):
+        rel = 'evidence/%s' % path.relative_to(evidence_root).as_posix()
+        data = json.loads(path.read_text())
+        if not strip_injected(data):
+            clean += 1
+            continue
+        blob = json.dumps(data, indent=2).encode()
+        digest = hashlib.sha256(blob).hexdigest()
+        if reference.get(rel) != digest:
+            print('NOT RESTORABLE (stripped form does not match the '
+                  'reference): %s' % rel, file=sys.stderr)
+            return 1
+        path.write_bytes(blob)
+        if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            print('write verification failed: %s' % rel, file=sys.stderr)
+            return 1
+        restored += 1
+        print('restored %s' % rel)
+    print(json.dumps(dict(restored=restored, already_clean=clean,
+                          reference=str(reference_manifest))))
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence-root', type=Path,
                         default=Path('/home/phplab/php-lab/evidence'))
+    parser.add_argument('--restore', action='store_true',
+                        help='undo the 0b3a020 in-place mutation (see above)')
+    parser.add_argument('--reference-manifest', type=Path,
+                        default=DEFAULT_REFERENCE,
+                        help='pre-mutation manifest for --restore verification')
     args = parser.parse_args()
+    if args.restore:
+        return restore(args.evidence_root, args.reference_manifest)
     summaries = sorted(args.evidence_root.glob('corpus-h2-*/summary.json'))
     if not summaries:
         print('no corpus-h2 summaries found')
