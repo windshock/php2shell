@@ -134,7 +134,8 @@ def shadow_run(run_dir):
         execs[r['exec']] = r
     per_exec, agg = {}, dict(
         observer=dict(gdb_ok=0, gdb_missing=0, observer_error=0),
-        igc=dict(preconditions=0, progress=0, candidate=0),
+        igc=dict(preconditions=0, progress=0, candidate=0,
+                 anomaly_no_bailout_protected=0),
         ireq=dict(preconditions=0, progress=0, candidate=0),
         overlap=dict(igc_candidate_execs_with_G=0, ireq_candidate_execs_with_H=0,
                      execs_with_G=0, execs_with_H=0, igc_candidates=0,
