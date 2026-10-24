@@ -1570,7 +1570,8 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
   2. **포트 선점 검사가 TIME_WAIT 잔여를 점유로 오판**(`SO_REUSEADDR` 없는 bind) — 리스너 한정 검사로 수정. 거짓 양성이 fail-closed 검사를 무조건 차단해 스모크 2회 만에 검출됐다.
   3. **FPM 데몬화로 셀 정리가 비결정적** — `daemonize = no`(terminate+wait 보장) + 정리 후 포트 해제 대기·pidfile SIGKILL 폴백. root 실행 시 phplab 워커가 `cg-events.log`를 생성하지 못해 `guard_events=0`으로 오판(패치 0002의 fopen 실패→stderr 폴백) — 랩 관례대로 phplab 실행으로 해결.
 - **fail-closed 기동의 실전 검증**: (2)의 거짓 양성 기간 3셀이 `port_in_use`로 차단됐다 — 전 세션 13:27 오측정(고아 스택 측정) 경로가 실제로 막히는 것을 확인.
-- **evidence-sync 대소문자 충돌 버그 발견·수정**: 전체 검증에서 `lab-references-r/-R` 시드 3쌍이 사본에서 병합돼 불일치(NTFS 대소문자 무구분 — 10/23 R/r 시드 추가부터 잠복, `-r` 사본에 `-R` 내용이 들어 있었음). 동기화에 충돌 검사(fail-closed 중단)와 자기테스트 2케이스 추가, 원본 3개 `-R`을 `-R-upper`로 개명(내용 바이트 불변), 오염 사본 재복사 후 전체 검증 75,071/75,071 그린.
+- **evidence-sync 대소문자 충돌 버그 발견·수정**: 전체 검증에서 `lab-references-r/-R` 시드 3쌍이 사본에서 병합돼 불일치(NTFS 대소문자 무구분 — 10/23 R/r 시드 추가부터 잠복, `-r` 사본에 `-R` 내용이 들어 있었음). 동기화에 충돌 검사(fail-closed 중단)와 자기테스트 2케이스 추가, 원본 3개 `-R`을 `-R-upper`로 개명(내용 바이트 불변), 오염 사본 재복사 후 전체 검증 75,071/75,071 그린. **개명 대응표(구매니페스트 v21·v22 경로 연결용)**: `evidence/fuzz-phase5-20261022T224003/corpus/lab-references-R`·`…20261023T011018/…`·`…20261023T011329/…` → 각 디렉터리 `corpus/lab-references-R-upper`.
+- **재실행(T070908)과 선행(T055719)의 수치 대비**: enforce mc=1 교체 10회(~311ms→~310ms), 폴트창 p50 263.7→262.8ms, mc=4 프로버 p99 1.4→1.9ms, 그 외 전 지표 노이즈 내 동일 — 판정 불변.
 - **요약 판정**(상세는 evaluation-report §6): 재시작 증폭 음성(교체 정확히 1회/결함·listen queue 0·다음 헬스 100% 회복), enforce 비용은 요청 수준(해당 요청 reset·본문 중단)으로 한정, disabled/observe는 B와 전 지표 동치. 한계: 단일 프로버(≈20 rps)·순차 결함·`pm = static` 프로파일 한정.
 
 ### 12.5 corpus-h2 원본 복구와 재분류 재실행 (2026-10-24, 리뷰 `.zwork/handoff-20261024T1545-claude-review.md` P0·P1)
