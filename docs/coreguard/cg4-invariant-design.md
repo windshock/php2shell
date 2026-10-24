@@ -28,7 +28,7 @@
 | R46 | C-enforce | 가드 종료(차단) | **≥1** | **없음** | **70** |
 | R23 | V/F/C-disabled | functional_regression | 없음 | 없음 | 0 |
 | R23 | C-observe | functional_regression + 탐지 | **≥1** | 없음 | 0 |
-| R23 | C-enforce | 가드 종료(차단) | **≥1** | 없음 | **70** |
+| R23 | C-enforce | 가드 종료(차단) | **≥1** | 없음 | **70** ~~70~~ → **정정(실행 후)**: **255 + cg_fatal** |
 | R49 | V/F/C-disabled | custom | 없음 | 없음 | 255 |
 | R49 | C-observe | custom + 탐지 | **≥1** | 없음 | 255 |
 | R49 | C-enforce | CoreGuard fatal 선행 | **≥1** | 없음 | 255 |
@@ -37,6 +37,8 @@
 | R35 | 전 5셀 | completed_no_oracle | **0** | 없음 | 0 |
 
 근거: H2 reclassified(§1 표), Phase 5 hold-out 1회 평가(R46·R23 enforce=worker_contained rc 70, observe=detected_only), phase2b T1(R49 observe/enforce). 평가기: 어느 셀이든 기대 외 결과·미분류·계측 누락은 **실패(fail-closed)**, 종료 코드 비영.
+
+> **§3 정정(2026-10-24, 첫 실행 `cg4-invariants-20261024T085932` 이후 — 해당 실행은 보존)**: R23/C-enforce의 rc를 70으로 등록한 것은 R46의 Phase 3 `_exit(70)` 서명을 과잉 일반화한 사전등록 오기다. 실측: 이벤트 `gc_protected_after_caught_bailout` + cg_fatal(E_ERROR) + rc 255 + ASAN 없음 — Phase 2b enforce의 정상 경로(R49에 동결했던 것과 동일). 기능 발산이 가드 종료 이전에 관측됨(worker_contained≠prevented, Phase 5 동결 판정과 일치). 측정은 정확했고 등록이 틀렸다. 기대표는 위 행과 하네스 주석에서 정정 후 재실행한다.
 
 ## 4. hold-out 동결·노출 기록
 

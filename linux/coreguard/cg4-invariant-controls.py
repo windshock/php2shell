@@ -51,7 +51,14 @@ EXPECT = {
     ('R23', 'F'): dict(outcome='functional_regression', asan=False, events=0),
     ('R23', 'C-disabled'): dict(outcome='functional_regression', asan=False, events=0),
     ('R23', 'C-observe'): dict(outcome='functional_regression', asan=False, events=1),
-    ('R23', 'C-enforce'): dict(rc=70, asan=False, events=1),
+    ('R23', 'C-enforce'): dict(cg_fatal=True, rc=255, asan=False, events=1),
+    # correction after the first run (evidence cg4-invariants-20261024T085932,
+    # kept): the prereg wrote rc=70 by over-generalizing R46's Phase 3
+    # _exit(70) signature. R23 is the Phase 2b class - enforce ends the
+    # request with E_ERROR (rc 255 + cg_fatal), exactly as frozen for R49.
+    # The functional divergence is observable BEFORE the guard fires
+    # (worker_contained, not prevented - consistent with the frozen Phase 5
+    # verdict). Measurement was correct; the prereg was wrong.
     ('R49', 'V'): dict(outcome='custom', events=0),
     ('R49', 'F'): dict(outcome='custom', events=0),
     ('R49', 'C-disabled'): dict(outcome='custom', events=0),
