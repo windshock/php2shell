@@ -71,3 +71,14 @@
 - **비용의 위치는 풀이 아니라 요청** — enforce에서 손실되는 것은 결함 요청 본인(reset, 본문 중단)이며, 이는 §1의 `worker_contained`(요청을 잃는 격리) 정의와 일치한다. mc=1에서도 대기 중 프로브는 교체 뒤 즉시 서비스됐다(폴트창 p50 263ms는 결함이 단일 워커를 점유한 시간 자체이며 모드 무관 — enforce 추가 지연 0).
 - **disabled·observe는 B와 전 지표 동치**(observe는 이벤트 로그 10건만 추가) — 관측 오버헤드는 이 부하 프로파일에서 측정 불능.
 - 한계: 부하 프로파일이 단일 프로버(≈20 rps) + 순차 결함이다. 큐 깊이 0과 "증폭 없음"은 이 프로파일의 결과이며, 지속 스트림·고동시 부하·`pm.max_children` 고갈 상황은 미측정. PHP-FPM `pm = static` 한정. 셀당 결함 10개·매트릭스 1회 실행(미커밋 선행 실행과 판정 일치 확인) — 반복 분산은 미측정.
+
+## 7. CG-3 — Phase 2b 훅 수명·ZTS·연쇄 검증 (2026-10-24, 계획 §14.2 CG-3)
+
+> 질문: Phase 2b VM 인터럽트 훅이 ZTS에서 컴파일·동작하는가, 원본 인터럽트 경로가 보존되는가, 반복 요청 생명주기에서 훅이 살아있는가, disabled/observe는 동치인가, enforce PHPT 19건 회귀는 그대로인가.
+
+- **ZTS 빌드**: 신규 플레이버 `ztsnormalext`(normalext+`--enable-zts`)로 B·C 쌍 빌드 — **패치 0001~0003이 ZTS에서 문제없이 컴파일**(빌드 증적 `builds/8.4.27-ztsnormalext`·`…-coreguard-ztsnormalext`의 build-manifest). 참고: ZTS FPM 워커는 요청당 단일 스레드 — 검증은 요청 단위 TSRM 생명주기 한정(다중 스레드 동시성 SAPI=Apache worker는 미측정).
+- **배터리**: `phase2b-tests.py` 확장(T5 + 동치 검사) — **NTS 43/43, ZTS 43/43 모두 통과**(증적 `coreguard-p2b-tests-20261024T074127-asanext`·`…T075708-ztsnormalext`, citable). T1 탐지·봉쇄는 ZTS에서 NTS와 동일.
+- **훅 연쇄(T5, 신규)**: `set_time_limit(2)`+소멸자 대기 객체의 타임아웃 — 4모드 전부 정확히 ~2.0s에 rc=255 타임아웃 발발·출력 동일 → **가드가 연쇄한 인터럽트 훅 아래에서 원본 타임아웃 경로 보존**. 가드 이벤트 무발생(전 모드) — 타임아웃 bailout은 Phase 2b의 대상 서명(caught bailout 뒤 GC 보호 잔류)을 남기지 않는다는 정직한 음성(특성화 기록, 기대 부여 안 함).
+- **훅 수명**: ZTS FPM(mc=1, 결함 10)에서 observe·enforce 모두 `guard_events=10` — 결함당 정확히 1개, 잔여·누락 0(증적 `cg2-fpm-20261024T075732`). NTS 수명은 CG-2(§6)와 동일 근거. 반복 요청 생명주기에서 훅 재무장·판정 무붕괴.
+- **disabled/observe 동치**: 배터리 전 테스트에서 observe의 stdout·rc가 disabled와 동일(이벤트 로그만 추가) — NTS·ZTS 모두. disabled는 B stdout과 동일(기존 검사 유지).
+- **PHPT 19건 회귀 No-Go 유지**: enforce 재실행 `coreguard-phpt-20261024T075348`(citable) — counts 19/7725 동일, **비통과 23개 이름 집합이 기존 런과 완전 동일(차이 0)** → 회귀는 결정론적이며 해소되지 않음, enforce No-Go 판정 유지.

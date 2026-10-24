@@ -1582,3 +1582,13 @@ P15~P18 실험 설계에 대해 Calif 원문·공식 advisory 문구·8.4.4 원�
 - **판정기 재실행의 정정**: 집계 memory_error 15→14, custom 8→9 — 1행이 `reproduced`+`memory_error` 오라클인데 ASAN 음성·rc∉{134,139}라 사실검증으로 `custom` 강등(§12.2 정정각). 재현 집합 불변.
 - **R12 재실행(P1)**: CG-2 매트릭스를 커밋판 하네스로 재실행해 인용성 확보(`T070908`, `citable: true`) — 구 실행 2건은 `NON-CITABLE.md` 표지 후 보존(§12.4).
 - **예방(리뷰 P2·P3 수용)**: 무효 증적은 앞으로 삭제하지 않고 표지로 관리한다(이번 7디렉터리 삭제는 §14.2 (c) 기록 시점에 이미 완료된 행위). 랩 실행 계정 phplab 원칙은 §12.4에 기록.
+
+### 12.6 CG-3 — Phase 2b 훅 수명·ZTS·연쇄 검증 (2026-10-24, 계획 §14.2 #3 CG-3)
+
+상세 판정은 `docs/coreguard/evaluation-report.md` §7. 요점과 증적:
+
+- **도구(커밋 `63db2f2`)**: `ztsnormalext` 플레이버 양쪽 빌드 스크립트에 추가(B·C가 패치만 다름, 나머지 configure 동일), `phase2b-tests.py`에 T5(타임아웃 연쇄, 특성화)·observe≡disabled stdout+rc 동치 검사 추가, `cg2-fpm-isolation.py`에 `--build-b/--build-c`(ZTS FPM 수명 런 재사용).
+- **ZTS 빌드**: 패치 0001~0003 ZTS 컴파일 통과. 배터리 **NTS 43/43·ZTS 43/43**(증적 `coreguard-p2b-tests-20261024T074127-asanext`·`…T075708-ztsnormalext`, citable). 한계: ZTS FPM 워커는 요청당 단일 스레드 — 요청 단위 TSRM 생명주기 검증(다중 스레드 동시 SAPI는 미측정).
+- **훅 연쇄**: T5에서 4모드 전부 ~2.0s rc=255 타임아웃 동일 발발 — 연쇄된 인터럽트 훅 아래 원본 경로 보존. 이벤트 무발생은 타임아웃 bailout이 대상 서명(caught bailout 뒤 GC 보호)을 안 남긴다는 특성화 음성.
+- **훅 수명**: ZTS FPM mc=1 결함 10에서 observe·enforce `guard_events=10`(정확, 잔여·누락 0) — `cg2-fpm-20261024T075732`. NTS 수명은 CG-2와 동일 근거.
+- **PHPT enforce 19건 No-Go 유지**: 재실행 `coreguard-phpt-20261024T075348`(citable) — counts와 **비통과 이름 집합 23개 모두 기존 런과 동일(차이 0)**, 결정론적.
